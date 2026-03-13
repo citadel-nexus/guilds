@@ -1,0 +1,775 @@
+# 🔗 Phase 2.0 — VCC CREW Agent Integration & Systems Development from Sentinel Agent
+(Page ID: 64711d4a-4e56-4e1c-8197-37af4221ab7a)
+(URL: https://www.notion.so/Phase-2-0-VCC-CREW-Agent-Integration-Systems-Development-from-Sentinel-Agent-64711d4a4e564e1c819737af4221ab7a)
+
+[Total top-level blocks: 250]
+
+**Phase 2.0 extends the Sentinel agent's memory architecture, dynamic variable injection, and governance patterns into the VCC CREW agent fleet — enabling persistent cross-call memory, context rehydration, and closed-loop Notion feedback for all C.R.E.W. voice agents.**
+**Depends on:** MCP Server (Phase 5), Supabase Schema (Phase 4), NATS (Phase 2), ElevenLabs Agent Fleet, Sentinel DV Spec
+**Feeds into:** ZEA sales flow, CREW onboarding automation, Notion feedback loop, Metabase per-client dashboards
+
+---
+
+
+## Sentinel → CREW Integration Overview
+
+The Sentinel agent (`agent_1401khhn9wqcef0884hp4h45jyr7`) established the foundational patterns that Phase 2.0 ports to the CREW agent fleet:
+| Sentinel Pattern | CREW Adoption | Status |
+| 10 Dynamic Variables (identity, memory, promises) | 19 DVs — expanded with business context, tier interest, pain points | ✅ Shipped |
+| FAISS domain-partitioned memory search | Bedrock distillation cache (Supabase `caller_context_cache`) | ✅ Shipped |
+| Pre-call webhook → DV injection | `/webhooks/pre-call/{agent}` → 19-DV payload to ElevenLabs | ✅ Shipped |
+| Post-call transcript → memory storage | Post-call → save transcript → Bedrock distill → cache update → NATS | ✅ Shipped |
+| `sentinel_memory_search` tool (FAISS + Notion hydration) | Planned: `crew_memory_search` scoped to business/lead context | 🔜 Planned |
+| Promises ledger tracking | `open_items` DV — distilled from transcripts via Bedrock | ✅ Shipped |
+| Notion Memory Vault (FAISS → Notion page hydration) | Notion Feedback Loop (`notion_feedback_loop.py`  • `vcc_notion_bridge.py`) | ✅ Shipped |
+| NATS audit subjects (`citadel.sentinel.*`) | NATS subjects (`citadel.voice.caller.*`, `citadel.voice.context.*`) | ✅ Shipped |
+
+---
+
+
+## Architecture
+
+```mermaid
+flowchart TB
+    subgraph SENTINEL["Sentinel Agent (Governance)"]
+        S_DV["10 DVs\nis_returning, session_count,\nrelationship_summary, promises_ledger..."]
+        S_FAISS["FAISS Domain Index\nsentinel:personal | technical | promises | emotional | growth"]
+        S_MEM["sentinel_memory_search tool\nFAISS → Notion → Bedrock distill"]
+    end
+
+    subgraph CREW["CREW Agent Fleet (Phase 2.0)"]
+        C_DV["19 DVs\ncaller_name, business_name, business_type,\nsentiment_trend, open_items, recommended_action..."]
+        C_CACHE["caller_context_cache\nBedrock distillation → Supabase"]
+        C_LOOP["Notion Feedback Loop\nnotion_feedback_loop.py + vcc_notion_bridge.py"]
+    end
+
+    subgraph SHARED["Shared Infrastructure"]
+        MCP["MCP Server :8420"]
+        SB["Supabase"]
+        NATS_S["NATS JetStream"]
+        BR["AWS Bedrock Claude"]
+        EL["ElevenLabs API"]
+    end
+
+    SENTINEL -->|"Pattern transfer"| CREW
+    C_DV --> MCP
+    C_CACHE --> SB
+    MCP --> BR
+    MCP --> EL
+    MCP --> NATS_S
+    C_LOOP --> SB
+```
+
+---
+
+
+## Systems Developed
+
+
+### 1. CREW Dynamic Variable System (19 DVs)
+
+Expanded from Sentinel's 10-DV model to 19 DVs covering business context:
+| Variable | Type | Source | Sentinel Equivalent |
+| `caller_name` | string | caller_identity lookup | — |
+| `business_name` | string | caller_identity | — |
+| `business_type` | string | caller_identity | — |
+| `lead_id` | string | caller_identity.lead_id | — |
+| `is_returning` | string | caller_identity presence | `is_returning` |
+| `call_count` | string | caller_identity.total_calls | `session_count` |
+| `relationship_summary` | string | Bedrock distillation | `relationship_summary` |
+| `last_topics` | string | context_cache | `last_topics` |
+| `open_items` | string | context_cache (promises + actions) | `open_threads` / `promises_ledger` |
+| `sentiment_trend` | string | context_cache | `emotional_tone` |
+| `recommended_action` | string | Bedrock distillation | — |
+| `recommended_tier` | string | Bedrock distillation | — |
+| `crew_tier_interest` | string | context_cache | — |
+| `last_quote_amount` | string | context_cache | — |
+| `pain_points` | string | lead record | — |
+| `lead_status` | string | lead record | — |
+| `prior_context` | string | Bedrock distillation (full arc) | `memory_fragments` |
+| `email` | string | caller_identity | — |
+| `phone` | string | caller_identity | — |
+**Agent patched:** `agent_4201kjdgrph7fxtsm9rghc52w55c` — 22 tools, 5,159 char prompt, 19 DVs declared, `claude-sonnet-4-5` LLM, temp 0.7, max_tokens 400.
+
+---
+
+
+### 2. Post-Call Distillation Loop
+
+Derived from Sentinel's post-call memory storage pattern. Execution order:
+1. **Save transcript** — `save_call_transcript()` persists to `call_transcripts` with `phone_number` direct column + `elevenlabs_conversation_id` upsert
+1. **Fetch recent transcripts** — `get_recent_transcripts()` pulls last 5 transcripts by lead_id
+1. **Inline-inject** — if DB missed the just-finished call, inject from request body
+1. **Bedrock distillation** — `distill_context()` compresses history into compact DV JSON
+1. **Save cache** — `update_context_cache()` upserts to `caller_context_cache`
+1. **Publish NATS** — `citadel.voice.context.distilled` event
+**DISTILL_PROMPT** explicitly extracts:
+- `relationship_summary` — 2–3 sentences for next call
+- `last_topics` — 3–5 topic tags
+- `open_items` — bullet list of ALL commitments, promises, unresolved action items, quotes promised, follow-ups agreed to, discounts discussed
+- `sentiment_trend` — cold → warming → warm → hot → customer → at_risk → churned
+- `recommended_action` — what the agent should do/say first on the next call
+
+---
+
+
+### 3. Schema Migration — Root Cause Fix
+
+
+[CALLOUT] 🔴 **Root cause discovered (Feb 26 Session 4):** The `call_transcripts` table (created by `20260217_secure_deal_rooms.sql`) used `transcript JSONB` and `call_duration_secs`, but `citadel_crew_api.py` queried `transcript_text TEXT` and `phone_number` — neither column existed. Every `get_recent_transcripts()` call returned 400, transcripts list was always empty, Bedrock never fired, cache never updated, and the agent always got cold defaults.
+
+**Migration:** `20260226_call_transcripts_phone_column.sql`
+```sql
+-- Add phone_number column for direct pre-call lookup
+ALTER TABLE public.call_transcripts
+  ADD COLUMN IF NOT EXISTS phone_number TEXT;
+
+-- Auto-extract text from JSONB transcript field
+ALTER TABLE public.call_transcripts
+  ADD COLUMN IF NOT EXISTS transcript_text TEXT
+  GENERATED ALWAYS AS (transcript->>'text') STORED;
+
+-- Indexes for fast lookup
+CREATE INDEX IF NOT EXISTS idx_call_transcripts_phone
+  ON public.call_transcripts(phone_number);
+CREATE INDEX IF NOT EXISTS idx_call_transcripts_created_desc
+  ON public.call_transcripts(created_at DESC);
+```
+**Additional fixes:**
+- `PostCallRequest` model expanded — accepts full ElevenLabs post-call payload
+- `get_recent_transcripts` — corrected column names, added JSONB fallback
+- `distill_context` — references `call_duration_secs` (not `duration_seconds`)
+- `save_call_transcript` — writes `phone_number` as direct column
+
+---
+
+
+### 4. Notion Feedback Loop
+
+New modules derived from Sentinel's Notion Memory Vault pattern:
+`**tools/notion_feedback_loop.py**` (~400 lines)
+- `NotionFeedbackLoop` class with `hydrate()` → `push()` round-trip
+- **Hydrate:** Reads last EVO cycle from EVO Cycle History DB (`0d7b51c2`), open SANCTUM tasks from Citadel Tasks DB (`af0a6992`), CAPS grades from Evolution Tracker
+- **Push (3-way write):** Task page (narrative) → Cycle history row (audit) → Evolution Tracker callout (dashboard)
+- `EvoCycleRecord` and `HydrationContext` dataclasses
+- Retry logic (3 attempts) with 429 rate-limit handling
+`**tools/vcc_notion_bridge.py**` — VCC voice integration
+- `vcc_hydrate_summary()` — plain-text status for VCC to speak aloud
+- `vcc_push_voice_note(evo_id, voice_note)` — appends 🎙️ callout blocks by External ID
+
+---
+
+
+### 5. Production API Architecture
+
+
+[CALLOUT] 🔍 **Key discovery:** `citadel-crew-api` service runs `tools.citadel_crew_api:app` on port 8422 via systemd. It does **not** use `src/main.py` routes. The pre-call webhook with full 19-DV Bedrock distillation lives entirely in `citadel_crew_api.py`. The `crew_onboarding_routes.py` pre-call route (registered in `src/main.py`) is a reference implementation only.
+
+| Component | Location | Port | Runtime |
+| CREW API (production) | `tools/citadel_crew_api.py` | 8422 | systemd |
+| MCP Server | `citadel_mcp/server.py` | 8420 | Docker |
+| Pre-call webhook | `citadel_crew_api.py` → `build_dynamic_variables()` | 8422 | systemd |
+| Post-call webhook | `citadel_crew_api.py` → `post_call_webhook()` | 8422 | systemd |
+| Notion feedback loop | `tools/notion_feedback_loop.py` | — | Imported by `evolve_mca_system.py` |
+| VCC voice bridge | `tools/vcc_notion_bridge.py` | — | Imported by CREW API |
+
+---
+
+
+### 6. NATS Event Subjects
+
+```javascript
+citadel.voice.caller.new             # First-time caller detected
+citadel.voice.caller.returning       # Returning caller with context loaded
+citadel.voice.context.distilled      # Context cache updated post-call
+citadel.voice.context.stale          # Context older than threshold (alert)
+citadel.voice.session.ended          # Triggers post-call distillation via n8n
+citadel.voice.transfer.crew_to_zea   # C.R.E.W. → ZEA handoff event
+citadel.voice.transfer.completed     # Transfer completed successfully
+```
+
+---
+
+
+### 7. Supabase Tables (Phase 2.0 additions)
+
+| Table | Purpose | Key Columns |
+| `caller_identity` | Phone → lead linkage, call counting | phone_number, lead_id, user_name, business_name, total_calls, last_seen_at |
+| `caller_context_cache` | Pre-computed DVs for fast injection (<50ms) | phone_number, relationship_summary, last_topics, open_items, sentiment_trend, distilled_at |
+| `call_transcripts` (patched) |   • phone_number column, + transcript_text generated column | phone_number, transcript (JSONB), transcript_text (generated), call_duration_secs |
+
+---
+
+
+### 8. Env Var Discovery
+
+
+[CALLOUT] ⚠️ `workspace.env` uses `SUPABASE_SERVICE_KEY` (not `SUPABASE_SERVICE_ROLE_KEY`). The `vault_loader.py` handles this mapping, but manual `source workspace.env` + Python scripts that look for `SUPABASE_SERVICE_ROLE_KEY` will fail silently with empty URL.
+
+
+---
+
+
+## Files Created / Modified
+
+| File | Action | Description |
+| `tools/citadel_crew_api.py` | Modified | PostCallRequest model, save_call_transcript, post_call_webhook rewrite, DISTILL_PROMPT, get_recent_transcripts, distill_context |
+| `tools/create_crew_agent.py` | Modified | SYSTEM_PROMPT with 19 DV placeholders, Memory Context block |
+| `tools/update_crew_agent.py` | Modified | PATCH payload for 19 DVs + correct webhook URL + post-call instructions |
+| `tools/notion_feedback_loop.py` | **NEW** | NotionFeedbackLoop class — hydrate/push round-trip, 3-way write, retry logic (~400 lines) |
+| `tools/vcc_notion_bridge.py` | **NEW** | VCC voice integration — vcc_hydrate_summary(), vcc_push_voice_note() |
+| `supabase/migrations/20260226_call_transcripts_phone_column.sql` | **NEW** | ALTER TABLE adds phone_number + transcript_text generated column + indexes |
+| `elevenlabs_configs/crew_backup_agent_42.json` | **NEW** | Pre-patch backup of ElevenLabs agent config |
+
+---
+
+
+## Commits & Deployments
+
+- **Commit:** `d65437c75` — `feat(crew): add dynamic variables + pre-call memory context webhook`
+- **Repo:** `gitlab.citadel-nexus.com/guilds/CNWB`
+- **VPS:** `root@147.93.43.117` — `citadel-crew-api` service restarted, active
+- **ElevenLabs:** Agent `agent_4201kjdgrph7fxtsm9rghc52w55c` patched — 22 tools, 5,159 char prompt, 19 DVs
+
+---
+
+
+## Remaining Work (Critical Path)
+
+- [ ] **Apply migration** `20260226_call_transcripts_phone_column.sql` to production Supabase
+- [ ] **Deploy updated **`**citadel_crew_api.py**` to VPS and restart `citadel-crew-api` service
+- [ ] **Configure ElevenLabs webhooks** for `agent_4201kjdgrph7fxtsm9rghc52w55c`:
+  - Pre-call: `https://mcp.citadel-nexus.com/webhooks/pre-call`
+  - Post-call: `https://mcp.citadel-nexus.com/webhooks/post-call`
+  - Header: `X-Crew-Auth: <CREW_WEBHOOK_SECRET>`
+- [ ] **Re-test post-call** — verify `distilled: true` and `transcript_archived: true`
+- [ ] **Re-test pre-call** for returning caller — verify DVs populated from fresh cache
+- [ ] **Add Supabase RPC** `increment_caller_calls` (atomic increment)
+- [ ] **Add webhook auth** (X-Crew-Auth header validation)
+- [ ] **Deploy **`**notion_feedback_loop.py**` to VPS and wire into `evolve_mca_system.py`
+- [ ] **Set env vars on VPS:** `EVO_TRACKER_PAGE_ID`, `EVO_CYCLE_HISTORY_DB_ID`, `CITADEL_TASKS_DB_ID`
+- [ ] **End-to-end test:** real phone call → pre-call DVs → conversation → post-call distill → next call with memory
+- [ ] **Verify Bedrock distillation** produces compact `prior_context` within 1,500 token budget
+
+---
+
+
+## Latency Targets
+
+| Operation | Target | Status |
+| Pre-call (cache hit) | < 200ms | 🔜 Pending test |
+| Pre-call (cache miss, Bedrock distill) | < 2s | 🔜 Pending test |
+| Post-call distillation | < 5s (async) | 🔜 Pending test |
+| Token budget (distilled context) | < 1,500 tokens | 🔜 Pending test |
+
+---
+
+
+## 🩺 Health Checks — Phase 2.0
+
+
+[CALLOUT] 🩺 **Every Phase 2.0 service must expose a **`**/health**`** endpoint. Health checks gate deployment — no service goes live without green health for ≥ 30 minutes.**
+
+
+### Per-Service Health Endpoints
+
+| **Service** | **Endpoint** | **Port** | **Checks** | **Interval** |
+| CREW API | `/health` | 8422 | Supabase conn, Bedrock auth, ElevenLabs reachable, NATS connected | 30s |
+| MCP Server | `/health` | 8420 | Docker container running, FastMCP tools registered, Bedrock auth | 30s |
+| MCP FastAPI | `/health` | 8443 | Router mounted, College :8200 reachable, Book Maker pipeline warm | 60s |
+| College | `/api/v1/college/health` | 8200 | Professor chain loaded, FAISS indexes warm, `college_categories.json` parsed | 60s |
+| NATS JetStream | `/healthz` (NATS built-in) | 8222 | JetStream enabled, streams created for `citadel.voice.*`, `citadel.college.*`, `citadel.writer.*` | 15s |
+| Notion Feedback Loop | Heartbeat via NATS `citadel.vcc.feedback.heartbeat` | — | 3-way write success rate > 95%, retry queue < 10 | 60s |
+
+### Health Check Response Schema
+
+```json
+{
+  "status": "healthy" | "degraded" | "unhealthy",
+  "service": "citadel-crew-api",
+  "version": "2.0.0",
+  "phase": "2.0",
+  "checks": {
+    "supabase": {"status": "ok", "latency_ms": 12},
+    "bedrock": {"status": "ok", "model": "claude-sonnet-4-5"},
+    "nats": {"status": "ok", "streams": 3},
+    "elevenlabs": {"status": "ok", "agent_id": "agent_4201..."},
+    "cache_freshness": {"status": "ok", "oldest_entry_hours": 2.3}
+  },
+  "timestamp": "2026-02-27T14:30:00Z"
+}
+```
+
+### Central Health Aggregator (Phase 2.0)
+
+```python
+# tools/health_check_phase2.py
+import httpx, asyncio
+from datadog import statsd
+import posthog
+
+PHASE2_SERVICES = {
+    "crew_api":    {"url": "http://localhost:8422/health", "critical": True},
+    "mcp_server":  {"url": "http://localhost:8420/health", "critical": True},
+    "mcp_fastapi": {"url": "http://localhost:8443/health", "critical": False},
+    "college":     {"url": "http://localhost:8200/api/v1/college/health", "critical": False},
+}
+
+async def check_service(name: str, cfg: dict) -> dict:
+    try:
+        r = await httpx.AsyncClient().get(cfg["url"], timeout=10)
+        data = r.json()
+        status = data.get("status", "unknown")
+        latency = r.elapsed.total_seconds() * 1000
+        # Emit to Datadog
+        statsd.gauge(f"citadel.phase2.{name}.healthy", 1 if status == "healthy" else 0)
+        statsd.histogram(f"citadel.phase2.{name}.health_latency_ms", latency)
+        # Emit to PostHog
+        posthog.capture("system", f"phase2_health_check", {
+            "service": name, "status": status, "latency_ms": latency,
+            "critical": cfg["critical"], "phase": "2.0",
+        })
+        return {"service": name, "status": status, "latency_ms": latency}
+    except Exception as e:
+        statsd.gauge(f"citadel.phase2.{name}.healthy", 0)
+        return {"service": name, "status": "unhealthy", "error": str(e)}
+
+async def run_phase2_health():
+    results = await asyncio.gather(*[check_service(n, c) for n, c in PHASE2_SERVICES.items()])
+    critical_ok = all(r["status"] == "healthy" for r in results if PHASE2_SERVICES[r["service"]]["critical"])
+    return {"phase": "2.0", "overall": "healthy" if critical_ok else "degraded", "services": results}
+```
+
+---
+
+
+## 📊 Datadog Integration — Phase 2.0
+
+
+[CALLOUT] 🐶 **Datadog monitors the CREW API, MCP Server, Bedrock distillation, NATS voice subjects, and all Supabase operations.** APM tracing covers the full pre-call → conversation → post-call → distillation lifecycle.
+
+
+### Datadog APM Instrumentation
+
+```python
+# Added to citadel_crew_api.py on startup:
+from ddtrace import tracer, patch_all
+patch_all()
+tracer.configure(
+    service="citadel-crew-api",
+    env="production",
+    version="2.0.0",
+    tags={"phase": "2.0", "system": "vcc"}
+)
+
+# Key spans to trace:
+# - pre_call_webhook: Full 19-DV build pipeline
+# - post_call_webhook: Transcript save + distillation + cache update
+# - distill_context: Bedrock Claude call with token tracking
+# - notion_feedback_loop: 3-way write cycle
+```
+
+### Datadog Monitors (Phase 2.0)
+
+| **Monitor** | **Metric / Check** | **Threshold** | **Alert** |
+| CREW API Health | `http.can_connect` on `:8422/health` | 2 consecutive failures | Slack `#citadel-alerts` |
+| MCP Server Health | `http.can_connect` on `:8420/health` | 2 consecutive failures | Slack `#citadel-alerts` |
+| Pre-Call Latency | `citadel.crew.precall.latency_ms` (p95) | > 200ms (cache hit) or > 2s (cache miss) | Slack `#citadel-infra` |
+| Post-Call Distillation | `citadel.crew.postcall.distillation_ms` (p95) | > 5s | Slack `#citadel-infra` |
+| Bedrock Token Budget | `citadel.crew.bedrock.output_tokens` | > 1,500 tokens per distillation | Slack `#citadel-alerts` |
+| NATS Voice Subject Activity | `citadel.nats.voice.messages_per_min` | 0 messages for 30 min (business hours) | Slack `#citadel-infra` |
+| Supabase Cache Staleness | `citadel.crew.cache.oldest_entry_hours` | > 168h (1 week) for any active caller | Slack `#citadel-infra` |
+| College Enrichment Latency | `citadel.college.enrich.latency_ms` (p95) | > 30s | Slack `#citadel-infra` |
+| Book Maker Lore Backlog | `citadel.writer.lore.pending_fragments` | > 50 uncompiled fragments for single caller | Slack `#citadel-alerts` |
+| Notion Feedback Loop | `citadel.vcc.feedback.3way_write_success_rate` | < 95% over 1h window | Slack `#citadel-alerts` |
+
+### Datadog Custom Metrics (Phase 2.0)
+
+```python
+# tools/dd_metrics_phase2.py
+from datadog import statsd
+
+def emit_precall_metrics(phone: str, cache_hit: bool, latency_ms: float, dv_count: int):
+    statsd.increment("citadel.crew.precall.total")
+    statsd.histogram("citadel.crew.precall.latency_ms", latency_ms)
+    statsd.gauge("citadel.crew.precall.dv_count", dv_count)
+    tag = "cache:hit" if cache_hit else "cache:miss"
+    statsd.increment("citadel.crew.precall.cache", tags=[tag])
+
+def emit_postcall_metrics(distillation_ms: float, tokens_used: int, cache_updated: bool):
+    statsd.increment("citadel.crew.postcall.total")
+    statsd.histogram("citadel.crew.postcall.distillation_ms", distillation_ms)
+    statsd.gauge("citadel.crew.bedrock.output_tokens", tokens_used)
+    statsd.increment("citadel.crew.postcall.cache_updated", tags=[f"success:{cache_updated}"])
+
+def emit_college_metrics(professors_used: int, enrichment_ms: float, pii_scrubbed: bool):
+    statsd.histogram("citadel.college.enrich.latency_ms", enrichment_ms)
+    statsd.gauge("citadel.college.enrich.professors_used", professors_used)
+    statsd.increment("citadel.college.enrich.pii_scrubbed", tags=[f"clean:{pii_scrubbed}"])
+
+def emit_bookmaker_metrics(fragments_count: int, compilation_triggered: bool):
+    statsd.gauge("citadel.writer.lore.pending_fragments", fragments_count)
+    if compilation_triggered:
+        statsd.increment("citadel.writer.compilation.triggered")
+```
+
+### Datadog Dashboards (Phase 2.0)
+
+1. **VCC Voice Pipeline** — Pre-call latency (cache hit vs miss), post-call distillation time, Bedrock token usage, DV completion rate
+1. **NATS Voice Events** — `citadel.voice.*` throughput, consumer lag per subject, dead letter queue depth
+1. **College + Book Maker Tracks** — Enrichment latency, professor chain utilization, lore fragment backlog, compilation rate
+1. **Notion Feedback Loop** — 3-way write success rate, retry queue depth, write latency per leg
+1. **Supabase Phase 2.0** — `caller_context_cache` row count, cache freshness distribution, `call_transcripts` growth rate
+
+---
+
+
+## 📈 PostHog Integration — Phase 2.0
+
+
+[CALLOUT] 🦔 **PostHog tracks the caller journey through the VCC voice pipeline — from first call to returning caller with full memory context.** Server-side events capture every distillation, enrichment, and pipeline stage.
+
+
+### PostHog Events (Phase 2.0)
+
+| **Event** | **Trigger** | **Properties** | **Use Case** |
+| `vcc_call_started` | Pre-call webhook fires | `caller_phone` (hashed), `is_returning`, `cache_hit`, `dv_count`, `latency_ms` | Call volume, returning caller rate |
+| `vcc_call_ended` | Post-call webhook fires | `call_duration_secs`, `transcript_saved`, `distillation_triggered` | Call completion, transcript capture rate |
+| `vcc_distillation_complete` | Bedrock distillation finishes | `tokens_used`, `latency_ms`, `sentiment_trend`, `cache_updated` | Distillation health, token budget tracking |
+| `vcc_college_enrichment` | College professor enrichment completes | `professors_used`, `latency_ms`, `enrichment_quality` (A/B/C) | College pipeline effectiveness |
+| `vcc_lore_extracted` | Lore fragment extracted from distilled context | `fragment_count`, `canonical_facts_count`, `compilation_threshold_met` | Book Maker pipeline readiness |
+| `vcc_book_compilation_started` | Book Maker pipeline triggered (≥10 fragments) | `caller_id` (hashed), `fragment_count`, `estimated_chapters` | Compilation conversion rate |
+| `vcc_notion_feedback_written` | 3-way Notion write completes | `write_success`, `retry_count`, `legs_completed` (1-3) | Feedback loop reliability |
+| `vcc_nats_event_published` | Any NATS event published | `subject`, `payload_size_bytes`, `ack_received` | Event mesh health |
+
+### PostHog Feature Flags (Phase 2.0)
+
+| **Flag** | **Description** | **Default** | **Rollout** |
+| `vcc_college_enrichment` | Enable College professor enrichment for returning callers | OFF | Internal → callers with call_count > 3 → 100% |
+| `vcc_bookmaker_lore` | Enable lore extraction + Book Maker pipeline | OFF | Internal → Beta → 100% |
+| `vcc_bedrock_distillation_v2` | Enable updated DISTILL_PROMPT with expanded extraction | ON | 100% (rollback flag) |
+| `vcc_notion_feedback_loop` | Enable Notion 3-way write feedback loop | OFF | Internal → 100% |
+| `vcc_crew_memory_search` | Enable `crew_memory_search` tool on CREW agent | OFF | Internal testing only (Phase 2.0 scope) |
+
+### PostHog Dashboards (Phase 2.0)
+
+1. **Caller Journey Funnel** — First call → Returning call → Memory-enriched call → College-enriched call → Lore extraction
+1. **Distillation Health** — Token usage distribution, sentiment trend transitions, cache update success rate
+1. **Parallel Track Adoption** — College enrichment activation rate, Book Maker lore extraction rate, feature flag rollout progress
+1. **Voice Pipeline Reliability** — Pre-call success rate, post-call completion rate, NATS event delivery rate
+1. **Returning Caller Insights** — Average calls before first memory hit, sentiment progression over calls, open items resolution rate
+
+---
+
+
+---
+
+
+## 🚫 Must-Dos & Must-Not-Dos
+
+
+[CALLOUT] 🔴 **VCC operators and all agents building in Phase 2.0 MUST follow these rules. Violations require rollback before proceeding.**
+
+
+### ✅ MUST-DOs
+
+1. **Apply schema migrations BEFORE deploying code** — `20260226_call_transcripts_phone_column.sql` must be applied to production Supabase before any updated `citadel_crew_api.py` is deployed. Code depends on columns that don't exist until migration runs.
+1. **Validate all 19 DVs round-trip** — After deployment, make a real phone call and confirm every DV is populated on pre-call AND updated on post-call. If even one DV returns `null` when it should have data, halt and debug.
+1. **Use **`**SUPABASE_SERVICE_KEY**` (not `SUPABASE_SERVICE_ROLE_KEY`) — `workspace.env` uses this non-standard name. `vault_loader.py` handles the mapping, but any new scripts or modules MUST use `SUPABASE_SERVICE_KEY` or go through `vault_loader`.
+1. **Scope all NATS subjects to **`**citadel.voice.***` — Phase 2.0 voice events live under this namespace only. Do not publish to `citadel.crew.*` (reserved for Phase 3.0 guild build-out) or `citadel.sentinel.*` (Sentinel-only).
+1. **Keep Bedrock distillation under 1,500 tokens** — The `DISTILL_PROMPT` must enforce compact output. If `prior_context` exceeds 1,500 tokens, the pre-call webhook will breach the 200ms latency target.
+1. **Write to **`**caller_context_cache**`** via upsert only** — Never `INSERT` into cache; always `UPSERT` on `phone_number`. Duplicate cache rows cause the pre-call lookup to return stale data.
+1. **Log every post-call distillation to NATS** — `citadel.voice.context.distilled` must fire on every successful distillation. Downstream consumers (Metabase dashboards, n8n alerting) depend on this event.
+1. **Maintain the Notion Feedback Loop 3-way write** — Task page → Cycle history row → Evolution Tracker callout. If any leg fails, retry up to 3x before logging a `VCC-QUESTION` flag.
+1. **Back up ElevenLabs agent config before patching** — Always export the current agent JSON to `elevenlabs_configs/crew_backup_agent_42.json` before any `PATCH` to `agent_4201kjdgrph7fxtsm9rghc52w55c`.
+1. **Run guardrail scan on every commit** — All 16 guardrail rules from the CRP v1.0 protocol apply. Critical violations (`NO_FLOAT_MONEY`, `NO_SELECT_STAR`, `RLS_ENABLED`, `TENANT_ID_REQUIRED`, `STRIPE_ACCOUNT_HEADER`) block deployment.
+1. **Publish CRP cycle report after every build cycle** — One report per cycle, posted as a toggle heading on the Build Instructions page, with SRS code cross-references.
+1. **Test with real phone numbers** — Simulated HTTP calls to `/webhooks/pre-call` do not validate the full ElevenLabs round-trip. End-to-end test requires an actual inbound call.
+
+### 🚫 MUST-NOT-DOs
+
+1. **DO NOT use **`**src/main.py**`** pre-call route in production** — `crew_onboarding_routes.py` is a reference implementation only. Production runs `tools.citadel_crew_api:app` on port 8422 via systemd. Using the wrong entry point means zero DV injection.
+1. **DO NOT modify **`**caller_identity**`** schema** — This table is shared across all voice agents (Sentinel, CREW, ZEA, future guild agents). Schema changes require a cross-team migration plan.
+1. **DO NOT hardcode phone numbers or lead IDs** — All identity lookups go through `caller_identity` table. Hardcoded values will break multi-tenant isolation.
+1. **DO NOT skip the Bedrock distillation step** — If distillation fails, do NOT fall back to raw transcript injection. Raw transcripts will blow past the token budget and cause ElevenLabs to truncate the system prompt.
+1. **DO NOT deploy **`**notion_feedback_loop.py**`** without setting env vars** — `EVO_TRACKER_PAGE_ID`, `EVO_CYCLE_HISTORY_DB_ID`, `CITADEL_TASKS_DB_ID` must all be set on VPS. Missing vars cause silent failures (no error, just empty writes).
+1. **DO NOT publish to NATS subjects outside **`**citadel.voice.***`** or **`**citadel.vcc.***` — Phase 2.0 is scoped. Cross-guild subjects (`citadel.finance.*`, `citadel.ent.*`, etc.) are Phase 3.0 territory.
+1. **DO NOT use **`**float**`** for any monetary values** — All currency amounts must be `INTEGER` cents or `NUMERIC(12,2)`. This applies to Stripe amounts, quote values, and the `last_quote_amount` DV.
+1. **DO NOT store secrets in code or **`**.env**`** files committed to Git** — Use Supabase Vault + AWS Secrets Manager. The `workspace.env` is gitignored for a reason.
+1. **DO NOT modify platform-level tables** — `tenants`, `tenant_members`, `auth.users` are off-limits. Phase 2.0 only touches `caller_identity`, `caller_context_cache`, and `call_transcripts`.
+1. **DO NOT run College or Book Maker professors against CREW voice transcripts directly** — Transcripts must go through Bedrock distillation first. Raw transcripts contain PII (phone numbers, names, business details) that must not enter the professor chain unfiltered.
+
+---
+
+
+## 🎓 Parallel Development Track A — College System Integration
+
+
+[CALLOUT] 🎓 **College** is the multi-professor AI pipeline running on `:8200`. Phase 2.0 wires it into the VCC CREW voice flow as a parallel development track — enabling voice-triggered tutoring, quiz generation, and professor-enriched context for CREW agents.
+
+
+### College Architecture Overview
+
+| Component | Location | Port | Description |
+| College FastAPI Router | `src/college/college_router.py` | 8200 | Enrollment, phase tracking, assessment endpoints |
+| Professor Chain | `professors/*.py` | — | 33+ professors: Architect, Cybersec, Diagnoser, Drift, EnumToReflex, Fintech, Government, HTML, Systems, Teaching, Therapeutics, Vantheorist, VideoLogic, WebDesign, etc. |
+| Vector Store | FAISS indexes per domain | — | `college_main`, `test_domain_cli`, `adaptive_policy_branches` |
+| Metadata Store | `college_categories.json`  • SQLite | — | Tags, categories, fingerprints per professor output |
+| Master Ledger | `college_ledger.jsonl` | — | Append-only log of all professor outputs |
+
+### VCC ↔ College Integration Points
+
+```mermaid
+flowchart LR
+    subgraph VCC["VCC CREW Agent :8422"]
+        PRE["Pre-Call\n19 DVs"]
+        POST["Post-Call\nDistillation"]
+    end
+    subgraph COL["College :8200"]
+        TUTOR["/api/v1/college/tutor"]
+        QUIZ["/api/v1/college/quiz"]
+        ENRICH["/api/v1/college/enrich"]
+        PROFS["33+ Professors"]
+    end
+    subgraph SHARED["Shared Infra"]
+        NATS_C["NATS JetStream"]
+        SB_C["Supabase"]
+        FAISS_C["FAISS Vectors"]
+    end
+    POST -->|"transcript distilled"| NATS_C
+    NATS_C -->|"citadel.college.tutor.started"| TUTOR
+    TUTOR --> PROFS
+    PROFS --> FAISS_C
+    PROFS --> SB_C
+    QUIZ --> PROFS
+    ENRICH -->|"enriched context"| PRE
+    style VCC fill:#f3e5f5
+    style COL fill:#e3f2fd
+    style SHARED fill:#f5f5f5
+```
+
+### College NATS Subjects (Phase 2.0 Scope)
+
+```javascript
+citadel.college.tutor.started        // Tutoring session initiated from VCC voice
+citadel.college.tutor.quiz.generated  // Quiz generated from professor chain
+citadel.college.tutor.graded          // Answer graded via semantic similarity
+citadel.college.tutor.velocity        // Learning velocity update per user
+citadel.college.enrich.requested      // VCC requests professor enrichment of caller context
+citadel.college.enrich.completed      // Enriched context returned to VCC cache
+```
+
+### College Integration Tasks (Phase 2.0)
+
+- [ ] **Mount College router** at `/api/v1/college` on MCP server `:8443` — `app.include_router(college_router, prefix="/api/v1/college")`
+- [ ] **Create **`**college_voice_bridge.py**` — Adapter that converts VCC caller context into College session input format
+- [ ] **Wire NATS consumer** — `citadel.voice.context.distilled` → triggers College enrichment for returning callers with `call_count > 3`
+- [ ] **Add **`**college_enrichment**`** DV** — New dynamic variable (DV #20) that injects professor-enriched analysis into pre-call payload when available
+- [ ] **Professor PII filter** — Create `college_pii_scrubber.py` that strips phone numbers, emails, and names from transcripts before professor ingestion
+- [ ] **FAISS domain index** — Create `college_voice` domain in FAISS for voice-session-derived knowledge vectors
+- [ ] **Supabase table: **`**college_voice_sessions**` — Track voice-initiated tutoring sessions with `caller_id`, `professor_chain`, `session_outcome`
+- [ ] **Known flaw: No aggregation layer** — College currently has no continuous aggregation to a central MD document. For Phase 2.0, we work around this by writing enrichment results directly to `caller_context_cache.college_enrichment` JSONB column
+
+### College Must-Dos (Track A)
+
+1. **Always route through the PII scrubber** before any professor chain — raw voice transcripts contain business PII
+1. **Use **`**gpt-4o-mini**`** for professor LLM calls** (existing College config) — do NOT switch to Bedrock Claude for professor enrichment; keep the LLM boundary clean
+1. **Cap professor chain to 5 professors per enrichment** — Full 33-professor runs take 5+ minutes; voice context enrichment must complete in < 30s
+1. **Store professor outputs to **`**college_ledger.jsonl**` — Maintain the append-only pattern even for voice-derived inputs
+
+### College Must-Not-Dos (Track A)
+
+1. **DO NOT enable self-learning mode** on professors for voice data — self-learning writes to professor knowledge bases and is not validated for PII-scrubbed voice content
+1. **DO NOT run the full enrichment cycle synchronously** in the pre-call path — enrichment is async, results cached, served on next call
+1. **DO NOT create new FAISS domains without updating **`**college_categories.json**` — orphaned domains cause embedding drift detection to fail
+
+---
+
+
+## 📚 Parallel Development Track B — Book Maker Pipeline Integration
+
+
+[CALLOUT] 📚 **Book Maker v4.0** is the 33-professor publishing pipeline that compiles narrative content into books and audiobooks. Phase 2.0 connects VCC voice session data to the Book Maker pipeline, enabling voice-to-book compilation and ElevenAuthors audiobook generation.
+
+
+### Book Maker v4.0 Architecture
+
+| Stage | Component | Professors | Output |
+| S00 — Council Gate | Content policy + cost gate | Council S00→S03 | ALLOW / DENY + cost estimate |
+| S01 — Conceptor | World building + outline | Conceptor, Lorecrafter | Chapter outline, world bible |
+| S02 — Drafting | Chapter generation | DialogueMason, Emotioneer, Narrator | Draft chapters with dialogue + emotion tags |
+| S03 — Synthesis | Final assembly | SynthMaster | Final chapters + soundtrack metadata |
+| S04 — Compilation | Book assembly | Compiler | MD → EPUB + audiobook via ElevenAuthors |
+
+### VCC ↔ Book Maker Integration Flow
+
+```mermaid
+flowchart TB
+    subgraph VCC_BM["VCC CREW Agent"]
+        CALL["Voice Call"]
+        DISTILL_BM["Post-Call Distillation"]
+        LORE["Lore Fragment Extractor"]
+    end
+    subgraph NATS_BM["NATS Bridge"]
+        N_DIST["citadel.voice.context.distilled"]
+        N_LORE["citadel.writer.lore.extracted"]
+        N_REQ["citadel.writer.session.request"]
+        N_DONE["citadel.writer.book.compiled"]
+    end
+    subgraph BM["Book Maker v4.0"]
+        COUNCIL_BM["Council S00-S03"]
+        CHAIN_BM["33-Professor Chain"]
+        COMPILE_BM["Compiler → EPUB"]
+        AUDIO_BM["ElevenAuthors Audiobook"]
+    end
+    CALL --> DISTILL_BM --> N_DIST
+    N_DIST --> LORE --> N_LORE
+    N_LORE -->|"threshold: 10+ fragments"| N_REQ
+    N_REQ --> COUNCIL_BM --> CHAIN_BM --> COMPILE_BM --> AUDIO_BM --> N_DONE
+    style VCC_BM fill:#f3e5f5
+    style BM fill:#e8f5e9
+    style NATS_BM fill:#e3f2fd
+```
+
+### Book Maker NATS Subjects (Phase 2.0 Scope)
+
+```javascript
+citadel.writer.lore.extracted          // Lore fragment extracted from voice session
+citadel.writer.session.request         // Book compilation requested (≥10 fragments)
+citadel.writer.chapter.completed       // Single chapter compiled by SynthMaster
+citadel.writer.book.compiled           // Full book compiled → EPUB + audiobook ready
+citadel.ent.book.published             // Book published to marketplace
+```
+
+### Book Maker Integration Tasks (Phase 2.0)
+
+- [ ] **Create **`**vcc_lore_extractor.py**` — Post-call hook that extracts canonical facts, character mentions, and narrative arcs from distilled transcripts
+- [ ] **Wire NATS consumer** — `citadel.voice.context.distilled` → `vcc_lore_extractor.py` → publishes `citadel.writer.lore.extracted`
+- [ ] **Supabase table: **`**vcc_lore_fragments**` — Store extracted lore fragments with `caller_id`, `session_id`, `canonical_facts JSONB`, `characters_involved JSONB`, `compiled BOOLEAN`
+- [ ] **Lore threshold trigger** — n8n workflow: when `vcc_lore_fragments` count ≥ 10 uncompiled for a caller, publish `citadel.writer.session.request`
+- [ ] **Book Maker professor config for voice lore** — Custom `professor_config` that weights `lorecrafter` for voice-derived content and sets `dialoguemason.rpg_dialogue_style: false` (business context, not RPG)
+- [ ] **ElevenAuthors audiobook bridge** — Route compiled books through RAG Narrator for multi-voice audiobook generation
+- [ ] **Marketplace listing auto-draft** — On `citadel.writer.book.compiled`, auto-create a draft marketplace listing with SAKE/AEGIS review gate
+- [ ] **XP award on publication** — Wire `citadel.ent.book.published` → USO SmartBank for +500 XP to creator
+
+### Book Maker Must-Dos (Track B)
+
+1. **Run all lore extraction through Bedrock distillation first** — Never feed raw call transcripts to the Book Maker pipeline
+1. **Enforce the Council S00 cost gate** — Every Book Maker session costs real Bedrock tokens; Council must approve before the 33-professor chain fires
+1. **Use **`**book_dossiers**`** SAKE domain** for compiled artifacts — Do not create new domains; Book Maker artifacts go in the canonical location
+1. **Respect the 70/30 marketplace split** — Platform takes 30%, creator gets 70%. This is hardcoded in Stripe Connect and must not be overridden
+1. **Tag all Book Maker outputs with source: **`**vcc_voice**` — Distinguishes voice-derived books from RPG-session-derived books in analytics
+
+### Book Maker Must-Not-Dos (Track B)
+
+1. **DO NOT trigger Book Maker compilation on every call** — Only trigger when lore fragment count reaches threshold (≥10). Premature compilation wastes Bedrock tokens
+1. **DO NOT bypass SAKE/AEGIS review** for marketplace listings — All auto-drafted listings must pass quality and safety checks before publishing
+1. **DO NOT mix RPG lore fragments with VCC business lore** — These are separate `source` types in the lore table; mixing them produces incoherent books
+1. **DO NOT use ElevenAuthors voice cloning** on caller voices without explicit consent — Voice data from calls is PII; cloning requires documented opt-in
+
+---
+
+
+## 🔗 Interconnection Blueprint — VCC × College × Book Maker
+
+
+[CALLOUT] 🔗 **The three systems share infrastructure but must remain independently deployable.** This section defines the wiring contracts between them.
+
+
+### Shared Infrastructure Map
+
+| Resource | VCC CREW | College | Book Maker |
+| **Supabase** | `caller_identity`, `caller_context_cache`, `call_transcripts` | `college_voice_sessions`, `college_ledger` | `vcc_lore_fragments`, `book_sessions` |
+| **NATS Namespace** | `citadel.voice.*` | `citadel.college.*` | `citadel.writer.*` |
+| **FAISS Domains** | — | `college_main`, `college_voice` | `book_dossiers` |
+| **FastAPI Port** | 8422 | 8200 | 8443 (via MCP) |
+| **LLM** | AWS Bedrock Claude | GPT-4o-mini | AWS Bedrock Claude |
+
+### Event Flow Contract
+
+```mermaid
+flowchart LR
+    A["📞 Inbound Call"] --> B["VCC Pre-Call\n19 DVs + College Enrichment"]
+    B --> C["🗣️ Live Conversation"]
+    C --> D["VCC Post-Call\nBedrock Distillation"]
+    D --> E{"NATS Fan-Out"}
+    E -->|"citadel.voice.context.distilled"| F["College PII Scrub\n→ Professor Enrichment"]
+    E -->|"citadel.voice.context.distilled"| G["Lore Extractor\n→ Fragment Storage"]
+    E -->|"citadel.voice.context.distilled"| H["Notion Feedback Loop\n→ 3-Way Write"]
+    F -->|"citadel.college.enrich.completed"| I["Cache Update\ncaller_context_cache"]
+    G -->|"≥10 fragments"| J["Book Maker\n33-Prof Pipeline"]
+    J -->|"citadel.writer.book.compiled"| K["ElevenAuthors\nAudiobook"]
+    K -->|"citadel.ent.book.published"| L["Marketplace\n+ XP Award"]
+    style A fill:#f3e5f5
+    style F fill:#e3f2fd
+    style J fill:#e8f5e9
+    style L fill:#fff3e0
+```
+
+### Data Boundary Rules
+
+1. **VCC → College:** Only distilled context (never raw transcripts). PII-scrubbed via `college_pii_scrubber.py`
+1. **VCC → Book Maker:** Only lore fragments (structured JSON, not free text). Extracted via `vcc_lore_extractor.py`
+1. **College → VCC:** Enrichment results only (`college_enrichment` JSONB blob). No professor chain metadata
+1. **Book Maker → VCC:** Publication status only (`book_session_id`, `status`). No chapter content fed back to voice agents
+1. **College ↔ Book Maker:** No direct connection in Phase 2.0. College enriches caller context; Book Maker consumes lore fragments. They do not talk to each other
+
+### Failure Isolation
+
+| If This Fails | Impact | Fallback |
+| College :8200 down | No enrichment DVs; pre-call still works with cached context | Skip `college_enrichment` DV, serve from `caller_context_cache` only |
+| Book Maker pipeline stalls | Lore fragments accumulate but no book compiled | Fragments stored in Supabase; compilation retries on next threshold trigger |
+| NATS JetStream down | No async processing (enrichment, lore, feedback loop) | Post-call still saves transcript + cache locally; NATS replays on recovery |
+| Bedrock distillation fails | No cache update, no downstream processing | Serve stale cache; log `VCC-QUESTION` flag; do NOT inject raw transcript |
+| PII scrubber fails | College enrichment blocked | Hard block — never send unscrubbed data to professors |
+
+---
+
+
+## 🔍 Gap Analysis — What Was Missing
+
+
+[CALLOUT] ⚠️ **Items identified as gaps in the original Phase 2.0 scope, now addressed above or flagged as open.**
+
+| Gap | Category | Status | Resolution |
+| `crew_memory_search` tool not built | CREW Agent | 🔜 Open | Listed as Planned in Sentinel→CREW table. Needs implementation: scoped FAISS search for business/lead context |
+| No College voice integration | Parallel Track A | ✅ Blueprinted | See §College System Integration above — PII scrubber, voice bridge, FAISS domain, enrichment DV |
+| No Book Maker voice integration | Parallel Track B | ✅ Blueprinted | See §Book Maker Pipeline Integration above — lore extractor, threshold trigger, marketplace auto-draft |
+| No VCC build guardrails for 2.0 | Governance | ✅ Defined | See §Must-Dos & Must-Not-Dos — 12 must-dos, 10 must-not-dos |
+| No error handling / rollback plan | Operations | ✅ Defined | See §Failure Isolation table — fallback behavior for each component failure |
+| No `increment_caller_calls` RPC | Supabase | 🔜 Open | Atomic increment function needed for `caller_identity.total_calls` |
+| No webhook auth (X-Crew-Auth) | Security | 🔜 Open | Header validation needed on pre-call and post-call endpoints |
+| No CAPS permissions for 2.0 systems | Governance | 🔜 Open | Need: `cap.crew.precall`, `cap.crew.postcall`, `cap.crew.distill`, `cap.college.enrich`, `cap.writer.compile` |
+| No College aggregation layer | College Known Flaw | ⚠️ Workaround | Phase 2.0 writes enrichment to `caller_context_cache` JSONB. Full aggregation deferred to Phase 3.0 |
+| No cross-system testing matrix | QA | 🔜 Open | Need end-to-end test: call → distill → College enrich → lore extract → verify cache + fragments |
+
+---
+
+
+## 📋 Parallel Development Lanes — Phase 2.0
+
+| Lane | Owner | Systems | Dependencies | Est. Hours |
+| **Lane 1: Core CREW** | VCC | 19 DVs, pre/post-call webhooks, Bedrock distillation, cache | Supabase migration, ElevenLabs agent patch | ~12h |
+| **Lane 2: College Voice Bridge** | VCC + College | PII scrubber, voice bridge, enrichment DV, FAISS domain | Lane 1 (post-call distillation must exist) | ~8h |
+| **Lane 3: Book Maker Lore Pipeline** | VCC + Writer | Lore extractor, threshold trigger, Book Maker config, marketplace draft | Lane 1 (post-call distillation must exist) | ~10h |
+| **Lane 4: Notion + Observability** | VCC | Notion feedback loop, NATS wiring, Metabase dashboards, CRP reports | Lane 1 (NATS events must be publishing) | ~6h |
+**Execution Order:**
+1. **Lane 1** ships first (core CREW integration — already mostly complete)
+1. **Lanes 2, 3, 4** can run in parallel once Lane 1 is deployed and producing `citadel.voice.context.distilled` events
+1. **Integration testing** across all lanes after individual lane completion
+
+---
+
+
+## Cross-References
+
+- Sentinel — ElevenLabs System Prompt + Dynamic Variables Spec — Source architecture for DV injection + memory search
+- Context Rehydration Pipeline — C.R.E.W. Agent Memory System — Full pipeline code (Phases 1–10)
+- 🚀 MCP Server + Agent Workflows — VCC Deployment Blueprint — Parent blueprint + progress logs
+- Untitled — Feedback loop module documentation
+- Crew Intake → Stripe Monetization Bridge — VCC Feedback Loop Integration — Feb 26, 2026 — Stripe monetization wiring
+- Untitled — College State of Development Blueprint (architecture, professors, known flaws)
+- 📖 RAG Book Narrator — Voice Agent Narration Engine Blueprint — Book Maker → Narrator → Audiobook pipeline
+- Untitled — Book Maker v4.0 integration spec, lore→book compilation, marketplace
+- 🔊 USO System — Unified Signal Orchestrator — Master Blueprint — College voice endpoints, professor mapping, NATS subjects
+- Untitled — CRP v1.0, guardrails, partner agent coordination

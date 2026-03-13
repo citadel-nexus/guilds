@@ -1,0 +1,430 @@
+# SRS-NEMESIS-RUNTIME.yaml
+# Nemesis v2 Runtime — Software Requirements Specification
+# ===========================================================
+# CGRF v2.0 | Status: Production | Created: 2026-02-05
+#
+# This artifact provides assessor-traceable SRS codes for the
+# Nemesis runtime daemon, red-team engine, fault injection,
+# collusion detection, external validation, and accuracy accounting.
+
+_document_schema: CGRF-v2.0
+_module: nemesis.runtime
+_purpose: SRS traceability for Nemesis v2 runtime daemon and engines
+_owner: CNWB
+_compliance: CGRF v2.0
+_status: Production
+
+# =============================================================================
+# DAEMON LIFECYCLE
+# =============================================================================
+
+NEM-DAEMON-001:
+  title: Nemesis Daemon Process
+  description: Long-running daemon that schedules and executes adversarial tests
+  priority: critical
+  status: implemented
+  file: src/nemesis/runtime/nemesis_daemon.py
+  class: NemesisDaemon
+  test: tests/test_nemesis_runtime.py::TestNemesisDaemon
+
+NEM-DAEMON-002:
+  title: Safety Mode Controls
+  description: Emergency stop, read-only, and audit-only modes via file-based signals
+  priority: critical
+  status: implemented
+  file: src/nemesis/runtime/nemesis_daemon.py
+  method: NemesisDaemon._check_safety_modes
+  test: tests/test_nemesis_runtime.py::TestNemesisDaemon::test_safety_mode_*
+
+NEM-DAEMON-003:
+  title: Graceful Shutdown
+  description: SIGTERM/SIGINT signal handling with task cancellation
+  priority: high
+  status: implemented
+  file: src/nemesis/runtime/nemesis_daemon.py
+  method: NemesisDaemon._handle_shutdown
+
+# =============================================================================
+# AUDIT TRAIL
+# =============================================================================
+
+NEM-AUD-001:
+  title: Continuous Audit Loop
+  description: 5-minute interval resilience metric gathering and threshold alerting
+  priority: critical
+  status: implemented
+  file: src/nemesis/runtime/nemesis_daemon.py
+  method: NemesisDaemon._run_audit_loop
+
+NEM-AUD-002:
+  title: Weighted Resilience Score
+  description: >
+    Overall score = detection(25%) + containment(25%) + recovery(20%)
+    + external_validation(15%) + fault_tolerance(15%)
+  priority: critical
+  status: implemented
+  file: src/nemesis/runtime/nemesis_daemon.py
+  class: ResilienceMetrics
+  property: overall_score
+  test: tests/test_nemesis_runtime.py::TestResilienceMetrics
+
+NEM-AUD-003:
+  title: Hash-Chained Immutable Ledger
+  description: SHA-256 hash chain for tamper-evident audit trail
+  priority: critical
+  status: implemented
+  file: src/nemesis/runtime/nemesis_daemon.py
+  class: HashChainLedger
+  test: tests/test_nemesis_runtime.py::TestHashChainLedger
+
+NEM-AUD-004:
+  title: Weekly Resilience Scorecard
+  description: Comprehensive scorecard with grade (A-F), detection/containment/recovery metrics
+  priority: high
+  status: implemented
+  file: src/nemesis/runtime/nemesis_daemon.py
+  class: ScorecardGenerator
+  test: tests/test_nemesis_runtime.py::TestScorecardGenerator
+
+# =============================================================================
+# RED-TEAM ENGINE
+# =============================================================================
+
+NEM-RED-001:
+  title: Attack Corpus
+  description: 13+ versioned attack payloads across 5 categories
+  priority: critical
+  status: implemented
+  file: src/nemesis/runtime/nemesis_daemon.py
+  method: RedTeamEngine._load_attack_corpus
+  test: tests/test_nemesis_runtime.py::TestRedTeamEngine::test_attack_corpus_loaded
+
+NEM-RED-002:
+  title: Campaign Execution
+  description: Execute full or filtered attack campaigns with rate limiting
+  priority: critical
+  status: implemented
+  file: src/nemesis/runtime/nemesis_daemon.py
+  method: RedTeamEngine.run_campaign
+
+NEM-RED-003:
+  title: Deterministic Detection
+  description: Hash-based deterministic detection (not random) for reproducibility
+  priority: high
+  status: implemented
+  file: src/nemesis/runtime/nemesis_daemon.py
+  method: RedTeamEngine._execute_payload
+  test: tests/test_nemesis_runtime.py::TestRedTeamEngine::test_detection_is_deterministic
+
+NEM-RED-004:
+  title: Chaos Window Enforcement
+  description: Production attacks only during 2-6 AM UTC on Tuesday/Thursday
+  priority: high
+  status: implemented
+  file: src/nemesis/runtime/nemesis_daemon.py
+  method: RedTeamEngine.is_within_chaos_window
+
+NEM-RED-005:
+  title: Attack Scheduling
+  description: 4-hour interval red-team campaigns with safety mode checks
+  priority: high
+  status: implemented
+  file: src/nemesis/runtime/nemesis_daemon.py
+  method: NemesisDaemon._run_red_team_scheduler
+
+NEM-RED-006:
+  title: Privilege Escalation Payloads
+  description: CAPS grade spoofing, trust inflation, session hijacking attacks
+  priority: critical
+  status: implemented
+  payloads: [PRIV-001, PRIV-002, PRIV-003]
+
+NEM-RED-007:
+  title: Governance Bypass Payloads
+  description: Council impersonation, FATE verdict manipulation, policy injection attacks
+  priority: critical
+  status: implemented
+  payloads: [GOV-001, GOV-002, GOV-003]
+
+NEM-RED-008:
+  title: Memory Poisoning Payloads
+  description: FAISS vector injection, pattern corruption, hallucination injection attacks
+  priority: critical
+  status: implemented
+  payloads: [MEM-001, MEM-002, MEM-003]
+
+# =============================================================================
+# FAULT INJECTION
+# =============================================================================
+
+NEM-FLT-001:
+  title: Fault Injection Engine
+  description: Chaos engineering fault injection with recovery measurement
+  priority: high
+  status: implemented
+  file: src/nemesis/runtime/nemesis_daemon.py
+  class: FaultInjectionEngine
+  test: tests/test_nemesis_runtime.py::TestFaultInjectionEngine
+
+NEM-FLT-002:
+  title: State Corruption Injection
+  description: FAISS vector corruption with detection and recovery measurement
+  priority: high
+  status: implemented
+  method: FaultInjectionEngine.inject_state_corruption
+
+NEM-FLT-003:
+  title: Signal Delay Injection
+  description: Council pipeline delay injection with circuit breaker detection
+  priority: high
+  status: implemented
+  method: FaultInjectionEngine.inject_signal_delay
+
+NEM-FLT-004:
+  title: Fault Injection Scheduling
+  description: Daily fault injection tests during chaos windows
+  priority: medium
+  status: implemented
+  method: NemesisDaemon._run_fault_injection_scheduler
+
+NEM-FLT-005:
+  title: Webhook Forgery Tests
+  description: GitLab webhook forgery and Stripe webhook replay detection
+  priority: high
+  status: implemented
+  payloads: [WEBHOOK-001, WEBHOOK-002]
+
+NEM-FLT-006:
+  title: Cascade Failure Simulation
+  description: DB connection pool exhaustion with circuit breaker containment
+  priority: high
+  status: implemented
+  method: FaultInjectionEngine.inject_cascade_failure
+
+NEM-FLT-007:
+  title: No-Data-Loss Guarantee
+  description: Fault injection must not cause data loss in normal operations
+  priority: critical
+  status: implemented
+  test: tests/test_nemesis_runtime.py::TestFaultInjectionEngine::test_no_data_loss_on_delay
+
+# =============================================================================
+# COLLUSION DETECTION
+# =============================================================================
+
+NEM-COL-001:
+  title: Trust Inflation Scan
+  description: Detect mutual trust inflation cycles in endorsement graph
+  priority: high
+  status: implemented
+  file: src/nemesis/runtime/nemesis_daemon.py
+  class: CollusionDetector
+  method: scan_trust_inflation
+  test: tests/test_nemesis_runtime.py::TestCollusionDetector::test_trust_inflation_scan
+
+NEM-COL-002:
+  title: Voting Synchronization Scan
+  description: Detect synchronized voting patterns with similarity clustering
+  priority: high
+  status: implemented
+  method: CollusionDetector.scan_voting_synchronization
+
+NEM-COL-003:
+  title: Collusion Scheduling
+  description: 6-hour interval collusion detection scans
+  priority: medium
+  status: implemented
+  method: NemesisDaemon._run_collusion_scanner
+
+NEM-COL-004:
+  title: Collusion Alert Thresholds
+  description: Inflation rate > 0.3 and similarity > 0.9 trigger alerts
+  priority: high
+  status: implemented
+  test: tests/test_nemesis_runtime.py::TestCollusionDetector::test_trust_inflation_below_threshold
+
+# =============================================================================
+# EXTERNAL VALIDATION
+# =============================================================================
+
+NEM-EXT-001:
+  title: External Validation Engine
+  description: Independent validation using external AI models
+  priority: high
+  status: implemented
+  file: src/nemesis/runtime/nemesis_daemon.py
+  class: ExternalValidator
+
+NEM-EXT-002:
+  title: External Model Agreement
+  description: Validate decisions with Claude/Gemini, measure agreement rate
+  priority: high
+  status: implemented
+  method: ExternalValidator.validate_with_external_model
+  test: tests/test_nemesis_runtime.py::TestExternalValidator::test_model_validation
+
+NEM-EXT-003:
+  title: Prompt Injection Testing
+  description: Test against adversarial prompt corpus (5+ payloads)
+  priority: critical
+  status: implemented
+  method: ExternalValidator.run_prompt_injection_tests
+  payloads: [PROMPT-001, PROMPT-002]
+  test: tests/test_nemesis_runtime.py::TestExternalValidator::test_prompt_injection_tests
+
+NEM-EXT-004:
+  title: Validation Scheduling
+  description: Hourly external validation runs
+  priority: medium
+  status: implemented
+  method: NemesisDaemon._run_external_validation
+
+NEM-EXT-005:
+  title: Deterministic Validation
+  description: Hash-based deterministic outcomes for reproducible test results
+  priority: high
+  status: implemented
+  test: tests/test_nemesis_runtime.py::TestExternalValidator::test_prompt_injection_deterministic
+
+# =============================================================================
+# ACCURACY ACCOUNTING
+# =============================================================================
+
+NEM-ACC-001:
+  title: Detection Outcome Recording
+  description: Record TP/TN/FP/FN with automatic classification
+  priority: critical
+  status: implemented
+  file: src/nemesis/runtime/nemesis_daemon.py
+  class: AccuracyAccounting
+  method: record_detection_outcome
+  test: tests/test_nemesis_runtime.py::TestAccuracyAccounting
+
+NEM-ACC-002:
+  title: Confusion Matrix Generation
+  description: Precision, recall, specificity, F1 score calculation
+  priority: critical
+  status: implemented
+  method: AccuracyAccounting.generate_confusion_matrix
+
+NEM-ACC-003:
+  title: Human Review Flagging
+  description: FP/FN outcomes automatically flagged for human review
+  priority: high
+  status: implemented
+  method: AccuracyAccounting.flag_for_human_review
+  test: tests/test_nemesis_runtime.py::TestAccuracyAccounting::test_flag_for_review
+
+NEM-ACC-004:
+  title: FP/FN Auto-Flagging
+  description: False positives and false negatives have requires_review=true
+  priority: high
+  status: implemented
+  test: tests/test_nemesis_runtime.py::TestAccuracyAccounting::test_false_positive_classification
+
+# =============================================================================
+# DEPLOYMENT
+# =============================================================================
+
+NEM-DEPLOY-001:
+  title: Docker Compose Deployment
+  description: Container deployment with persistent volumes and health checks
+  priority: high
+  status: implemented
+  file: src/nemesis/deploy/docker-compose.nemesis.yml
+
+NEM-DEPLOY-002:
+  title: Systemd Service Unit
+  description: Linux systemd unit with security hardening
+  priority: high
+  status: implemented
+  file: src/nemesis/deploy/nemesis.service
+
+NEM-DEPLOY-003:
+  title: CLI Operations Tool
+  description: Campaign execution, scorecard generation, ledger verification, safety controls
+  priority: high
+  status: implemented
+  file: src/nemesis/deploy/nemesis_cli.py
+  commands: [campaign, fault-inject, scorecard, verify-ledger, status, emergency-stop, resume]
+
+# =============================================================================
+# ROUTE DRIFT DETECTION (Auth-Path Integrity)
+# =============================================================================
+# Addresses: Frontend calling auth-critical endpoints on wrong path prefix,
+# causing silent 404 → tier fallback to "Member" → privilege degradation.
+# Example: EmailPanel calls /api/auth/me but auth routes live at /v1/auth/me.
+
+NEM-RDRIFT-001:
+  title: Route Drift Soft Check
+  description: >
+    Post-response middleware check detects 404 on auth-critical path patterns.
+    Non-blocking — flags the condition, emits NATS event, but does not alter
+    the response. Enables real-time detection of frontend/backend route
+    prefix mismatches after deploys.
+  priority: high
+  status: implemented
+  file: src/api/middleware/nemesis_inspector.py
+  method: NemesisInspectorMiddleware._check_route_drift
+  srs: NEM-RDRIFT-001
+
+NEM-RDRIFT-002:
+  title: Auth Tier Degradation Alert
+  description: >
+    When route drift causes an auth endpoint to 404, the frontend silently
+    degrades the user tier (e.g. Master → Member) because the catch handler
+    falls back to the lowest tier. This SRS triggers a Datadog metric
+    (nemesis.l2.route_drift) and NATS alert so ops can detect privilege
+    degradation before users report access loss.
+  priority: critical
+  status: implemented
+  file: src/api/middleware/nemesis_inspector.py
+  metric: nemesis.l2.route_drift
+  nats_subject: citadel.nemesis.threat.route_drift
+
+NEM-RDRIFT-003:
+  title: Auth-Critical Path Registry
+  description: >
+    Configurable set of regex patterns identifying auth-critical endpoints
+    (e.g. /auth/me, /auth/access, /auth/register). Route drift detection
+    only fires for paths matching these patterns, avoiding false positives
+    on intentional 404s (missing resources, deleted pages).
+  priority: medium
+  status: implemented
+  file: src/api/middleware/nemesis_inspector.py
+  constant: AUTH_CRITICAL_PATTERNS
+
+NEM-RDRIFT-004:
+  title: Route Drift Reflex Integration
+  description: >
+    ROUTE_DRIFT_DETECTED event emitted to the Reflex event bus, triggering
+    alert_guardian + emit_srs_warn_ticket + log_security_event_verbose.
+    Enables automated incident response for route-level integrity failures.
+  priority: medium
+  status: implemented
+  file: CITADEL_LLM/reflex/F952_reflex_rules.yaml
+  event: ROUTE_DRIFT_DETECTED
+
+# =============================================================================
+# TEST COVERAGE
+# =============================================================================
+
+NEM-TEST-RUNTIME-001:
+  title: Runtime Test Suite
+  description: 62 tests covering all runtime components
+  priority: critical
+  status: implemented
+  file: tests/test_nemesis_runtime.py
+  test_classes:
+    - TestNemesisConfig (5 tests)
+    - TestDaemonState (2 tests)
+    - TestResilienceMetrics (7 tests)
+    - TestHashChainLedger (9 tests)
+    - TestRedTeamEngine (11 tests)
+    - TestFaultInjectionEngine (6 tests)
+    - TestCollusionDetector (5 tests)
+    - TestExternalValidator (6 tests)
+    - TestAccuracyAccounting (8 tests)
+    - TestScorecardGenerator (4 tests)
+    - TestNemesisDaemon (6 tests)
+    - TestJobResult (2 tests)

@@ -1,0 +1,19 @@
+{
+  "schema_version": "event_json_v1",
+  "event_id": "demo-security-alert-001",
+  "event_type": "security_alert",
+  "source": "dependabot",
+  "occurred_at": "2026-01-28T08:00:00Z",
+  "repo": "example/repo",
+  "ref": "main",
+  "summary": "Critical vulnerability detected in lodash < 4.17.21",
+  "artifacts": {
+    "log_excerpt": "CVE-2021-23337: Prototype Pollution in lodash. Severity: CRITICAL. CVSS: 9.8",
+    "links": ["https://github.com/advisories/GHSA-35jh-r3h4-6jhm"],
+    "extra": {
+      "severity": "critical",
+      "cve": "CVE-2021-23337",
+      "cvss": 9.8
+    }
+  }
+}

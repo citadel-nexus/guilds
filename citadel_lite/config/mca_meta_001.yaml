@@ -1,0 +1,128 @@
+# ============================================================================
+# MCA-META-001: System Constitution (Provisional)
+# ============================================================================
+# Origin: MCA/EMERGENT_AI_METARULE.yaml
+# Version: 0.1.0 (provisional — awaiting formal review)
+# Purpose: Defines the MCA system's governance rules, AI behavioral norms,
+#          and evolution cycle constraints.
+# ============================================================================
+
+meta:
+  document_id: "MCA-META-001"
+  version: "0.1.0"
+  status: "provisional"
+  created: "2026-02-20"
+  origin: "MCA/EMERGENT_AI_METARULE.yaml"
+
+# ── System Identity ────────────────────────────────────────────────────────
+system:
+  name: "Citadel Nexus MCA"
+  description: "Meta Cognitive Architecture for autonomous product evolution"
+  tier: "T2"
+  operational_mode: "evolution_cycle"
+
+# ── Governance Rules ───────────────────────────────────────────────────────
+governance:
+  # CAPS Protocol: Compliance, Approval, Policy, Security
+  caps:
+    compliance:
+      - "All code changes must have corresponding test coverage plans"
+      - "CGRF Tier 1 metadata required on all new modules"
+      - "No module may bypass SANCTUM recording for state changes"
+    approval:
+      - "Government professor must review all EP-* proposals"
+      - "HIGH/CRITICAL risk proposals require manual human review"
+      - "Approved proposals are logged with justification"
+    policy:
+      - "Stale content must be flagged within 7 days of detection"
+      - "Coverage gaps blocking revenue gates are CRITICAL priority"
+      - "RAG document changes must maintain knowledge base consistency"
+    security:
+      - "No credentials in code or proposals"
+      - "External API calls must use environment variable credentials"
+      - "Bedrock client must use exponential backoff on failures"
+
+  # Proposal types and their governance requirements
+  proposal_rules:
+    EP-CODE:
+      requires_test_plan: true
+      auto_approve_risk: "LOW"
+      max_auto_approve_per_cycle: 5
+    EP-RAG:
+      requires_test_plan: false
+      auto_approve_risk: "LOW"
+      max_auto_approve_per_cycle: 10
+    EP-SALES:
+      requires_test_plan: false
+      auto_approve_risk: "MEDIUM"
+      max_auto_approve_per_cycle: 3
+    EP-STALE:
+      requires_test_plan: false
+      auto_approve_risk: "MEDIUM"
+      max_auto_approve_per_cycle: 20
+    EP-GAP:
+      requires_test_plan: true
+      auto_approve_risk: "LOW"
+      max_auto_approve_per_cycle: 5
+
+# ── AI Behavioral Norms ───────────────────────────────────────────────────
+ai_norms:
+  professors:
+    mirror:
+      role: "Code pattern analysis + product coverage evaluation"
+      output_schema: ["code_patterns", "anti_patterns", "plan_coverage", "key_findings", "recommendations"]
+      model_preference: "claude-opus"
+    oracle:
+      role: "Strategic guidance + health evaluation"
+      output_schema: ["health_status", "product_doc_strength", "top_3_improvements", "tier_coverage", "key_findings"]
+      model_preference: "claude-opus"
+    government:
+      role: "CAPS compliance + proposal approval/rejection"
+      output_schema: ["approved", "rejected", "risk_assessment", "conflict_arbitration", "policy_notes", "enum_tags"]
+      model_preference: "claude-opus"
+
+  constraints:
+    - "Professors must not modify code directly — only generate proposals"
+    - "All LLM calls route through BedrockProfessorBase adapter"
+    - "Deterministic operations (translation, normalization) must not use LLM"
+    - "Professor outputs must be structured and parseable"
+
+# ── Evolution Cycle Configuration ──────────────────────────────────────────
+evolution_cycle:
+  phases:
+    - id: "phase_1"
+      name: "Data Collection"
+      required: true
+    - id: "phase_2"
+      name: "Meta Document Loading"
+      required: false
+    - id: "phase_3"
+      name: "Metrics Aggregation"
+      required: true
+    - id: "phase_4"
+      name: "AI Professor Analysis"
+      required: true
+    - id: "phase_5"
+      name: "Proposal Generation"
+      required: true
+    - id: "phase_6"
+      name: "SANCTUM Recording"
+      required: false  # MS-6
+    - id: "phase_7"
+      name: "Canonical Publisher"
+      required: false  # MS-6
+
+  max_proposals_per_cycle: 50
+  dry_run_default: true
+
+# ── Revenue Gate Mapping (Provisional) ─────────────────────────────────────
+revenue_gates:
+  core:
+    description: "Core infrastructure components"
+    phases: [19, 20, 21, 22, 23, 24, 26]
+  zes_agent:
+    description: "ZES Agent tier features"
+    phases: [25]
+  tradebuilder:
+    description: "Trade Builder premium features"
+    phases: [27]

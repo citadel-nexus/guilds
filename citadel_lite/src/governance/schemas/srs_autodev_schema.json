@@ -1,0 +1,318 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:citadel:cgrf:srs-autodev-orch:v1",
+  "title": "SRS Autodev Orchestrator Schema",
+  "description": "JSON Schema for SRS-AUTODEV-ORCH-001.yaml — validates orchestrator SRS requirements, reflex definitions, CAPS gates, and FATE configuration.",
+  "type": "object",
+  "required": ["_document_schema", "_module", "_srs_code", "_purpose", "_owner", "_status"],
+  "additionalProperties": true,
+
+  "properties": {
+
+    "_document_schema": {
+      "type": "string",
+      "const": "CGRF-v2.0",
+      "description": "Must always be CGRF-v2.0"
+    },
+    "_module": {
+      "type": "string",
+      "description": "Python module path this document governs"
+    },
+    "_srs_code": {
+      "type": "string",
+      "pattern": "^SRS-[A-Z]+-[A-Z]+-\\d{3}$",
+      "description": "Primary SRS document code e.g. SRS-AUTODEV-ORCH-001"
+    },
+    "_purpose": {
+      "type": "string"
+    },
+    "_owner": {
+      "type": "string"
+    },
+    "_compliance": {
+      "type": "string"
+    },
+    "_status": {
+      "type": "string",
+      "enum": ["planned", "in_progress", "Production", "deprecated"]
+    },
+
+    "REFLEX_AUTODEV_PIPELINE_V1": {
+      "$ref": "#/$defs/ReflexFamily"
+    },
+
+    "CAPS_GATE_TABLE": {
+      "$ref": "#/$defs/CAPSGateTable"
+    },
+
+    "FATE_ENGINE": {
+      "$ref": "#/$defs/FATEEngine"
+    }
+  },
+
+  "patternProperties": {
+    "^AOD-[A-Z]+-\\d{3}$": {
+      "$ref": "#/$defs/SRSRequirement"
+    }
+  },
+
+  "$defs": {
+
+    "SRSRequirement": {
+      "type": "object",
+      "required": ["title", "description", "priority", "status"],
+      "additionalProperties": true,
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 3
+        },
+        "description": {
+          "type": "string"
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["critical", "high", "medium", "low"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["planned", "in_progress", "implemented", "deprecated"]
+        },
+        "file": {
+          "type": "string"
+        },
+        "function": {
+          "type": "string"
+        },
+        "caps_minimum": {
+          "$ref": "#/$defs/CAPSGrade"
+        },
+        "acceptance_criteria": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "test": {
+          "type": "string"
+        },
+        "llm_backend": {
+          "type": "string",
+          "enum": ["azure", "openai", "bedrock", "fallback", "local"]
+        }
+      }
+    },
+
+    "CAPSGrade": {
+      "type": "string",
+      "enum": ["S", "A", "B", "C", "D"],
+      "description": "CAPS performance grade. S=10000+ XP, A=2001-10000, B=501-2000, C=101-500, D=0-100"
+    },
+
+    "AutonomyLevel": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4,
+      "description": "0=EMERGENCY, 1=CRITICAL, 2=SUPERVISED, 3=MONITORED, 4=AUTONOMOUS"
+    },
+
+    "ReflexDefinition": {
+      "type": "object",
+      "required": ["title", "description", "triggers", "actions", "max_autonomy"],
+      "additionalProperties": true,
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "srs_ref": {
+          "type": "string",
+          "pattern": "^AOD-[A-Z]+-\\d{3}$"
+        },
+        "triggers": {
+          "type": "array",
+          "items": {"type": "string"},
+          "minItems": 1
+        },
+        "actions": {
+          "type": "array",
+          "items": {"type": "string"},
+          "minItems": 1
+        },
+        "expected_resolutions": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "max_autonomy": {
+          "$ref": "#/$defs/AutonomyLevel"
+        },
+        "caps_minimum": {
+          "$ref": "#/$defs/CAPSGrade"
+        },
+        "requires_fate_advisory": {
+          "type": "boolean"
+        },
+        "requires_fate_approval": {
+          "type": "boolean"
+        },
+        "fate_bypass_allowed": {
+          "type": "boolean"
+        },
+        "escalate_if_repeated": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "min_tp": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "timeout": {
+          "type": "string",
+          "description": "Human-readable timeout e.g. '60s', '5min', '1h'"
+        }
+      }
+    },
+
+    "ReflexTier": {
+      "type": "object",
+      "required": ["description"],
+      "additionalProperties": {
+        "oneOf": [
+          {"$ref": "#/$defs/ReflexDefinition"},
+          {"type": "string"}
+        ]
+      },
+      "properties": {
+        "description": {"type": "string"}
+      }
+    },
+
+    "ReflexFamily": {
+      "type": "object",
+      "required": ["family_id", "version", "description"],
+      "additionalProperties": true,
+      "properties": {
+        "family_id": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "srs_code": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "tier_1_automated": {
+          "$ref": "#/$defs/ReflexTier"
+        },
+        "tier_2_supervised": {
+          "$ref": "#/$defs/ReflexTier"
+        },
+        "tier_3_approval": {
+          "$ref": "#/$defs/ReflexTier"
+        },
+        "tier_4_emergency": {
+          "$ref": "#/$defs/ReflexTier"
+        }
+      }
+    },
+
+    "CAPSGateEntry": {
+      "type": "object",
+      "required": ["caps_minimum"],
+      "additionalProperties": true,
+      "properties": {
+        "srs_ref": {
+          "type": "string"
+        },
+        "caps_minimum": {
+          "$ref": "#/$defs/CAPSGrade"
+        },
+        "rationale": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "example_tasks": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+
+    "CAPSGateTable": {
+      "type": "object",
+      "required": ["description", "gates"],
+      "properties": {
+        "description": {"type": "string"},
+        "gates": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/CAPSGateEntry"
+          }
+        }
+      }
+    },
+
+    "FATETPThresholds": {
+      "type": "object",
+      "required": ["autonomous", "advisory"],
+      "properties": {
+        "autonomous": {"type": "integer", "minimum": 0, "maximum": 100},
+        "advisory":   {"type": "integer", "minimum": 0, "maximum": 100},
+        "approval":   {"type": "integer", "minimum": 0, "maximum": 100},
+        "override":   {"type": "integer", "minimum": 0, "maximum": 100},
+        "emergency":  {"type": "integer", "minimum": 0, "maximum": 100}
+      }
+    },
+
+    "FATEEscalationEntry": {
+      "type": "object",
+      "required": ["occurrences", "severity", "notify"],
+      "properties": {
+        "occurrences": {"type": "integer", "minimum": 1},
+        "severity": {
+          "type": "string",
+          "enum": ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "EMERGENCY"]
+        },
+        "notify": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+
+    "FATEEngine": {
+      "type": "object",
+      "required": ["family", "description", "tp_thresholds"],
+      "additionalProperties": true,
+      "properties": {
+        "family": {"type": "string"},
+        "description": {"type": "string"},
+        "autonomy_levels": {
+          "type": "object",
+          "additionalProperties": {"type": "string"}
+        },
+        "tp_thresholds": {
+          "$ref": "#/$defs/FATETPThresholds"
+        },
+        "escalation_matrix": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/FATEEscalationEntry"}
+        },
+        "fate_decision_audit": {
+          "type": "object",
+          "properties": {
+            "backend": {"type": "string"},
+            "retention_days": {"type": "integer", "minimum": 1}
+          }
+        }
+      }
+    }
+  }
+}

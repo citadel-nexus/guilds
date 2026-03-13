@@ -1,0 +1,65 @@
+The loop exits 0 and writes to Notion — it's not broken in the "crashes" sense. But it's feeding untrustworthy data to Perplexity and the user needs to know that. Here's the full picture:
+
+Kousaki Update — Citadel Lite additions + perplexity loop status
+What we built this session — Sentinel Memory Loop
+SRS: SRS-SENTINEL-MEMORY-001/002/003
+
+Four components wired into citadel_lite:
+
+POST /webhooks/post-call/sentinel/rehydrate
+Fires on ElevenLabs on_conversation_end. 9-step pipeline:
+
+Bedrock extracts structured objects (promises, memories, emotional shift, growth note) from the call summary
+Promises written to sentinel:promises FAISS index + sentinel_promises Supabase table
+Resolved promises matched via semantic search and closed
+Domain memories (personal/technical/emotional/growth) embedded + stored in FAISS + Notion Memory Vault
+Supabase context cache updated (call count, relationship summary, emotional tone, open threads)
+NATS events broadcast for each storage operation
+POST /webhooks/pre-call/sentinel
+Fires at conversation start, target <200ms on cache hit:
+
+Looks up caller in sentinel_context_cache
+Seeds memory fragments from sentinel:all FAISS (top-5, Bedrock-distilled into 200-word narrative)
+Pulls active promises ledger from Supabase
+Pulls growth notes from sentinel:growth FAISS (after 5+ calls)
+Returns full ElevenLabs dynamic variables payload (relationship summary, last topics, open threads, emotional tone, days since last call, etc.)
+src/workers/faiss_indexer.py — Scheduled worker
+
+Incremental and full-rebuild modes
+Pulls transcripts from ElevenLabs, chunks via Bedrock, classifies to domain, embeds, stores in per-domain FAISS + unified sentinel:all index
+High-importance chunks (≥0.6) also written to Notion Memory Vault
+Emits citadel.sentinel.index.complete NATS event on completion
+Services layer (all new under src/services/):
+faiss_manager.py · embedding.py · bedrock_distill.py · supabase_client.py (async façade) · nats_client.py · notion_memory_vault.py · elevenlabs_client.py · auth.py
+
+Migration — migrations/sentinel_memory_loop.sql:
+Tables: sentinel_context_cache, sentinel_promises, sentinel_post_call_log, sentinel_pre_call_log, api_keys
+Views: sentinel_active_promises, sentinel_caller_stats
+RLS policies applied.
+
+To apply: python tools/supabase_agent.py migrate-sentinel-memory
+
+VPS wiring — src/agents/vps_ssh.py
+Added run_faiss_indexer(agent_id, mode, timeout):
+
+Triggers the indexer worker on VPS via SSH
+Validates agent_id and mode before building the shell command
+Default path corrected to /opt/citadel/cnwb/citadel_lite (was pointing at a non-existent path — caught and fixed by test)
+All new sentinel files deployed to VPS
+Pre-flight test: 10/10 checks pass — SSH, directory, module presence, faiss 1.13.2, boto3 all confirmed on VPS.
+
+Perplexity loop — runs but data is degraded
+The loop itself is functional (exits 0, Perplexity call succeeds, Notion page created, Linear issue CNWB-105 filed). But it is silently feeding broken data to Perplexity on every run:
+
+Source	Status	Error
+GitLab	RED	401 Unauthorized — token expired, tracked as CNWB-72
+Lead Hunter: compound_metrics	BROKEN	Table doesn't exist — hints guild_metrics
+Lead Hunter: leads_discovered.pitch_angle	BROKEN	Column doesn't exist
+Lead Hunter: lead_outreach_log	BROKEN	Table doesn't exist — hints guild_outreach_log
+The loop doesn't fail on these — it degrades silently to 0-activity reads and sends Perplexity a context where GitLab shows 0 commits and lead gen shows 0 leads. The verdict (RECOVERING, risk 65) is computed from incomplete telemetry.
+
+Three fixes needed before the loop's output is trustworthy:
+
+Rotate the GitLab token (CNWB-72 is already open)
+Run migrate-sentinel-memory — or check whether the Lead Hunter migration 20260220_lead_hunter_tables.sql was actually applied with the correct table and column names matching what the collector expects (lead_outreach_log, pitch_angle)
+Either rename the tables to match the collector or update the collector queries to use the actual table names (guild_outreach_log, guild_metrics)

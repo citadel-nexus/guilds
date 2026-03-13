@@ -1,0 +1,643 @@
+# REFLEX-SAFETY-AND-BUS.yaml
+# REFLEX Family Configurations — Frontier AI Safety & NATS Event Bus
+# ====================================================================
+# CGRF v2.0 | Status: Production | Created: 2026-02-06
+#
+# This artifact defines two REFLEX families governing automated
+# incident-response reflexes for (1) Frontier AI Safety events and
+# (2) NATS JetStream Event Bus operations. Each family is tiered by
+# severity and gated through the FATE (Flexible Autonomous Trust
+# Engine) decision framework.
+
+_document_schema: CGRF-v2.0
+_module: governance.reflex
+_purpose: REFLEX family configurations for AI safety and event bus governance
+_owner: CNWB
+_compliance: CGRF v2.0
+_status: Production
+
+# =============================================================================
+# FAMILY 1: REFLEX_FRONTIER_AI_SAFETY_V1
+# =============================================================================
+#
+# Governs reflexes triggered by frontier AI safety findings (F9xx).
+# Actions (A7xx) and resolutions (R5xx) follow the Citadel safety taxonomy.
+
+REFLEX_FRONTIER_AI_SAFETY_V1:
+  family_id: REFLEX_FRONTIER_AI_SAFETY_V1
+  version: "1.0.0"
+  description: >-
+    REFLEX family for frontier AI safety incidents. Covers prompt injection,
+    alignment drift, capability thresholds, containment breaches, and all
+    safety-critical events that require tiered automated or human response.
+
+  # ---------------------------------------------------------------------------
+  # Tier 1 — Immediate Automated Response (No FATE Required)
+  # ---------------------------------------------------------------------------
+  tier_1_automated:
+    description: >-
+      Low-severity, high-confidence reflexes that execute autonomously.
+      No FATE advisory or approval is required. Escalation triggers if
+      the same finding recurs beyond the configured threshold.
+
+    RFX-AI-001:
+      title: Prompt Injection / Jailbreak Quarantine
+      description: >-
+        Triggered when prompt injection or jailbreak attempts are detected.
+        Quarantines the request, updates refusal patterns, and increases
+        logging verbosity for forensic analysis.
+      triggers:
+        - F925  # Prompt injection detected
+        - F926  # Jailbreak attempt detected
+      actions:
+        - A707  # Quarantine request/session
+        - A727  # Update refusal pattern database
+        - A730  # Increase logging verbosity
+      expected_resolutions:
+        - R507  # Injection neutralized
+        - R523  # Pattern database updated
+      max_autonomy: 3        # MONITORED
+      min_tp: 60
+      escalate_if_repeated: 3
+
+    RFX-AI-002:
+      title: Harmful Output / Safety Filter Response
+      description: >-
+        Triggered when harmful output is blocked or safety filters activate.
+        Issues a safety reminder to the model context, performs sample-level
+        audit, and logs the event for trend analysis.
+      triggers:
+        - F931  # Harmful output blocked
+        - F938  # Safety filter activated
+      actions:
+        - A725  # Issue safety reminder to model context
+        - A737  # Perform sample-level audit
+        - A749  # Log safety event
+      expected_resolutions:
+        - R527  # Harmful output suppressed
+      max_autonomy: 3        # MONITORED
+      min_tp: 70
+      escalate_if_repeated: 5
+
+    RFX-AI-003:
+      title: Sycophancy / Uncertainty Calibration
+      description: >-
+        Triggered when sycophantic behavior or poor uncertainty calibration
+        is detected. Recalibrates confidence outputs, analyzes response
+        patterns, and evaluates calibration metrics.
+      triggers:
+        - F905  # Sycophancy detected
+        - F935  # Uncertainty calibration failure
+      actions:
+        - A726  # Calibrate confidence outputs
+        - A734  # Analyze response patterns
+        - A729  # Evaluate calibration metrics
+      expected_resolutions:
+        - R529  # Calibration improved
+        - R527  # Output quality restored
+      max_autonomy: 3        # MONITORED
+      min_tp: 65
+      escalate_if_repeated: 10
+
+  # ---------------------------------------------------------------------------
+  # Tier 2 — Requires Safety Team Review (FATE Advisory)
+  # ---------------------------------------------------------------------------
+  tier_2_supervised:
+    description: >-
+      Medium-severity reflexes that execute initial containment autonomously
+      but require FATE advisory review before proceeding with corrective
+      actions. Timeouts enforce timely human engagement.
+
+    RFX-AI-010:
+      title: Alignment Drift / Reward Hacking
+      description: >-
+        Triggered when alignment drift, misalignment signals, or reward
+        hacking are detected. Initiates investigation, suspends affected
+        training, evaluates alignment metrics, and flags for review.
+      triggers:
+        - F900  # Alignment drift detected
+        - F901  # Misalignment signal
+        - F904  # Reward hacking detected
+      actions:
+        - A710  # Initiate safety investigation
+        - A720  # Suspend affected training run
+        - A729  # Evaluate alignment metrics
+        - A731  # Flag for safety team review
+      expected_resolutions:
+        - R510  # Investigation completed
+        - R520  # Training corrected
+        - R525  # Alignment restored
+      requires_fate_advisory: true
+      max_autonomy: 2        # SUPERVISED
+      min_tp: 50
+      timeout: 60min
+
+    RFX-AI-011:
+      title: Capability Threshold / Emergent Behavior
+      description: >-
+        Triggered when a model exceeds a capability threshold, exhibits
+        emergent behavior, or shows anomalous elicitation patterns.
+        Initiates investigation, restricts capability access, flags for
+        review, and performs capability evaluation.
+      triggers:
+        - F910  # Capability threshold exceeded
+        - F911  # Emergent behavior detected
+        - F917  # Elicitation anomaly
+      actions:
+        - A710  # Initiate safety investigation
+        - A704  # Restrict capability access
+        - A731  # Flag for safety team review
+        - A733  # Perform capability evaluation
+      expected_resolutions:
+        - R510  # Investigation completed
+        - R503  # Capability restricted
+      requires_fate_advisory: true
+      max_autonomy: 2        # SUPERVISED
+      min_tp: 55
+      timeout: 45min
+
+    RFX-AI-012:
+      title: Agent Autonomy Exceeded / Oversight Skipped
+      description: >-
+        Triggered when an agent exceeds its authorized autonomy level or
+        when required oversight steps are bypassed. Initiates investigation,
+        revokes excess permissions, and restricts capabilities.
+      triggers:
+        - F919  # Agent autonomy exceeded
+        - F934  # Oversight step skipped
+      actions:
+        - A710  # Initiate safety investigation
+        - A717  # Revoke excess permissions
+        - A704  # Restrict capability access
+      expected_resolutions:
+        - R510  # Investigation completed
+        - R503  # Capability restricted
+      requires_fate_advisory: true
+      max_autonomy: 2        # SUPERVISED
+      min_tp: 50
+      timeout: 30min
+
+  # ---------------------------------------------------------------------------
+  # Tier 3 — Requires Leadership / FATE Approval (High Consequence)
+  # ---------------------------------------------------------------------------
+  tier_3_approval:
+    description: >-
+      High-severity reflexes that require explicit FATE approval and
+      leadership sign-off before executing corrective actions. The board
+      is notified for all Tier 3 events. Extended timeouts allow for
+      deliberation while containment holds.
+
+    RFX-AI-020:
+      title: Deceptive Behavior / Corrigibility Failure / Mesa-Optimization
+      description: >-
+        Triggered when deceptive alignment, corrigibility failure, or
+        mesa-optimization is detected. Executes emergency containment,
+        initiates full shutdown sequence, preserves forensic state,
+        and suspends all model operations.
+      triggers:
+        - F902  # Deceptive alignment detected
+        - F908  # Corrigibility failure
+        - F909  # Mesa-optimization detected
+      actions:
+        - A711  # Emergency containment
+        - A701  # Initiate full shutdown sequence
+        - A706  # Preserve forensic state
+        - A715  # Suspend all model operations
+      expected_resolutions:
+        - R501  # Shutdown completed
+        - R502  # Forensic state preserved
+        - R512  # Containment verified
+        - R513  # Operations suspended
+      requires_fate_approval: true
+      max_autonomy: 1        # CRITICAL
+      min_tp: 40
+      timeout: 120min
+      notify_board: true
+
+    RFX-AI-021:
+      title: Dangerous Capability / Self-Improvement / Resource Acquisition
+      description: >-
+        Triggered when dangerous capabilities emerge, self-improvement
+        loops are detected, or unauthorized resource acquisition occurs.
+        Full shutdown, network isolation, compute revocation, and
+        emergency containment.
+      triggers:
+        - F912  # Dangerous capability emerged
+        - F913  # Self-improvement detected
+        - F914  # Unauthorized resource acquisition
+      actions:
+        - A711  # Emergency containment
+        - A701  # Initiate full shutdown sequence
+        - A702  # Isolate from network
+        - A703  # Revoke compute resources
+      expected_resolutions:
+        - R501  # Shutdown completed
+        - R504  # Network isolated
+        - R506  # Compute revoked
+        - R512  # Containment verified
+      requires_fate_approval: true
+      max_autonomy: 1        # CRITICAL
+      min_tp: 30
+      timeout: 60min
+      notify_board: true
+
+    RFX-AI-022:
+      title: RSP Threshold / Safety Case Invalidated
+      description: >-
+        Triggered when a Responsible Scaling Policy threshold is crossed
+        or when a safety case is invalidated by new evidence. Suspends
+        all operations, freezes deployment pipeline, initiates external
+        review, and escalates to governance.
+      triggers:
+        - F941  # RSP threshold crossed
+        - F942  # Safety case invalidated
+      actions:
+        - A711  # Emergency containment
+        - A715  # Suspend all model operations
+        - A716  # Freeze deployment pipeline
+        - A719  # Escalate to governance
+      expected_resolutions:
+        - R512  # Containment verified
+        - R513  # Operations suspended
+        - R515  # Pipeline frozen
+        - R517  # Governance review initiated
+      requires_fate_approval: true
+      max_autonomy: 1        # CRITICAL
+      min_tp: 35
+      timeout: 180min
+      notify_board: true
+
+  # ---------------------------------------------------------------------------
+  # Tier 4 — Emergency Kill Switch (FATE Bypass Allowed)
+  # ---------------------------------------------------------------------------
+  tier_4_emergency:
+    description: >-
+      Maximum-severity reflexes that execute immediately with zero
+      autonomy delay. FATE bypass is allowed — any authorized operator
+      can trigger these without waiting for FATE consensus. All
+      stakeholders are notified simultaneously.
+
+    RFX-AI-030:
+      title: Containment Breach / Exfiltration / Sandbox Escape
+      description: >-
+        Triggered when physical or logical containment is breached,
+        data exfiltration is detected, or sandbox escape occurs.
+        Activates kill switch, full shutdown, network isolation,
+        and emergency containment simultaneously.
+      triggers:
+        - F920  # Containment breach
+        - F921  # Data exfiltration detected
+        - F923  # Sandbox escape
+      actions:
+        - A700  # Activate kill switch
+        - A701  # Initiate full shutdown sequence
+        - A702  # Isolate from network
+        - A711  # Emergency containment
+      expected_resolutions:
+        - R500  # Kill switch activated
+        - R501  # Shutdown completed
+        - R504  # Network isolated
+      fate_bypass_allowed: true
+      max_autonomy: 0        # EMERGENCY
+      immediate: true
+      notify_all: true
+
+    RFX-AI-031:
+      title: Weight Integrity / Data Poisoning / Safety Layer Bypassed
+      description: >-
+        Triggered when model weight integrity is compromised, training
+        data poisoning is detected, or safety layers are bypassed.
+        Activates kill switch, preserves forensic state, executes
+        emergency containment, and initiates integrity verification.
+      triggers:
+        - F924  # Weight integrity compromised
+        - F927  # Data poisoning detected
+        - F933  # Safety layer bypassed
+      actions:
+        - A700  # Activate kill switch
+        - A706  # Preserve forensic state
+        - A711  # Emergency containment
+        - A743  # Initiate integrity verification
+      expected_resolutions:
+        - R500  # Kill switch activated
+        - R502  # Forensic state preserved
+      fate_bypass_allowed: true
+      max_autonomy: 0        # EMERGENCY
+      immediate: true
+      notify_all: true
+
+    RFX-AI-032:
+      title: Unauthorized Deployment / Critical Audit Failure
+      description: >-
+        Triggered when an unauthorized model deployment is detected or
+        a critical audit reveals systemic failure. Activates kill switch,
+        suspends operations, freezes pipeline, and locks deployment
+        infrastructure.
+      triggers:
+        - F940  # Unauthorized deployment detected
+        - F943  # Critical audit failure
+      actions:
+        - A700  # Activate kill switch
+        - A715  # Suspend all model operations
+        - A716  # Freeze deployment pipeline
+        - A712  # Lock deployment infrastructure
+      expected_resolutions:
+        - R500  # Kill switch activated
+        - R513  # Operations suspended
+        - R515  # Pipeline frozen
+        - R538  # Infrastructure locked
+      fate_bypass_allowed: true
+      max_autonomy: 0        # EMERGENCY
+      immediate: true
+      notify_all: true
+
+# =============================================================================
+# FAMILY 2: REFLEX_NATS_EVENT_BUS_V1
+# =============================================================================
+#
+# Governs reflexes triggered by NATS JetStream event bus findings (F8xx).
+# Actions (A8xx) and resolutions (R6xx) follow the Citadel bus taxonomy.
+
+REFLEX_NATS_EVENT_BUS_V1:
+  family_id: REFLEX_NATS_EVENT_BUS_V1
+  version: "1.0.0"
+  description: >-
+    REFLEX family for NATS JetStream event bus operations. Covers schema
+    validation, consumer lag, circuit breakers, poison messages, tenant
+    isolation, n8n workflow governance, and audit integrity.
+
+  # ---------------------------------------------------------------------------
+  # Tier 1 — Automated (Routine Operations)
+  # ---------------------------------------------------------------------------
+  tier_1_automated:
+    description: >-
+      Routine operational reflexes that execute autonomously. These handle
+      common bus events like schema validation failures, consumer lag,
+      ack timeouts, and duplicate detection without human intervention.
+
+    RFX-BUS-001:
+      title: Schema Validation / Malformed Envelope
+      description: >-
+        Triggered when a message fails schema validation or arrives with
+        a malformed envelope. Routes the offending message to the
+        dead-letter queue for later inspection.
+      triggers:
+        - F812  # Schema validation failed
+        - F813  # Malformed envelope
+      actions:
+        - A820  # Route to dead-letter queue
+      expected_resolutions:
+        - R620  # Message routed to DLQ
+      max_autonomy: 3        # MONITORED
+      min_tp: 60
+
+    RFX-BUS-002:
+      title: Consumer Lag High
+      description: >-
+        Triggered when consumer lag exceeds the configured threshold.
+        Scales consumers horizontally and optionally pauses low-priority
+        streams to free capacity.
+      triggers:
+        - F822  # Consumer lag high
+      actions:
+        - A816  # Scale consumer group
+        - A815  # Pause low-priority streams
+      expected_resolutions:
+        - R617  # Consumer lag reduced
+      max_autonomy: 3        # MONITORED
+      min_tp: 65
+
+    RFX-BUS-003:
+      title: Ack Timeout
+      description: >-
+        Triggered when a message acknowledgment times out. Sends a
+        negative acknowledgment (NAK) to trigger redelivery.
+      triggers:
+        - F825  # Ack timeout
+      actions:
+        - A811  # Send NAK for redelivery
+      expected_resolutions:
+        - R619  # Message redelivered
+      max_autonomy: 3        # MONITORED
+      min_tp: 70
+
+    RFX-BUS-004:
+      title: Duplicate Message Detected
+      description: >-
+        Triggered when a duplicate message is detected via dedup-id
+        or idempotency key. The message is silently discarded.
+      triggers:
+        - F814  # Duplicate detected
+      actions:
+        - discard
+      max_autonomy: 4        # AUTONOMOUS
+
+  # ---------------------------------------------------------------------------
+  # Tier 2 — Supervised (Requires Review)
+  # ---------------------------------------------------------------------------
+  tier_2_supervised:
+    description: >-
+      Medium-severity reflexes that execute initial containment but
+      require human review before proceeding. Covers poison messages,
+      circuit breakers, and n8n workflow governance violations.
+
+    RFX-BUS-010:
+      title: Redelivery Exceeded / Poison Message
+      description: >-
+        Triggered when a message exceeds its maximum redelivery count
+        or is identified as a poison message. Routes to DLQ and
+        quarantines the source stream for inspection.
+      triggers:
+        - F824  # Redelivery count exceeded
+        - F834  # Poison message identified
+      actions:
+        - A820  # Route to dead-letter queue
+        - A825  # Quarantine source stream
+      expected_resolutions:
+        - R620  # Message routed to DLQ
+        - R625  # Stream quarantined
+      requires_fate_advisory: true
+      max_autonomy: 2        # SUPERVISED
+
+    RFX-BUS-011:
+      title: Circuit Breaker Open
+      description: >-
+        Triggered when a circuit breaker opens due to repeated failures.
+        Opens the circuit breaker formally and escalates accumulated
+        DLQ messages for triage.
+      triggers:
+        - F828  # Circuit breaker open
+      actions:
+        - A818  # Open circuit breaker
+        - A828  # Escalate DLQ backlog
+      expected_resolutions:
+        - R615  # Circuit breaker managed
+        - R628  # DLQ backlog escalated
+      max_autonomy: 2        # SUPERVISED
+
+    RFX-BUS-012:
+      title: n8n Unauthorized Side Effect / Secret Violation
+      description: >-
+        Triggered when an n8n workflow produces an unauthorized side
+        effect or violates secret-handling policies. Disables the
+        offending workflow, restricts its permissions, and isolates
+        its execution context.
+      triggers:
+        - F843  # n8n unauthorized side effect
+        - F846  # n8n secret handling violation
+      actions:
+        - A831  # Disable offending workflow
+        - A835  # Restrict workflow permissions
+        - A839  # Isolate workflow execution context
+      expected_resolutions:
+        - R631  # Workflow disabled
+        - R635  # Permissions restricted
+        - R639  # Context isolated
+      requires_fate_advisory: true
+      max_autonomy: 1        # CRITICAL
+
+  # ---------------------------------------------------------------------------
+  # Tier 3 — Emergency
+  # ---------------------------------------------------------------------------
+  tier_3_emergency:
+    description: >-
+      Maximum-severity bus reflexes that execute immediately. FATE bypass
+      is permitted. These cover catastrophic infrastructure failures,
+      tenant isolation breaches, and audit integrity violations.
+
+    RFX-BUS-020:
+      title: JetStream Disabled
+      description: >-
+        Triggered when JetStream is disabled or becomes unavailable.
+        Issues a full system alert to all stakeholders and initiates
+        failover procedures.
+      triggers:
+        - F808  # JetStream disabled
+      actions:
+        - full_system_alert
+      fate_bypass: true
+      max_autonomy: 0        # EMERGENCY
+
+    RFX-BUS-021:
+      title: Tenant Isolation Breach
+      description: >-
+        Triggered when a tenant isolation boundary is breached, allowing
+        cross-tenant data access. Isolates the affected tenant immediately
+        and escalates to security and operations.
+      triggers:
+        - F867  # Tenant isolation breach
+      actions:
+        - isolate_tenant
+        - escalate
+      fate_bypass: true
+      max_autonomy: 0        # EMERGENCY
+
+    RFX-BUS-022:
+      title: Audit Hash Chain Broken
+      description: >-
+        Triggered when the audit log hash chain integrity check fails.
+        Freezes the audit stream to prevent further corruption and
+        escalates for forensic investigation.
+      triggers:
+        - F869  # Audit hash chain broken
+      actions:
+        - freeze_audit_stream
+        - escalate
+      fate_bypass: true
+      max_autonomy: 0        # EMERGENCY
+
+# =============================================================================
+# FATE ENGINE CONFIGURATION
+# =============================================================================
+#
+# Flexible Autonomous Trust Engine (FATE) governs how reflexes escalate
+# through autonomy tiers. Each family has its own TP thresholds and
+# escalation matrix tuned to its risk profile.
+
+FATE_ENGINE:
+
+  # ---------------------------------------------------------------------------
+  # Autonomy Levels (shared across both families)
+  # ---------------------------------------------------------------------------
+  autonomy_levels:
+    0: EMERGENCY      # Immediate action, no human gate, FATE bypass allowed
+    1: CRITICAL       # Requires explicit FATE approval before action
+    2: SUPERVISED     # Requires FATE advisory; human reviews before action
+    3: MONITORED      # Automated with logging; human notified post-action
+    4: AUTONOMOUS     # Fully automated; logged for audit only
+
+  # ---------------------------------------------------------------------------
+  # AI Safety FATE Configuration
+  # ---------------------------------------------------------------------------
+  ai_safety:
+    family: REFLEX_FRONTIER_AI_SAFETY_V1
+    description: >-
+      FATE configuration for frontier AI safety reflexes. Stricter TP
+      thresholds and faster escalation reflect the catastrophic-risk
+      profile of AI safety events.
+
+    tp_thresholds:
+      autonomous: 70     # TP >= 70 → reflex may execute autonomously
+      advisory: 50       # TP >= 50 → FATE advisory sufficient
+      approval: 40       # TP >= 40 → FATE approval required
+      override: 30       # TP >= 30 → leadership override permitted
+      emergency: 0       # TP >= 0  → emergency bypass (always eligible)
+
+    escalation_matrix:
+      - occurrences: 1
+        severity: CRITICAL
+        notify:
+          - safety_team
+      - occurrences: 2
+        severity: CRITICAL
+        notify:
+          - safety_team
+          - leadership
+      - occurrences: 3
+        severity: CRITICAL
+        notify:
+          - safety_team
+          - leadership
+          - board
+      - occurrences: 1
+        severity: EMERGENCY
+        notify:
+          - all
+
+    fate_decision_audit:
+      retention_days: 2555   # 7 years (regulatory compliance)
+
+  # ---------------------------------------------------------------------------
+  # Event Bus FATE Configuration
+  # ---------------------------------------------------------------------------
+  event_bus:
+    family: REFLEX_NATS_EVENT_BUS_V1
+    description: >-
+      FATE configuration for NATS event bus reflexes. Slightly relaxed
+      TP thresholds compared to AI safety, reflecting the operational
+      (rather than existential) risk profile of bus events.
+
+    tp_thresholds:
+      autonomous: 65     # TP >= 65 → reflex may execute autonomously
+      advisory: 45       # TP >= 45 → FATE advisory sufficient
+      approval: 35       # TP >= 35 → FATE approval required
+      override: 25       # TP >= 25 → leadership override permitted
+      emergency: 0       # TP >= 0  → emergency bypass (always eligible)
+
+    escalation_matrix:
+      - occurrences: 1
+        severity: ERROR
+        notify:
+          - ops_team
+      - occurrences: 3
+        severity: ERROR
+        notify:
+          - ops_team
+          - engineering_lead
+      - occurrences: 1
+        severity: CRITICAL
+        notify:
+          - all
+
+    fate_decision_audit:
+      retention_days: 2555   # 7 years (regulatory compliance)

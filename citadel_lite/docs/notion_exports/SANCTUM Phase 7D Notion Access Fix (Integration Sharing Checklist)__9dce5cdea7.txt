@@ -1,0 +1,35 @@
+# SANCTUM Phase 7D Notion Access Fix (Integration Sharing Checklist)
+(Page ID: 9dce5cde-a7c1-45e6-9301-d484ffba3b18)
+(URL: https://www.notion.so/SANCTUM-Phase-7D-Notion-Access-Fix-Integration-Sharing-Checklist-9dce5cdea7c145e69301d484ffba3b18)
+
+[Total top-level blocks: 18]
+
+
+### What’s happening
+
+Your Notion API key is valid, but the integration behind it does not have access to the target databases. When a Notion integration lacks access, the API returns `404 object_not_found` even if the database exists.
+
+### The fix (must be done in the Notion UI)
+
+You need to **share the source databases** with the integration used by `NOTION_API_KEY`.
+1. Open **🧩 Citadel Tasks — USO + ZES Growth** (database: 🧩 Citadel Tasks — USO + ZES Growth)
+1. Click **Share** (top right)
+1. Under **Connections / Integrations**, find the integration that corresponds to your `NOTION_API_KEY`
+1. Click **Invite / Add** and grant access
+Repeat the same steps for:
+- **📎 Citadel Docs Index** (database: 📎 Citadel Docs Index)
+
+### After sharing, validate from Rig 1
+
+Run (from the same python env that runs `tools/evolve_mca_system.py`):
+```bash
+python -c "from tools.agent_registry import NOTION_TASKS_DB_ID; print('Tasks DB:', NOTION_TASKS_DB_ID)"
+python -c "import os; from tools.sanctum_canonical_publisher import get_credential; print('NOTION_API_KEY set:', bool(get_credential('NOTION_API_KEY')))"
+```
+Then run one cycle and confirm Phase 7D logs **a successful Notion patch**.
+
+### Notes
+
+- This is a permissions/share problem, not a database-id problem.
+- If you use multiple Notion integrations, make sure the one you shared is the one whose secret starts with `ntn_...` that you are loading from `workspace.env`.
+[Child Page]

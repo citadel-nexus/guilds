@@ -1,0 +1,53 @@
+# You can override the included template(s) by including variable overrides
+# SAST customization: https://docs.gitlab.com/ee/user/application_security/sast/#customizing-the-sast-settings
+# Secret Detection customization: https://docs.gitlab.com/user/application_security/secret_detection/pipeline/configure
+# Dependency Scanning customization: https://docs.gitlab.com/ee/user/application_security/dependency_scanning/#customizing-the-dependency-scanning-settings
+# Container Scanning customization: https://docs.gitlab.com/ee/user/application_security/container_scanning/#customizing-the-container-scanning-settings
+# Note that environment variables can be set in several places
+# See https://docs.gitlab.com/ee/ci/variables/#cicd-variable-precedence
+stages:
+- build
+- test
+- deploy
+- review
+- dast
+- staging
+- canary
+- production
+- incremental rollout 10%
+- incremental rollout 25%
+- incremental rollout 50%
+- incremental rollout 100%
+- performance
+- cleanup
+- secret-detection
+
+sast:
+  stage: test
+
+include:
+- template: Auto-DevOps.gitlab-ci.yml
+
+variables:
+  SECRET_DETECTION_ENABLED: 'true'
+
+secret_detection:
+  stage: secret-detection
+
+# ─────────────────────────────────────────────────────────────
+# GitHub Mirror — syncs citadel_lite_repo → public GitHub repo
+# Runs on every push to main. Requires GITHUB_TOKEN CI variable.
+# Set in GitLab: Settings → CI/CD → Variables → GITHUB_TOKEN
+# ─────────────────────────────────────────────────────────────
+github_mirror:
+  stage: deploy
+  only:
+    - main
+  script:
+    - git config user.email "ci@citadel-nexus.com"
+    - git config user.name "Citadel CI"
+    - git remote add github "https://x-token-auth:${GITHUB_TOKEN}@github.com/raizoken23/citadel-lite.git" || git remote set-url github "https://x-token-auth:${GITHUB_TOKEN}@github.com/raizoken23/citadel-lite.git"
+    - git push github HEAD:main --force
+  variables:
+    GIT_STRATEGY: clone
+  allow_failure: true

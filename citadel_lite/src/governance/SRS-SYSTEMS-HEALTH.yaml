@@ -1,0 +1,497 @@
+# SRS-SYSTEMS-HEALTH.yaml
+# Citadel Nexus Systems Health Monitoring — Software Requirements Specification
+# ===========================================================
+# CGRF v2.0 | Status: Draft | Created: 2026-02-07
+#
+# This artifact provides assessor-traceable SRS codes for the
+# systems health monitoring domain, covering service probing,
+# infrastructure health, resource metrics, health event publishing,
+# automated remediation (REFLEX), ECS migration health gates,
+# alert escalation, and rollback triggers.
+
+_document_schema: CGRF-v2.0
+_module: systems_health
+_purpose: SRS traceability for Citadel Nexus systems health monitoring, probing, metrics, events, and remediation
+_owner: CNWB
+_compliance: CGRF v2.0
+_status: Draft
+
+# =============================================================================
+# PROBE — Service Health Probing
+# =============================================================================
+
+SYH-PROBE-001:
+  title: Health Check Endpoint
+  description: >
+    Every runtime service (event_listener, sake_builder, reflex_runtime,
+    council, smartbank, guardian) MUST expose a GET /health endpoint that
+    returns HTTP 200 with a JSON body containing at minimum
+    {"status": "healthy", "service": "<name>"}.  The health monitor
+    iterates the SERVICES map and issues async GET requests with a 5-second
+    timeout via httpx.AsyncClient.
+  priority: critical
+  status: implemented
+  file: src/runtime/health_monitor.py
+  function: check_service
+  notes: >
+    Each service URL is configurable via environment variables
+    (EVENT_LISTENER_URL, SAKE_BUILDER_URL, etc.) and defaults to
+    localhost with the canonical port.
+
+SYH-PROBE-002:
+  title: Periodic Health Sweep
+  description: >
+    The health monitor runs a continuous async loop that invokes
+    check_all_services() at a configurable interval (default 30 seconds,
+    controlled by the RUNTIME_MONITOR_INTERVAL environment variable).
+    Each cycle gathers the status of every registered service.
+  priority: critical
+  status: implemented
+  file: src/runtime/health_monitor.py
+  function: monitor_loop
+  notes: >
+    The interval is read from RUNTIME_MONITOR_INTERVAL env var at startup.
+    The loop runs indefinitely via asyncio.run(monitor_loop(interval)).
+
+SYH-PROBE-003:
+  title: Health Status Aggregation
+  description: >
+    The check_all_services() function aggregates individual service statuses
+    into an overall system state: "healthy" (all services OK), "degraded"
+    (at least one healthy but not all), or "down" (zero healthy services).
+    The result includes a timestamp, healthy_count, total_count, and a
+    per-service breakdown.
+  priority: critical
+  status: implemented
+  file: src/runtime/health_monitor.py
+  function: check_all_services
+  notes: >
+    Uses asyncio.gather to probe all services concurrently.  Each service
+    result includes status ("healthy", "unhealthy", or "down"), and an
+    error field when applicable.
+
+SYH-PROBE-004:
+  title: ECS Task Health Awareness
+  description: >
+    When services are running on ECS (post-migration), the health monitor
+    MUST be able to query ECS task status and compare desired_count vs
+    running_count.  A service is considered unhealthy if running_count
+    falls below desired_count for more than two consecutive probe cycles.
+  priority: high
+  status: draft
+  file: src/runtime/health_monitor.py
+  notes: >
+    Requires integration with AWS ECS DescribeServices API.  The
+    migrate_orchestrator already tracks per-service state (VPS_RUNNING,
+    ECS_RUNNING, etc.) which informs which probe mode to use.
+
+SYH-PROBE-005:
+  title: Deep Health Check
+  description: >
+    A deep health check validates the full dependency chain for each service:
+    database connectivity, Redis cache, NATS connection, and downstream
+    service reachability.  Unlike the basic /health probe, this endpoint
+    (GET /health/deep) exercises actual I/O paths and returns per-dependency
+    status.
+  priority: medium
+  status: draft
+  file: src/runtime/health_monitor.py
+  notes: >
+    Each service must implement a /health/deep endpoint.  The health monitor
+    will call deep checks on a longer interval (e.g., every 5 minutes) to
+    avoid overloading dependencies.
+
+# =============================================================================
+# INFRA — Infrastructure Health (Redis, NATS, Supabase)
+# =============================================================================
+
+SYH-INFRA-001:
+  title: Redis Connectivity Probe
+  description: >
+    The VPS monitor daemon checks Redis health by executing "redis-cli ping"
+    and expecting a "PONG" response.  The result is recorded as the
+    redis_healthy metric (1.0 for healthy, 0.0 for down) and pushed to
+    CloudWatch and Datadog.
+  priority: critical
+  status: implemented
+  file: infra/vps/monitor_daemon.py
+  function: _check_redis_health
+  notes: >
+    Uses subprocess with a 5-second timeout.  The metric is included in
+    every collection cycle of the main monitoring loop.
+
+SYH-INFRA-002:
+  title: NATS JetStream Connectivity Probe
+  description: >
+    The health system MUST probe NATS JetStream availability by attempting
+    a connection via the NATSPublisher.connect() method.  A successful
+    connection sets _connected=True; failure logs a warning and degrades
+    gracefully (publish becomes no-op).  The probe result feeds into the
+    overall infrastructure health status.
+  priority: critical
+  status: draft
+  file: services/nats/publisher.py
+  class: NATSPublisher
+  method: connect
+  notes: >
+    Currently NATSPublisher.connect() handles connectivity but does not
+    report health status externally.  A periodic NATS health probe should
+    be added to the health monitor service map.
+
+SYH-INFRA-003:
+  title: Supabase API Connectivity Probe
+  description: >
+    The health system MUST verify Supabase API reachability by issuing a
+    lightweight request (e.g., a health endpoint or a trivial RPC call)
+    against the Supabase REST URL.  Failure triggers a health.infra.alert
+    event.
+  priority: high
+  status: draft
+  file: src/runtime/health_monitor.py
+  notes: >
+    Supabase URL is available via NEXT_PUBLIC_CITADEL_NEXUS_SUPABASE_URL.
+    The probe should use the service_role key for server-side checks.
+
+SYH-INFRA-004:
+  title: VPS SSH Reachability Probe
+  description: >
+    From the ECS or CI environment, the health system MUST verify VPS SSH
+    reachability (147.93.43.117) via a lightweight SSH command (e.g.,
+    "ssh -o ConnectTimeout=5 ... echo ok").  Failure indicates the VPS
+    is unreachable and blocks any migration operations.
+  priority: medium
+  status: draft
+  notes: >
+    Citadel Helper already performs SSH operations against the VPS.
+    This probe formalizes the reachability check as a health gate.
+
+SYH-INFRA-005:
+  title: ALB Health Status Aggregation
+  description: >
+    When services are deployed behind an Application Load Balancer (ALB),
+    the health system MUST aggregate ALB target group health status.
+    A target group with fewer healthy targets than the minimum healthy
+    threshold triggers a health.infra.alert event.
+  priority: medium
+  status: draft
+  notes: >
+    Requires integration with AWS ELBv2 DescribeTargetHealth API.
+    Relevant after ECS migration is active.
+
+# =============================================================================
+# METRIC — Resource Metrics (CPU, Memory, Disk)
+# =============================================================================
+
+SYH-METRIC-001:
+  title: CPU Usage Collection and Threshold Evaluation
+  description: >
+    The VPS monitor daemon collects CPU usage via psutil.cpu_percent()
+    with a 1-second sampling interval.  The metric is pushed to CloudWatch
+    as cpu_usage_user and to Datadog as citadel.vps.cpu.  Threshold
+    evaluation (e.g., >80% sustained) should trigger health.metric.threshold
+    events.
+  priority: critical
+  status: implemented
+  file: infra/vps/monitor_daemon.py
+  function: collect_metrics
+  notes: >
+    Currently collected and pushed but threshold evaluation and event
+    publishing are not yet wired.  The metric is written to the state
+    file for local consumers.
+
+SYH-METRIC-002:
+  title: Memory Usage Collection and Threshold Evaluation
+  description: >
+    The VPS monitor daemon collects memory usage via psutil.virtual_memory(),
+    recording both mem_used_percent and mem_available_mb.  Pushed to
+    CloudWatch and Datadog (citadel.vps.memory).  Sustained usage above
+    85% should trigger health.metric.threshold events.
+  priority: critical
+  status: implemented
+  file: infra/vps/monitor_daemon.py
+  function: collect_metrics
+  notes: >
+    Threshold alerting not yet implemented; metric collection and push
+    are operational.
+
+SYH-METRIC-003:
+  title: Disk Usage Collection and Threshold Evaluation
+  description: >
+    The VPS monitor daemon collects disk usage via psutil.disk_usage("/"),
+    recording disk_used_percent and disk_free_gb.  Pushed to CloudWatch
+    and Datadog.  Disk usage above 90% should trigger an immediate
+    health.metric.threshold event.
+  priority: critical
+  status: implemented
+  file: infra/vps/monitor_daemon.py
+  function: collect_metrics
+  notes: >
+    Disk pressure is particularly critical on the VPS (limited storage).
+    Threshold alerting not yet wired.
+
+SYH-METRIC-004:
+  title: Container-Level Resource Metrics
+  description: >
+    The VPS monitor daemon collects per-Docker-container CPU and memory
+    metrics via "docker stats --no-stream".  Each container's cpu_percent
+    and mem_percent are pushed to CloudWatch with a ContainerName dimension
+    and to Datadog with a container tag.
+  priority: high
+  status: implemented
+  file: infra/vps/monitor_daemon.py
+  function: collect_container_metrics
+  notes: >
+    SRS-MIGRATE-MONITOR-001.  The top 3 CPU containers are logged when
+    above 5%.  Container metrics feed into the migrate_orchestrator's
+    migration decisions.
+
+SYH-METRIC-005:
+  title: CloudWatch Metric Dual-Write
+  description: >
+    All collected metrics MUST be dual-written to both CloudWatch
+    (Citadel/VPS namespace) and Datadog (when DD_API_KEY is configured).
+    CloudWatch uses AWS CLI put-metric-data in batches of 20; Datadog
+    uses the HTTP Series API with gauge type.
+  priority: high
+  status: implemented
+  file: infra/vps/monitor_daemon.py
+  function: push_to_cloudwatch
+  related: push_to_datadog
+  notes: >
+    SRS: CITADEL-INT-002.  Datadog push is non-fatal; CloudWatch is the
+    primary metric store.  Consecutive CloudWatch failures trigger backoff.
+
+# =============================================================================
+# EVENT — Health Event Publishing to NATS
+# =============================================================================
+
+SYH-EVENT-001:
+  title: Publish health.check.completed Events
+  description: >
+    After each health sweep cycle, the health monitor MUST publish a
+    health.check.completed event to NATS JetStream containing the full
+    aggregated health status (overall state, per-service breakdown,
+    healthy_count, total_count, and timestamp).
+  priority: high
+  status: draft
+  file: src/runtime/health_monitor.py
+  nats_subject: citadel.health.check.completed
+  notes: >
+    Uses NATSPublisher from services/nats/publisher.py.  The event
+    envelope follows the canonical EventEnvelope schema.
+
+SYH-EVENT-002:
+  title: Publish health.service.degraded Events
+  description: >
+    When the overall system status transitions from "healthy" to "degraded",
+    the health monitor MUST publish a health.service.degraded event
+    identifying which service(s) are unhealthy and the aggregated status.
+  priority: high
+  status: draft
+  file: src/runtime/health_monitor.py
+  nats_subject: citadel.health.service.degraded
+  notes: >
+    Should include the list of unhealthy services and their individual
+    error messages to aid rapid diagnosis.
+
+SYH-EVENT-003:
+  title: Publish health.service.down Events
+  description: >
+    When the overall system status transitions to "down" (zero healthy
+    services), the health monitor MUST publish a health.service.down event.
+    This is a critical event that triggers immediate alert escalation.
+  priority: critical
+  status: draft
+  file: src/runtime/health_monitor.py
+  nats_subject: citadel.health.service.down
+  notes: >
+    If NATS itself is down, this event should be logged locally and
+    queued for retry when connectivity is restored.
+
+SYH-EVENT-004:
+  title: Publish health.infra.alert Events
+  description: >
+    When an infrastructure dependency (Redis, NATS, Supabase, VPS SSH)
+    fails its health probe, the health monitor MUST publish a
+    health.infra.alert event specifying the failed dependency and
+    failure details.
+  priority: critical
+  status: draft
+  nats_subject: citadel.health.infra.alert
+  notes: >
+    Infrastructure alerts carry higher severity than individual service
+    alerts because they typically affect multiple services.
+
+SYH-EVENT-005:
+  title: Publish health.metric.threshold Events
+  description: >
+    When a resource metric (CPU, memory, disk) exceeds its configured
+    warning threshold, the monitor daemon MUST publish a
+    health.metric.threshold event containing the metric name, current
+    value, threshold, and the affected host/container.
+  priority: high
+  status: draft
+  file: infra/vps/monitor_daemon.py
+  nats_subject: citadel.health.metric.threshold
+  notes: >
+    Default thresholds: CPU >80%, memory >85%, disk >90%.
+    Thresholds should be configurable via environment variables.
+
+# =============================================================================
+# REFLEX — Automated Remediation Triggers
+# =============================================================================
+
+SYH-REFLEX-001:
+  title: REFLEX Trigger on Service Degradation
+  description: >
+    When health.service.degraded events are detected, the REFLEX dispatcher
+    MUST evaluate matching reflex rules.  The default remediation for
+    degradation is "log_and_alert": log the event to Guardian and send
+    an alert notification.  CAPS trust score gating applies.
+  priority: high
+  status: draft
+  file: src/runtime/reflex_dispatcher.py
+  class: ReflexDispatcher
+  method: dispatch
+  notes: >
+    Requires a reflex manifest rule with trigger "health.service.degraded"
+    and action "log_and_alert".  The dispatcher already supports
+    log_and_alert via the @reflex_action decorator.
+
+SYH-REFLEX-002:
+  title: REFLEX Trigger on Service Down
+  description: >
+    When health.service.down events are detected, the REFLEX dispatcher
+    MUST evaluate matching reflex rules.  The default remediation for
+    service-down is "escalate_and_patch": log an escalation to Guardian
+    and queue a patch/restart action.  This is a critical-priority reflex.
+  priority: critical
+  status: draft
+  file: src/runtime/reflex_dispatcher.py
+  class: ReflexDispatcher
+  method: dispatch
+  notes: >
+    Requires a reflex manifest rule with trigger "health.service.down"
+    and action "escalate_and_patch".  The dispatcher already supports
+    escalate_and_patch via the @reflex_action decorator.
+
+SYH-REFLEX-003:
+  title: REFLEX Trigger on Infrastructure Failure
+  description: >
+    When health.infra.alert events are detected (Redis down, NATS down,
+    Supabase unreachable), the REFLEX dispatcher MUST evaluate matching
+    reflex rules.  Infrastructure failures may trigger service restarts,
+    connection pool resets, or failover switching depending on the
+    affected dependency.
+  priority: critical
+  status: draft
+  file: src/runtime/reflex_dispatcher.py
+  class: ReflexDispatcher
+  notes: >
+    May require new reflex action handlers beyond log_and_alert and
+    escalate_and_patch (e.g., "restart_service", "reset_connections").
+
+# =============================================================================
+# MIGRATE — ECS Migration Health Awareness
+# =============================================================================
+
+SYH-MIGRATE-001:
+  title: Migration Readiness Health Gate
+  description: >
+    Before initiating a VPS-to-ECS migration for any service, the
+    migrate_orchestrator MUST verify that the target service passes
+    its health check on the destination environment.  A migration MUST
+    NOT proceed if the overall system health status is "down" or if
+    the specific service's health check fails on the ECS side.
+  priority: critical
+  status: draft
+  file: citadel_lite/src/agents/migrate_orchestrator.py
+  related: src/runtime/health_monitor.py
+  notes: >
+    The migrate_orchestrator state machine transitions through
+    VPS_RUNNING -> MIGRATING_TO_ECS -> ECS_RUNNING.  The health gate
+    should be checked before and during the MIGRATING_TO_ECS state.
+
+SYH-MIGRATE-002:
+  title: Post-Migration Health Verification
+  description: >
+    After completing a migration (service state reaches ECS_RUNNING or
+    VPS_RUNNING), the health monitor MUST perform a verification sweep
+    of the migrated service.  If the service fails health checks within
+    a configurable stabilization window (default 60 seconds), an automatic
+    rollback to the previous environment is triggered via the
+    nginx_route_manager.
+  priority: critical
+  status: draft
+  file: citadel_lite/src/agents/migrate_orchestrator.py
+  related:
+    - src/runtime/health_monitor.py
+    - infra/vps/nginx_route_manager.py
+  notes: >
+    The nginx_route_manager.switch() function handles upstream switching
+    between VPS and ECS with automatic revert on nginx config failure.
+    Health verification adds an application-layer check on top of this.
+
+# =============================================================================
+# ALERT — Alert Escalation
+# =============================================================================
+
+SYH-ALERT-001:
+  title: Alert Escalation Chain
+  description: >
+    Health alerts follow a four-stage escalation chain:
+    1. Log — All health events are logged to the local log and Guardian.
+    2. NATS — Events are published to the citadel.health.* subject tree.
+    3. n8n — Configured n8n workflows consume NATS events and trigger
+       external notifications (email, webhook).
+    4. Discord — Critical alerts are forwarded to the Citadel Discord
+       channel via the Zayara bot integration.
+    Each stage activates only when the previous stage has been attempted.
+  priority: high
+  status: draft
+  notes: >
+    The n8n workflow integration is documented in
+    ops/automation_hub/n8n-stripe-entitlement-documentation.md.
+    Zayara bot prefix is "!zayara" with slash command support.
+
+SYH-ALERT-002:
+  title: Alert Deduplication
+  description: >
+    Repeated health alerts for the same service and failure condition
+    MUST be suppressed within a configurable cooldown window (default
+    5 minutes).  The first occurrence triggers the full escalation chain;
+    subsequent identical alerts within the cooldown are logged but not
+    escalated.  A counter tracks suppressed alert count.
+  priority: medium
+  status: draft
+  notes: >
+    Deduplication key = (service_name, failure_type, severity).
+    The cooldown resets when the service recovers (status returns to
+    healthy) or when the cooldown window expires.
+
+# =============================================================================
+# ROLL — Rollback Triggers
+# =============================================================================
+
+SYH-ROLL-001:
+  title: Automatic Rollback Trigger on Sustained Health Failure
+  description: >
+    If a service remains in "down" status for more than N consecutive
+    health sweep cycles (default N=3, i.e., ~90 seconds at 30-second
+    intervals), the system MUST trigger an automatic rollback.  For
+    ECS-deployed services, this means switching the nginx upstream back
+    to VPS via nginx_route_manager.switch(service, "vps").  For
+    VPS-deployed services, this means restarting the Docker container
+    via the run_zayara.sh restart mechanism.  The rollback event is
+    published to NATS and escalated through the alert chain.
+  priority: critical
+  status: draft
+  file: infra/vps/nginx_route_manager.py
+  function: switch
+  related:
+    - src/runtime/health_monitor.py
+    - citadel_lite/src/agents/migrate_orchestrator.py
+  notes: >
+    The nginx_route_manager already supports automatic revert on nginx
+    config validation failure.  This SRS code adds application-health-driven
+    rollback on top of the infrastructure-level revert.

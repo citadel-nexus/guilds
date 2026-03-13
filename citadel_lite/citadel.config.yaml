@@ -1,0 +1,104 @@
+pipeline:
+  execution_mode: local
+  agent_version: v2
+  sse_enabled: true
+llm:
+  azure_openai:
+    endpoint: ''
+    api_key: ''
+    deployment: gpt-4o
+  openai:
+    api_key: ''
+    model: gpt-4o
+github:
+  token: ''
+  webhook_secret: ''
+gitlab:
+  url: ''
+  token: ''
+dashboard:
+  enabled: true
+  poll_interval_ms: 2000
+notifications:
+  slack:
+    webhook_url: ''
+    channel: '#citadel-alerts'
+  teams:
+    webhook_url: ''
+  webhook:
+    url: ''
+    headers: {}
+aws:
+  region: us-east-1
+  bedrock:
+    model: haiku  # haiku | sonnet | opus
+    max_tokens: 2048
+    temperature: 0.2
+  ecs:
+    cluster: citadel-cluster
+    services:
+      - nats-service
+      - n8n-service
+      - workshop-service
+  s3:
+    bucket: citadel-nexus-assets
+    lifecycle:
+      builds_delete_days: 180
+      logs_archive_days: 365
+      tmp_delete_days: 7
+      embeddings_expire_days: 365
+      asset_tiering_days: 30
+  ecr:
+    account_id: '568721121468'
+  cloudwatch:
+    vps_namespace: Citadel/VPS
+    vps_instance_id: vps-147-93-43-117
+    cpu_high_threshold: 80
+    cpu_low_threshold: 40
+    collection_interval_seconds: 60
+  autoscaling:
+    max_tasks: 3
+    min_tasks_workshop: 1
+    min_tasks_worker: 0
+    cooldown_seconds: 300
+  ray:
+    head_address: '147.93.43.117:6379'
+    dashboard_port: 8265
+    max_workers: 2
+  nats:
+    url: nats://localhost:4222
+    worker_categories:
+      - cpu
+      - data_processing
+      - notification
+memory:
+  backend: local  # local | faiss | azure_search
+  faiss_enabled: false
+supabase:
+  url: ''
+  api_key: ''
+notion:
+  api_key: ''
+  database_id: ''
+slack:
+  bot_token: ''
+  signing_secret: ''
+azure:
+  service_bus:
+    connection_string: ''
+    queue_name: citadel-events
+  cosmos:
+    connection_string: ''
+    database: citadel-lite
+    container: incidents
+  foundry:
+    endpoint: ''
+    api_key: ''
+  app_insights:
+    connection_string: ''
+  storage:
+    connection_string: ''
+  ai_search:
+    endpoint: ''
+    api_key: ''
+    index_name: citadel-incidents

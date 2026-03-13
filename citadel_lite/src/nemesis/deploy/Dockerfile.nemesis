@@ -1,0 +1,25 @@
+# Nemesis v2 Adversarial Resilience Daemon — Dockerfile
+# SRS: NEM-DAEMON-001
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# System deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl && rm -rf /var/lib/apt/lists/*
+
+# Create daemon directories
+RUN mkdir -p /var/lib/nemesis/scorecards /var/run/nemesis
+
+# Install Python deps (minimal — daemon has no heavy deps)
+RUN pip install --no-cache-dir pyyaml requests httpx
+
+# Copy nemesis source
+COPY src/nemesis/ ./nemesis/
+
+# Set defaults
+ENV NEMESIS_ENV="staging"
+ENV PYTHONUNBUFFERED=1
+
+# Entry point
+CMD ["python", "-m", "nemesis.runtime.nemesis_daemon"]

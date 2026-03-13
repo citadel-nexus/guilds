@@ -1,0 +1,380 @@
+{
+  "_description": "Citadel Lite Test Scenarios — comprehensive incident coverage",
+  "_usage": "POST any scenario to /webhook/event. Each has prebuilt log data for pipeline testing.",
+  "_tiers": {
+    "low": "Risk < 0.3 — auto-approve expected",
+    "medium": "Risk 0.3–0.6 — approval gate expected",
+    "critical": "Risk > 0.6 — block or escalate expected"
+  },
+
+  "scenarios": [
+
+    {
+      "_label": "TEST: CI Failure — Low Severity (missing dev dependency)",
+      "_tier": "low",
+      "_expected": "Auto-approve, simple fix: add dependency",
+      "schema_version": "event_json_v1",
+      "event_id": "test-ci-low-001",
+      "event_type": "ci_failure",
+      "source": "github_actions",
+      "repo": "acme/web-app",
+      "ref": "feature/add-logging",
+      "summary": "CI failed: missing dev dependency in test suite",
+      "artifacts": {
+        "log_excerpt": "Step 4/7 : RUN pip install -r requirements-dev.txt\n---\nCollecting pytest-cov>=4.0\n  Downloading pytest_cov-4.1.0.tar.gz\nERROR: Could not find a version that satisfies the requirement black==24.1.0 (from -r requirements-dev.txt (line 8))\nERROR: No matching distribution found for black==24.1.0\n\nThe command '/bin/sh -c pip install -r requirements-dev.txt' returned a non-zero code: 1\n\n##[error]Process completed with exit code 1.",
+        "links": ["https://github.com/acme/web-app/actions/runs/10001"]
+      }
+    },
+
+    {
+      "_label": "TEST: CI Failure — Medium Severity (test assertion failure)",
+      "_tier": "medium",
+      "_expected": "Needs review, test logic may need update",
+      "schema_version": "event_json_v1",
+      "event_id": "test-ci-med-001",
+      "event_type": "ci_failure",
+      "source": "github_actions",
+      "repo": "acme/api-service",
+      "ref": "develop",
+      "summary": "CI failed: 3 unit test assertions failed in payment module",
+      "artifacts": {
+        "log_excerpt": "FAILED tests/test_payment.py::TestPaymentProcessor::test_charge_card - AssertionError: Expected status 200, got 422\nFAILED tests/test_payment.py::TestPaymentProcessor::test_refund - AssertionError: Decimal('99.99') != Decimal('100.00')\nFAILED tests/test_payment.py::TestPaymentProcessor::test_webhook_signature - AssertionError: HMAC verification failed\n\n3 failed, 47 passed, 2 skipped in 12.34s\n\n##[error]Process completed with exit code 1.",
+        "links": ["https://github.com/acme/api-service/actions/runs/10002"]
+      }
+    },
+
+    {
+      "_label": "TEST: CI Failure — Critical (build system compromise indicator)",
+      "_tier": "critical",
+      "_expected": "Block — suspicious build artifact",
+      "schema_version": "event_json_v1",
+      "event_id": "test-ci-crit-001",
+      "event_type": "ci_failure",
+      "source": "github_actions",
+      "repo": "acme/core-platform",
+      "ref": "main",
+      "summary": "CI failed: unexpected binary in build output, possible supply chain issue",
+      "artifacts": {
+        "log_excerpt": "Step 8/10 : RUN npm run build\n---\nBuilding production bundle...\nWARNING: Unexpected file in dist/: update-helper.exe (4.2MB)\nSHA256: a1b2c3d4e5f6...does not match any known build artifact\nERROR: Build integrity check failed — unknown binary detected in output\nERROR: Artifact hash mismatch: expected 48 files, found 49\n\nBuild verification FAILED. Possible supply chain compromise.\n##[error]Process completed with exit code 2.",
+        "links": ["https://github.com/acme/core-platform/actions/runs/10003"],
+        "extra": { "severity": "critical", "security_flag": true }
+      }
+    },
+
+    {
+      "_label": "TEST: Deploy Failure — Low Severity (timeout on health check)",
+      "_tier": "low",
+      "_expected": "Auto-approve retry",
+      "schema_version": "event_json_v1",
+      "event_id": "test-deploy-low-001",
+      "event_type": "deploy_failure",
+      "source": "github_actions",
+      "repo": "acme/web-app",
+      "ref": "release/v1.5.2",
+      "summary": "Deploy to staging timed out waiting for health check",
+      "artifacts": {
+        "log_excerpt": "Deploying to staging environment...\nPushing image acme/web-app:v1.5.2 to registry... OK\nCreating deployment... OK\nWaiting for rollout to complete...\n  Waiting for 3 replicas to be ready: 2 of 3 ready\n  Waiting for 3 replicas to be ready: 2 of 3 ready\nERROR: Timeout after 300s waiting for deployment to complete\nHealth check endpoint /health returned 503 for pod web-app-7f9b4c-xk2lm\n\nRollback triggered automatically.\n##[error]Deploy failed: health check timeout",
+        "links": ["https://github.com/acme/web-app/actions/runs/10004"],
+        "extra": { "environment": "staging", "step": "health_check" }
+      }
+    },
+
+    {
+      "_label": "TEST: Deploy Failure — Medium Severity (database migration error)",
+      "_tier": "medium",
+      "_expected": "Needs approval — data migration risk",
+      "schema_version": "event_json_v1",
+      "event_id": "test-deploy-med-001",
+      "event_type": "deploy_failure",
+      "source": "github_actions",
+      "repo": "acme/api-service",
+      "ref": "release/v3.0.0",
+      "summary": "Deploy failed: database migration error on ALTER TABLE users",
+      "artifacts": {
+        "log_excerpt": "Running database migrations...\nMigration 0047_add_user_preferences... OK\nMigration 0048_alter_users_email_index... \nERROR 1062 (23000): Duplicate entry 'user@example.com' for key 'users.ix_users_email_unique'\npsycopg2.errors.UniqueViolation: could not create unique index \"ix_users_email_unique\"\nDETAIL: Key (email)=(user@example.com) is duplicated.\n\nMigration 0048 FAILED. Database state may be inconsistent.\nPlease review and resolve duplicate data before retrying.\n##[error]Deploy aborted: migration failure",
+        "links": ["https://github.com/acme/api-service/actions/runs/10005"],
+        "extra": { "environment": "production", "step": "migrate" }
+      }
+    },
+
+    {
+      "_label": "TEST: Deploy Failure — Critical (production secret leak in logs)",
+      "_tier": "critical",
+      "_expected": "Block and escalate — secrets exposed",
+      "schema_version": "event_json_v1",
+      "event_id": "test-deploy-crit-001",
+      "event_type": "deploy_failure",
+      "source": "github_actions",
+      "repo": "acme/core-platform",
+      "ref": "main",
+      "summary": "Deploy failed: production database credentials leaked in CI logs",
+      "artifacts": {
+        "log_excerpt": "Step: Configure Environment\nSetting DATABASE_URL from secrets...\nWARNING: Secret masking failed for step output\n  DATABASE_URL=postgres://admin:Pr0d_S3cret!@db.acme.io:5432/production\n  REDIS_URL=redis://:r3d1s_p@ss@cache.acme.io:6379/0\nERROR: Secret exposure detected in build logs!\nBuild terminated to prevent further exposure.\n\nIMMEDIATE ACTION REQUIRED: Rotate all exposed credentials.\n##[error]SECURITY: Secrets exposed in logs. Build halted.",
+        "links": ["https://github.com/acme/core-platform/actions/runs/10006"],
+        "extra": { "environment": "production", "security_flag": true, "severity": "critical" }
+      }
+    },
+
+    {
+      "_label": "TEST: Infra Alert — Low Severity (high CPU transient spike)",
+      "_tier": "low",
+      "_expected": "Auto-approve, monitor only",
+      "schema_version": "event_json_v1",
+      "event_id": "test-infra-low-001",
+      "event_type": "infra_alert",
+      "source": "azure_monitor",
+      "repo": "acme/web-app",
+      "ref": "main",
+      "summary": "Transient CPU spike on web-app-prod-01 (peak 87%, resolved)",
+      "artifacts": {
+        "log_excerpt": "Alert: CPU utilization exceeded threshold\nResource: web-app-prod-01 (Standard_D4s_v3)\nMetric: Percentage CPU\nCondition: Greater than 80% for 5 minutes\n\nTimeline:\n  14:22:03 - CPU: 82%\n  14:23:05 - CPU: 87% (peak)\n  14:24:02 - CPU: 74%\n  14:25:01 - CPU: 45% (resolved)\n\nCorrelation: Coincides with scheduled batch job cron-reports-daily.\nNo user impact detected. Response times normal.",
+        "links": ["https://portal.azure.com/#alerts/10007"]
+      }
+    },
+
+    {
+      "_label": "TEST: Infra Alert — Medium Severity (disk space warning)",
+      "_tier": "medium",
+      "_expected": "Needs review — preventive cleanup needed",
+      "schema_version": "event_json_v1",
+      "event_id": "test-infra-med-001",
+      "event_type": "infra_alert",
+      "source": "azure_monitor",
+      "repo": "acme/api-service",
+      "ref": "main",
+      "summary": "Disk space warning: /var/log at 89% on api-prod-02",
+      "artifacts": {
+        "log_excerpt": "Alert: Disk space utilization warning\nResource: api-prod-02 (Standard_E4s_v3)\nMount: /var/log\nUsage: 89% (42.7GB / 48GB)\n\nLargest consumers:\n  /var/log/api-service/access.log     18.2GB\n  /var/log/api-service/error.log       8.7GB\n  /var/log/api-service/debug.log      12.1GB\n  /var/log/syslog                      2.4GB\n\nGrowth rate: ~1.2GB/day\nEstimated time to full: 4.4 days\n\nRecommendation: Implement log rotation or increase volume size.",
+        "links": ["https://portal.azure.com/#alerts/10008"]
+      }
+    },
+
+    {
+      "_label": "TEST: Infra Alert — Critical (database connection pool exhausted)",
+      "_tier": "critical",
+      "_expected": "Block and escalate — active production impact",
+      "schema_version": "event_json_v1",
+      "event_id": "test-infra-crit-001",
+      "event_type": "infra_alert",
+      "source": "azure_monitor",
+      "repo": "acme/core-platform",
+      "ref": "main",
+      "summary": "CRITICAL: Database connection pool exhausted, 503s in production",
+      "artifacts": {
+        "log_excerpt": "CRITICAL Alert: Database Connection Pool Exhausted\nResource: db-prod-primary (Gen5, 8 vCores)\nActive connections: 200/200 (100%)\nWaiting queries: 847\n\nImpact:\n  HTTP 503 rate: 34% of requests (was 0.1%)\n  P99 latency: 28,400ms (was 180ms)\n  Affected services: api-service, auth-service, payment-service\n\nTimeline:\n  15:40:00 - Connections: 180/200\n  15:41:00 - Connections: 200/200 MAXED\n  15:42:00 - 503 errors begin\n  15:45:00 - 847 queries waiting\n\nPossible cause: Connection leak in api-service v3.0.0 deployed at 15:35.",
+        "links": ["https://portal.azure.com/#alerts/10009"],
+        "extra": { "severity": "critical", "active_impact": true }
+      }
+    },
+
+    {
+      "_label": "TEST: Security Alert — Low Severity (outdated minor dependency)",
+      "_tier": "low",
+      "_expected": "Auto-approve patch bump",
+      "schema_version": "event_json_v1",
+      "event_id": "test-security-low-001",
+      "event_type": "security_alert",
+      "source": "dependabot",
+      "repo": "acme/web-app",
+      "ref": "main",
+      "summary": "Low severity vulnerability in debug logging library",
+      "artifacts": {
+        "log_excerpt": "Security Advisory: GHSA-xxxx-yyyy-zzzz\nPackage: debug@4.3.1\nVulnerability: Information Exposure through debug output\nSeverity: LOW (CVSS 3.1)\nFixed in: debug@4.3.4\n\nDescription: In development mode, debug output may include\nsensitive headers when verbose logging is enabled.\n\nAffected path: web-app > express > debug\nRecommendation: Bump debug to >=4.3.4",
+        "links": ["https://github.com/advisories/GHSA-xxxx-yyyy-zzzz"],
+        "extra": { "severity": "low", "cvss": 3.1 }
+      }
+    },
+
+    {
+      "_label": "TEST: Security Alert — Medium Severity (XSS in template engine)",
+      "_tier": "medium",
+      "_expected": "Needs approval — user-facing vulnerability",
+      "schema_version": "event_json_v1",
+      "event_id": "test-security-med-001",
+      "event_type": "security_alert",
+      "source": "dependabot",
+      "repo": "acme/web-app",
+      "ref": "main",
+      "summary": "Medium severity XSS vulnerability in handlebars template engine",
+      "artifacts": {
+        "log_excerpt": "Security Advisory: GHSA-f2jv-r9rf-7988\nPackage: handlebars@4.7.6\nVulnerability: Cross-Site Scripting (XSS)\nSeverity: MEDIUM (CVSS 6.1)\nFixed in: handlebars@4.7.8\n\nDescription: When using {{triple-stash}}} expressions,\nhandlebars fails to properly sanitize certain Unicode\ncontrol characters, allowing stored XSS attacks.\n\nProof of concept:\n  Input: {{name}} where name = '\\u0000<script>alert(1)</script>'\n  Output: renders script tag\n\nAffected path: web-app > handlebars\nRecommendation: Upgrade to handlebars >=4.7.8",
+        "links": ["https://github.com/advisories/GHSA-f2jv-r9rf-7988"],
+        "extra": { "severity": "medium", "cvss": 6.1, "cve": "CVE-2023-XXXXX" }
+      }
+    },
+
+    {
+      "_label": "TEST: Security Alert — Critical (RCE in serialization library)",
+      "_tier": "critical",
+      "_expected": "Block — remote code execution",
+      "schema_version": "event_json_v1",
+      "event_id": "test-security-crit-001",
+      "event_type": "security_alert",
+      "source": "dependabot",
+      "repo": "acme/core-platform",
+      "ref": "main",
+      "summary": "CRITICAL: Remote Code Execution in PyYAML unsafe deserialization",
+      "artifacts": {
+        "log_excerpt": "Security Advisory: GHSA-rprw-h62v-c2w7\nPackage: PyYAML@5.3\nVulnerability: Arbitrary Code Execution via yaml.load()\nSeverity: CRITICAL (CVSS 9.8)\nFixed in: PyYAML@6.0.1\nCVE: CVE-2020-14343\n\nDescription: yaml.load() without Loader argument allows\nexecution of arbitrary Python objects through crafted YAML.\n\nExploit vector:\n  !!python/object/apply:os.system ['rm -rf /']\n\nAffected files:\n  src/config/loader.py:42 - yaml.load(data)\n  src/import/parser.py:18 - yaml.load(stream)\n\nIMPACT: Any endpoint accepting YAML input is exploitable.\nRecommendation: Upgrade and replace yaml.load() with yaml.safe_load()",
+        "links": ["https://github.com/advisories/GHSA-rprw-h62v-c2w7"],
+        "extra": { "severity": "critical", "cvss": 9.8, "cve": "CVE-2020-14343" }
+      }
+    },
+
+    {
+      "_label": "TEST: Rollback Needed — Low Severity (minor UI regression)",
+      "_tier": "low",
+      "_expected": "Auto-approve rollback",
+      "schema_version": "event_json_v1",
+      "event_id": "test-rollback-low-001",
+      "event_type": "rollback_needed",
+      "source": "manual",
+      "repo": "acme/web-app",
+      "ref": "release/v1.5.3",
+      "summary": "Minor UI regression: footer alignment broken on mobile",
+      "artifacts": {
+        "log_excerpt": "Rollback requested by @dev-team\nReason: CSS regression in v1.5.3\n\nImpact assessment:\n  - Footer overlaps content on viewport < 375px\n  - Affects: mobile Safari, Chrome Android\n  - User reports: 3 (low volume)\n  - Revenue impact: none\n\nPrevious stable: v1.5.2\nCommit range: abc1234..def5678 (2 commits)\nFiles changed: src/styles/layout.css, src/components/Footer.tsx",
+        "links": ["https://github.com/acme/web-app/compare/v1.5.2...v1.5.3"]
+      }
+    },
+
+    {
+      "_label": "TEST: Rollback Needed — Medium Severity (API breaking change)",
+      "_tier": "medium",
+      "_expected": "Needs approval — breaking change",
+      "schema_version": "event_json_v1",
+      "event_id": "test-rollback-med-001",
+      "event_type": "rollback_needed",
+      "source": "manual",
+      "repo": "acme/api-service",
+      "ref": "release/v3.0.0",
+      "summary": "API breaking change: v3 response format breaks mobile app v2.x",
+      "artifacts": {
+        "log_excerpt": "Rollback requested by @engineering-lead\nReason: Breaking API change in v3.0.0\n\nImpact assessment:\n  - /api/v2/users endpoint returns new JSON schema\n  - Mobile app v2.x expects { data: [...] } format\n  - v3.0.0 returns { users: [...], pagination: {...} }\n  - Error rate on mobile: 67% (was 0.2%)\n  - Affected users: ~12,000 on app v2.x\n\nPrevious stable: v2.9.4\nCommit range: 45 commits over 3 weeks\nDatabase migrations: 0048 applied (reversible)",
+        "links": ["https://github.com/acme/api-service/compare/v2.9.4...v3.0.0"]
+      }
+    },
+
+    {
+      "_label": "TEST: Rollback Needed — Critical (data corruption in production)",
+      "_tier": "critical",
+      "_expected": "Block and escalate — active data loss",
+      "schema_version": "event_json_v1",
+      "event_id": "test-rollback-crit-001",
+      "event_type": "rollback_needed",
+      "source": "manual",
+      "repo": "acme/core-platform",
+      "ref": "release/v4.0.0",
+      "summary": "CRITICAL: Data corruption — v4.0.0 migration truncated user addresses",
+      "artifacts": {
+        "log_excerpt": "INCIDENT REPORT — Severity: P0\nRollback requested by @VP-Engineering\n\nImpact:\n  - Migration 0052 truncated address_line_2 column to VARCHAR(10)\n  - 84,291 user records affected\n  - Shipping addresses corrupted for active orders\n  - 1,247 orders in fulfillment pipeline with bad addresses\n  - Estimated revenue impact: $340K in delayed shipments\n\nTimeline:\n  09:00 - v4.0.0 deployed to production\n  09:15 - First customer complaint (wrong address)\n  09:45 - Engineering confirms data truncation\n  10:00 - Rollback initiated\n\nRecovery: Requires point-in-time database restore from 08:55 backup.\nWARNING: Any orders placed 09:00-10:00 will need manual reconciliation.",
+        "links": ["https://github.com/acme/core-platform/releases/tag/v4.0.0"],
+        "extra": { "severity": "critical", "data_loss": true }
+      }
+    },
+
+    {
+      "_label": "TEST: Performance Degradation — Low Severity (slow dashboard load)",
+      "_tier": "low",
+      "_expected": "Auto-approve, monitor",
+      "schema_version": "event_json_v1",
+      "event_id": "test-perf-low-001",
+      "event_type": "performance_degradation",
+      "source": "azure_monitor",
+      "repo": "acme/web-app",
+      "ref": "main",
+      "summary": "Dashboard page load time increased from 1.2s to 2.8s",
+      "artifacts": {
+        "log_excerpt": "Performance Alert: Page Load Time Degradation\nPage: /dashboard\nBaseline P95: 1,200ms\nCurrent P95: 2,800ms (+133%)\n\nBreakdown:\n  Server response: 180ms (normal)\n  DOM load: 420ms (normal)\n  JS bundle: 1,800ms (was 600ms) << REGRESSION\n  API calls: 400ms (normal)\n\nCorrelation: bundle size increased from 340KB to 890KB\nCommit: feat: add chart library (recharts)\nImpact: No functional errors, slight UX delay only.",
+        "links": ["https://portal.azure.com/#perf/10010"]
+      }
+    },
+
+    {
+      "_label": "TEST: Performance Degradation — Medium (API latency p99 spike)",
+      "_tier": "medium",
+      "_expected": "Needs review — intermittent user impact",
+      "schema_version": "event_json_v1",
+      "event_id": "test-perf-med-001",
+      "event_type": "performance_degradation",
+      "source": "azure_monitor",
+      "repo": "acme/api-service",
+      "ref": "main",
+      "summary": "API P99 latency spike: /api/search endpoint at 4.2s (baseline 200ms)",
+      "artifacts": {
+        "log_excerpt": "Performance Alert: API Latency Spike\nEndpoint: GET /api/search\nBaseline P99: 200ms\nCurrent P99: 4,200ms (+2000%)\n\nQuery analysis:\n  Slow query: SELECT * FROM products WHERE name ILIKE '%{term}%'\n  Missing index on: products.name\n  Full table scan: 2.1M rows\n  Avg query time: 3,800ms\n\nAffected: 23% of API requests hit this endpoint\nUser-visible: Search results delayed, some timeouts\nError rate: 2.1% (timeout 503s)\n\nMitigation: Add GIN index on products.name, implement search caching.",
+        "links": ["https://portal.azure.com/#perf/10011"]
+      }
+    },
+
+    {
+      "_label": "TEST: Performance Degradation — Critical (memory leak OOM kills)",
+      "_tier": "critical",
+      "_expected": "Block — active production failure",
+      "schema_version": "event_json_v1",
+      "event_id": "test-perf-crit-001",
+      "event_type": "performance_degradation",
+      "source": "azure_monitor",
+      "repo": "acme/core-platform",
+      "ref": "main",
+      "summary": "CRITICAL: Memory leak causing OOM kills every 2 hours in production",
+      "artifacts": {
+        "log_excerpt": "CRITICAL Alert: Out of Memory — Pod Restarts\nService: core-platform-api\nPod restarts in last 6h: 3 (OOMKilled)\n\nMemory pattern:\n  T+0min:   512MB (baseline)\n  T+30min:  1.1GB\n  T+60min:  2.3GB\n  T+90min:  3.8GB\n  T+120min: 4.0GB → OOMKilled (limit: 4GB)\n\nHeap analysis (last dump before OOM):\n  - EventEmitter listeners: 847,293 (leak!)\n  - Unreferenced Promises: 234,891\n  - String cache: 1.2GB\n\nRoot cause hypothesis: WebSocket handler not removing\nevent listeners on disconnect (introduced in v3.1.0).\n\nImpact: Service restarts every ~2h, 30s downtime per restart.\nAll active WebSocket connections dropped on restart.",
+        "links": ["https://portal.azure.com/#perf/10012"],
+        "extra": { "severity": "critical", "active_impact": true }
+      }
+    },
+
+    {
+      "_label": "TEST: Test Failure — Low Severity (flaky integration test)",
+      "_tier": "low",
+      "_expected": "Auto-approve, known flaky test",
+      "schema_version": "event_json_v1",
+      "event_id": "test-testfail-low-001",
+      "event_type": "test_failure",
+      "source": "github_actions",
+      "repo": "acme/web-app",
+      "ref": "develop",
+      "summary": "Flaky integration test: test_websocket_reconnect intermittent timeout",
+      "artifacts": {
+        "log_excerpt": "test session starts\nplatform linux -- Python 3.11.7, pytest-8.0.0\ncollected 156 items\n\ntests/integration/test_websocket.py::test_connect PASSED\ntests/integration/test_websocket.py::test_send_message PASSED\ntests/integration/test_websocket.py::test_reconnect FAILED\n\nFAILURE: tests/integration/test_websocket.py::test_reconnect\n  async def test_reconnect():\n>     await asyncio.wait_for(ws.recv(), timeout=5.0)\nE     asyncio.TimeoutError\n\nNote: This test has failed 3 of last 20 runs (15% flake rate).\n155 passed, 1 failed in 34.21s",
+        "links": ["https://github.com/acme/web-app/actions/runs/10013"]
+      }
+    },
+
+    {
+      "_label": "TEST: Test Failure — Medium (E2E checkout flow broken)",
+      "_tier": "medium",
+      "_expected": "Needs approval — user-facing flow broken",
+      "schema_version": "event_json_v1",
+      "event_id": "test-testfail-med-001",
+      "event_type": "test_failure",
+      "source": "github_actions",
+      "repo": "acme/web-app",
+      "ref": "feature/new-checkout",
+      "summary": "E2E test failure: complete checkout flow broken — payment step fails",
+      "artifacts": {
+        "log_excerpt": "Running E2E test suite (Playwright)\n\ntests/e2e/checkout.spec.ts\n  [chromium] > test_add_to_cart ........................ PASSED (2.1s)\n  [chromium] > test_update_quantity .................... PASSED (1.8s)\n  [chromium] > test_apply_coupon ....................... PASSED (2.4s)\n  [chromium] > test_enter_shipping ..................... PASSED (3.1s)\n  [chromium] > test_payment_step ....................... FAILED (15.2s)\n    Error: Element '#payment-form' not found\n    Waiting for selector '#payment-form' timed out after 10000ms\n    Screenshot saved: test-results/payment-step-failure.png\n  [chromium] > test_order_confirmation ................. SKIPPED\n\n4 passed, 1 failed, 1 skipped\n\nNote: payment-form component was refactored in commit abc123.",
+        "links": ["https://github.com/acme/web-app/actions/runs/10014"]
+      }
+    },
+
+    {
+      "_label": "TEST: Test Failure — Critical (auth bypass in security test suite)",
+      "_tier": "critical",
+      "_expected": "Block — security vulnerability confirmed by tests",
+      "schema_version": "event_json_v1",
+      "event_id": "test-testfail-crit-001",
+      "event_type": "test_failure",
+      "source": "github_actions",
+      "repo": "acme/core-platform",
+      "ref": "feature/oauth-refactor",
+      "summary": "CRITICAL: Security test suite detected auth bypass — unauthenticated access to admin API",
+      "artifacts": {
+        "log_excerpt": "Running security test suite\n\ntests/security/test_auth.py\n  test_unauthenticated_blocked ........................ PASSED\n  test_expired_token_rejected ......................... PASSED\n  test_invalid_signature_rejected ..................... PASSED\n  test_admin_requires_admin_role ...................... FAILED!\n  test_rate_limiting_enforced ......................... PASSED\n\nFAILURE: test_admin_requires_admin_role\n  Response for GET /admin/users with role='viewer':\n    Expected: 403 Forbidden\n    Actual:   200 OK (returned 847 user records!)\n\n  The admin endpoint returned full user data including:\n    - email addresses\n    - hashed passwords\n    - API keys\n    - billing information\n\n  Root cause: middleware.auth.check_role() returns True\n  for any authenticated user after OAuth refactor.\n\n  THIS IS A SECURITY VULNERABILITY. DO NOT MERGE.\n\n4 passed, 1 failed in 8.73s",
+        "links": ["https://github.com/acme/core-platform/actions/runs/10015"],
+        "extra": { "severity": "critical", "security_flag": true }
+      }
+    }
+  ]
+}

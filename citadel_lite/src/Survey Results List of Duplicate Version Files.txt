@@ -1,0 +1,52 @@
+調査結果：バージョン重複ファイル一覧
+1. Orchestrator 系（最大の重複）
+ファイル	行数	状態
+old/orchestrator.py	209	旧v0、どこからも未参照
+old/orchestrator_v2.py	332	アーカイブ済み
+old/orchestrator_v2 - コピー.py	332	完全なコピー（MD5同一）
+orchestrator_v2.py（ルート）	332	app.py + MCP server が参照中
+src/orchestrator_v3.py	906	現行バージョン
+重要: ルートの orchestrator_v2.py は src/app.py と src/mcp_server/server.py からまだ import されている。
+
+2. コアモジュール版数違い
+レガシー	現行	レガシー参照元
+src/memory/store.py	src/memory/store_v2.py	orchestrator_v2, azure系, vector_store
+src/execution/runner.py	src/execution/runner_V2.py	orchestrator_v2, test_execution.py
+3. エージェント版数違い
+旧（old/に退避済み）	現行（src/agents/）
+old/sentinel.py (v0)	sentinel_v2.py ← 最新だがv3はない
+old/sherlock.py (v0)	sherlock_v3.py
+old/fixer.py (v0)	fixer_v3.py
+old/guardian.py (v0)	guardian_v3.py
+インフラ系エージェント（nemesis_v2, watcher_v2, scaler_v2, curator_v2, budget_v2）は v2 のみで旧版なし。これらは現行のまま。
+
+4. OrchestratorV2 の参照元（移行が必要な箇所）
+ファイル	import	対応
+src/app.py:37	from src.orchestrator_v2 import OrchestratorV2	→ V3 に切替
+src/mcp_server/server.py:55	from src.orchestrator_v2 import OrchestratorV2	→ V3 に切替
+tests/test_pipeline_e2e.py:11	from orchestrator_v2 import OrchestratorV2	→ V3 に切替 or skip
+5. レガシー store/runner の参照元（V2 移行後に不要になるもの）
+レガシーモジュール	まだ使っているファイル
+src/memory/store.py	src/azure/cosmos_memory.py, src/integrations/azure_ai_search.py, src/memory/vector_store.py, orchestrator_v2
+src/execution/runner.py	orchestrator_v2, src/execution/outcome_store.py, tests/test_execution.py
+6. 推奨アクション
+Phase A: orchestrator_v2 → v3 統合
+
+src/app.py — OrchestratorV2 → OrchestratorV3 に切替（コンストラクタ引数の差異を確認要）
+src/mcp_server/server.py — 同上
+tests/test_pipeline_e2e.py — V3 に統一 or V2 テストを skip/削除
+ルートの orchestrator_v2.py → old/ に移動
+old/orchestrator_v2 - コピー.py — 削除（完全重複）
+Phase B: レガシー store/runner の old/ 退避
+6. src/memory/store.py → old/ に移動、参照元を store_v2 に切替
+7. src/execution/runner.py → old/ に移動、参照元を runner_V2 に切替
+
+Phase C: クリーンアップ
+8. azure 系（cosmos_memory.py, azure_ai_search.py）の store 参照を v2 化
+9. tests/test_execution.py の runner 参照を V2 化
+
+影響しないもの（現状維持）:
+
+old/ 内の旧エージェント（sentinel.py, sherlock.py 等）— 既にアーカイブ済み
+インフラ系エージェント v2 — 最新版で旧版なし
+テストファイルのバージョン名（test_sentinel_v2.py 等）— ソースが v2 なので正しい

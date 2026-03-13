@@ -1,0 +1,449 @@
+# 🔍 Phase 4.0 — Guild Audit & Cross-Guild Verification — VCC Compliance Plan
+(Page ID: 1a2d7c1f-72fd-4284-b35c-66eff513714a)
+(URL: https://www.notion.so/Phase-4-0-Guild-Audit-Cross-Guild-Verification-VCC-Compliance-Plan-1a2d7c1f72fd4284b35c66eff513714a)
+
+[Total top-level blocks: 200]
+
+**Status:** Blueprint | **Date:** Feb 27, 2026
+**Owner:** mr.nobody | **Scope:** Full guild system audit — health scoring, cross-guild integration verification, CAPS/FATE compliance, and governance sign-off
+**Depends on:** Phase 3.0 — Guild Build-Out & Service Rebrand
+
+---
+
+
+### Table of contents
+
+
+---
+
+
+## Objective
+
+
+[CALLOUT] 🎯 **Verify every guild is production-ready** — schema deployed, NATS flowing, Stripe wired, UI rendering, cross-guild events propagating, security hardened, and governance compliant. No guild ships without passing the full audit gate.
+
+Phase 4.0 runs **after** Phase 3.0 build-out is complete. It is the quality gate that prevents broken or half-built guilds from reaching production.
+
+---
+
+
+## Audit Framework
+
+
+### Audit Dimensions
+
+Each guild is scored across **7 dimensions** on an A–F scale:
+| **Dimension** | **Weight** | **What's Checked** | **Pass Threshold** |
+| 🏗️ **Infrastructure** | 20% | ECS tasks running, health checks green, auto-scaling configured, Docker images in ECR | ≥ B |
+| 📊 **Data Layer** | 15% | Supabase tables deployed, RLS policies enforced, indexes in place, migrations applied | ≥ B |
+| 📡 **Event Mesh** | 15% | NATS subjects publishing/subscribing correctly, JetStream streams configured, no auth violations | ≥ B |
+| 💳 **Monetization** | 15% | Stripe products configured, guild metadata set, entitlements enforced, payment flows tested | ≥ C |
+| 🖥️ **UI/UX** | 10% | Landing page renders, guild branding applied, navigation correct, mobile responsive | ≥ C |
+| 🔒 **Security** | 15% | Nemesis L6 compliance, tenant isolation, API auth, rate limiting, RBAC enforcement | ≥ B |
+| 🔗 **Cross-Guild** | 10% | Inter-guild NATS events propagate, data flows verified, no orphaned events | ≥ C |
+
+### Scoring Scale
+
+| **Grade** | **Score** | **Meaning** |
+| A | 90–100 | Production-ready, fully operational |
+| B | 75–89 | Functional with minor gaps |
+| C | 60–74 | Partially functional, needs work |
+| D | 40–59 | Significant gaps, not shippable |
+| F | 0–39 | Not deployed or critically broken |
+
+---
+
+
+## Audit 1 — Per-Guild Health Check
+
+Each guild goes through a structured health check.
+
+### 1.1 Commerce Guild (formerly TradeBuilder)
+
+- [ ] **Infra:** CREW voice agent responding, lead pipeline operational, CRM writes succeeding
+- [ ] **Data:** `crew_leads`, `crew_members`, `call_transcripts` tables healthy, 19 DVs populating
+- [ ] **Events:** `citadel.commerce.lead.captured` firing on new leads, post-call distillation loop active
+- [ ] **Monetization:** Stripe `guild: "commerce"` metadata on all products, entitlement gates working
+- [ ] **UI:** `/guilds/commerce` renders with blue (#3B82F6) branding, hero copy correct
+- [ ] **Security:** Pre-call webhook authenticated, Bedrock distillation within token budget
+- [ ] **Cross-Guild:** Commerce → Finance customer creation event flowing
+
+### 1.2 Intelligence Guild (formerly Intelligence Suite)
+
+- [ ] **Infra:** FastAPI router `/api/intel/*` responding, Bedrock stagger chain connected
+- [ ] **Data:** `intel_signals`, `intel_briefings`, `intel_sources` tables deployed with RLS
+- [ ] **Events:** `citadel.intel.signal.detected` → `citadel.research.dossier.started` chain working
+- [ ] **Monetization:** Premium tier pricing configured, entitlement gate on briefing generation
+- [ ] **UI:** `/guilds/intelligence` renders with green (#22C55E) branding
+- [ ] **Security:** API rate limiting on briefing endpoints, tenant data isolation verified
+- [ ] **Cross-Guild:** Intelligence → Research signal-to-dossier pipeline verified
+
+### 1.3 Research Guild (formerly Oracle Dossier)
+
+- [ ] **Infra:** College :8200 multi-professor analysis operational
+- [ ] **Data:** `research_dossiers`, `research_entities` tables deployed
+- [ ] **Events:** `citadel.research.dossier.complete` publishing correctly
+- [ ] **Monetization:** Per-project pricing wired, dossier delivery tracked
+- [ ] **UI:** `/guilds/research` renders with gold (#EAB308) branding
+- [ ] **Security:** Dossier access scoped to requesting tenant only
+- [ ] **Cross-Guild:** Research → Commerce dossier-to-pitch pipeline verified
+
+### 1.4 Creator Guild (formerly AI Generate)
+
+- [ ] **Infra:** Prompt factory connected, Bedrock content generation operational
+- [ ] **Data:** `creator_content`, `creator_brand_voices` tables deployed
+- [ ] **Events:** `citadel.creator.content.generated` → distribution pipeline active
+- [ ] **Monetization:** Usage-based pricing configured, volume tracking in place
+- [ ] **UI:** `/guilds/creator` renders with pink (#EC4899) branding
+- [ ] **Security:** Brand voice data tenant-isolated, content moderation pipeline active
+- [ ] **Cross-Guild:** Creator → Commerce content distribution verified
+
+### 1.5 Builder Guild (formerly Workshop)
+
+- [ ] **Infra:** MCP FastAPI :8443 accessible, SDK endpoints operational
+- [ ] **Data:** `builder_integrations`, `builder_api_keys` tables deployed
+- [ ] **Events:** `citadel.builder.api.called` telemetry flowing
+- [ ] **Monetization:** API usage metering active, enterprise tier gates working
+- [ ] **UI:** `/guilds/builder` renders with orange (#F97316) branding
+- [ ] **Security:** API key rotation, rate limiting per key, abuse detection
+- [ ] **Cross-Guild:** Builder → Finance API usage billing pipeline verified
+
+### 1.6 Finance Guild ✅
+
+- [ ] **Infra:** Dataroom Engine :8092 operational, all 17+ tables migrated
+- [ ] **Data:** Finance schema fully deployed (customers, quotes, invoices, payments, etc.)
+- [ ] **Events:** All `citadel.finance.*` subjects active, Guardian audit trail logging
+- [ ] **Monetization:** Stripe Connect multi-tenant, Xero sync, Mercury read
+- [ ] **UI:** `/guilds/finance` renders with emerald (#059669) branding, all wireframe screens built
+- [ ] **Security:** Tenant isolation via RLS, PCI compliance via Stripe hosted, Mercury 2FA gate
+- [ ] **Cross-Guild:** Finance receives events from all other guilds correctly
+
+### 1.7 Entertainment Guild 🆕
+
+- [ ] **Infra:** RPG Session Engine :8400 on ECS, LiveKit voice sessions functional
+- [ ] **Data:** `ent_marketplace_*` tables deployed, 18 social layer tables live
+- [ ] **Events:** `citadel.ent.session.started`, `citadel.rpg.*` subjects active
+- [ ] **Monetization:** Freemium tiers configured, Stripe Connect marketplace 70/30 payouts verified
+- [ ] **UI:** `/guilds/entertainment` renders with purple (#A855F7) branding
+- [ ] **Security:** Session isolation, per-character memory scoping, marketplace escrow
+- [ ] **Cross-Guild:** Entertainment → Writers lore compilation pipeline verified
+
+### 1.8 Writers Guild 🆕
+
+- [ ] **Infra:** Book Governor v4.0 operational, 33-professor pipeline on College :8200
+- [ ] **Data:** `writer_books`, `writer_chapters`, `writer_audiobooks` tables deployed
+- [ ] **Events:** `citadel.writer.book.compiled` publishing correctly
+- [ ] **Monetization:** Per-project commissions ($49–$199) configured, included in Entertainment tiers
+- [ ] **UI:** `/guilds/writers` renders with amber (#D97706) branding
+- [ ] **Security:** Book content DRM, audiobook watermarking, DMCA compliance
+- [ ] **Cross-Guild:** Writers → Entertainment marketplace listing pipeline verified
+
+---
+
+
+## Audit 2 — Cross-Guild Integration Matrix
+
+Verify all inter-guild event flows from the rebrand blueprint:
+| **Flow** | **Source Event** | **Target Action** | **Status** |
+| Commerce → Finance | `citadel.commerce.client.onboarded` | Auto-create finance_customer record |   • [ ] Verified |
+| Commerce → Creator | `citadel.commerce.content.requested` | Trigger content generation pipeline |   • [ ] Verified |
+| Intelligence → Research | `citadel.intel.signal.detected` | Auto-start dossier investigation |   • [ ] Verified |
+| Research → Commerce | `citadel.research.dossier.complete` | Attach dossier to lead/prospect record |   • [ ] Verified |
+| Creator → Commerce | `citadel.creator.content.published` | Update client content calendar |   • [ ] Verified |
+| Entertainment → Writers | `citadel.ent.lore.compiled` | Start Book Maker pipeline with lore data |   • [ ] Verified |
+| Writers → Entertainment | `citadel.writer.book.published` | List on marketplace, notify creator |   • [ ] Verified |
+| Entertainment → Finance | `citadel.ent.marketplace.sale` | Record payout, update commission tracking |   • [ ] Verified |
+| Builder → Finance | `citadel.builder.api.usage` | Meter usage for billing |   • [ ] Verified |
+| Builder → Commerce | `citadel.builder.integration.deployed` | Update client integration status |   • [ ] Verified |
+
+---
+
+
+## Audit 3 — CAPS/FATE Governance Compliance
+
+
+### 3.1 CAPS Scoring Per Guild
+
+Each guild receives a CAPS (Competence, Autonomy, Purpose, Safety) composite score:
+| **Guild** | **C (Competence)** | **A (Autonomy)** | **P (Purpose)** | **S (Safety)** | **Composite** | **Target** |
+| 🏪 Commerce | TBD | TBD | TBD | TBD | TBD | ≥ B |
+| 🔍 Intelligence | TBD | TBD | TBD | TBD | TBD | ≥ B |
+| 📜 Research | TBD | TBD | TBD | TBD | TBD | ≥ B |
+| 🎨 Creator | TBD | TBD | TBD | TBD | TBD | ≥ C |
+| 🔧 Builder | TBD | TBD | TBD | TBD | TBD | ≥ C |
+| 💰 Finance | TBD | TBD | TBD | TBD | TBD | ≥ B |
+| 🎮 Entertainment | TBD | TBD | TBD | TBD | TBD | ≥ C |
+| 📚 Writers | TBD | TBD | TBD | TBD | TBD | ≥ C |
+
+### 3.2 FATE Trust Scoring
+
+FATE (Fairness, Accountability, Transparency, Ethics) applied to each guild's AI components:
+- **Fairness:** No guild discriminates in service delivery based on protected attributes
+- **Accountability:** Every guild action logged in Guardian audit trail via NATS
+- **Transparency:** AI-generated content clearly labeled, model versions tracked
+- **Ethics:** Bedrock guardrails enforced, content filtering active, prompt injection mitigation
+
+### 3.3 Sentinel Watchdog Integration
+
+The Sentinel agent (`agent_1401khhn9wqcef0884hp4h45jyr7`) monitors all guilds for:
+- **Drift detection:** Guild behavior diverging from blueprint specification
+- **Boundary enforcement:** Guild agents staying within defined scopes
+- **Trust scoring:** Per-guild trust levels updated in real-time
+- **Anomaly detection:** Unusual patterns in NATS event flow, API usage, or revenue
+
+---
+
+
+## Audit 4 — Security & Compliance
+
+
+### 4.1 Nemesis L6 Compliance Checklist
+
+- [ ] All guild API routes behind Cloudflare WAF
+- [ ] Rate limiting configured per guild per tenant
+- [ ] Input validation on all guild endpoints (Pydantic models)
+- [ ] SQL injection prevention (parameterized queries)
+- [ ] XSS prevention (content sanitization on user-generated content)
+- [ ] CSRF protection on all state-changing endpoints
+- [ ] TLS 1.3 enforced on all guild connections
+- [ ] Secret rotation schedule documented per guild
+
+### 4.2 Multi-Tenant Isolation Verification
+
+- [ ] **Supabase RLS** active on ALL guild tables (100% coverage)
+- [ ] **NATS subject isolation** — tenant events scoped to tenant-specific subjects
+- [ ] **Stripe Connect isolation** — `Stripe-Account` header present on all API calls
+- [ ] **File storage isolation** — Supabase Storage buckets scoped by tenant
+- [ ] **API key isolation** — Builder Guild API keys scoped to issuing tenant
+- [ ] **Session isolation** — Entertainment Guild RPG sessions cannot cross-tenant
+
+### 4.3 GDPR / CCPA / DMCA Compliance
+
+- [ ] Data subject rights endpoints deployed (5 rights from Social Pipeline blueprint)
+- [ ] Cascade delete verified on user account deletion
+- [ ] DMCA notice/counter-notice flow tested
+- [ ] Data retention policies enforced via `pg_cron` jobs (4 jobs from blueprint)
+- [ ] Audit log captures all data access events
+
+---
+
+
+## Audit 5 — Observability, Health Checks & SLA Verification
+
+
+### 5.0 Health Check Audit Gate
+
+
+[CALLOUT] 🩺 **Before any guild enters Phase 4.0 auditing, its health check endpoint must have been green for ≥ 72 consecutive hours.** This is a hard prerequisite — no exceptions.
+
+```python
+# tools/audit_health_gate.py
+import httpx, asyncio
+from datetime import datetime, timedelta
+from datadog_api_client import ApiClient, Configuration
+from datadog_api_client.v1.api.monitors_api import MonitorsApi
+
+HEALTH_GATE_HOURS = 72  # Minimum consecutive green hours
+
+async def verify_health_gate(guild: str, monitor_id: int) -> dict:
+    """Check Datadog monitor history for consecutive uptime."""
+    config = Configuration()
+    with ApiClient(config) as api_client:
+        api = MonitorsApi(api_client)
+        # Get monitor state history for past 72h
+        now = datetime.utcnow()
+        history = api.get_monitor_sli_history(
+            monitor_id,
+            from_ts=int((now - timedelta(hours=HEALTH_GATE_HOURS)).timestamp()),
+            to_ts=int(now.timestamp()),
+        )
+        uptime_pct = history.data.overall.sli_value
+        passed = uptime_pct >= 99.9  # Allow ~4 min of blips in 72h
+        return {
+            "guild": guild,
+            "monitor_id": monitor_id,
+            "uptime_72h_pct": uptime_pct,
+            "gate_passed": passed,
+            "checked_at": now.isoformat(),
+        }
+
+async def run_health_gate_audit():
+    GUILD_MONITORS = {
+        "commerce": 100001, "intelligence": 100002, "research": 100003,
+        "creator": 100004, "builder": 100005, "finance": 100006,
+        "entertainment": 100007, "writer": 100008,
+    }
+    results = await asyncio.gather(*[
+        verify_health_gate(g, m) for g, m in GUILD_MONITORS.items()
+    ])
+    return {"audit": "health_gate", "results": results, "all_passed": all(r["gate_passed"] for r in results)}
+```
+
+### 5.1 Per-Guild SLOs
+
+| **Guild** | **Availability** | **API p95 Latency** | **Error Rate** | **NATS Lag** |
+| Commerce | 99.5% | < 500ms | < 1% | < 2s |
+| Intelligence | 99.0% | < 2s (analysis) | < 2% | < 5s |
+| Research | 99.0% | < 30s (dossier) | < 2% | < 10s |
+| Creator | 99.0% | < 5s (generation) | < 2% | < 5s |
+| Builder | 99.9% | < 200ms | < 0.5% | < 1s |
+| Finance | 99.5% | < 500ms | < 1% | < 2s |
+| Entertainment | 99.0% | < 1s (session) | < 2% | < 3s |
+| Writers | 99.0% | < 60s (chapter) | < 3% | < 10s |
+
+### 5.2 Datadog Audit Verification
+
+
+[CALLOUT] 🐶 **Verify all Datadog monitors, APM traces, custom metrics, and dashboards are operational for every guild before production sign-off.**
+
+- [ ] **Composite monitor exists per guild** — Each guild has a Datadog composite monitor grouping health, latency, error rate, and NATS lag
+- [ ] **APM traces flowing** — `dd-trace-py` instrumented on all guild FastAPI routers, traces visible in Datadog APM
+- [ ] **Custom metrics reporting** — `citadel.guild.{name}.event.*` and `citadel.guild.{name}.healthy` metrics present in Metrics Explorer
+- [ ] **Cross-guild flow monitors active** — All 10 inter-guild event flows have dedicated monitors with ack verification
+- [ ] **Supabase RLS violation monitor** — Zero-tolerance monitor on `citadel.supabase.rls.violation_count` (alert on > 0)
+- [ ] **Synthetic tests running** — HTTP tests for all 8 guild landing pages (`/guilds/{name}`) + all 8 health endpoints
+- [ ] **ECS task monitors** — Desired vs running task count monitors for all ECS-deployed guild services
+- [ ] **Alerting channels configured** — `#citadel-alerts` (critical), `#citadel-infra` (warnings), PagerDuty escalation for P0
+- [ ] **Dashboard live** — "Guild Fleet Overview", "Cross-Guild Event Flow", and "Stripe Guild Revenue" dashboards populated with real data
+- [ ] **Log pipeline configured** — Structured JSON logs from all guild services indexed in Datadog Logs with `guild` facet
+| **Audit Monitor** | **What It Checks** | **Pass Criteria** |  |  |
+| Health Gate (×8) | 72h consecutive uptime per guild health endpoint | ≥ 99.9% uptime in 72h window |  |  |
+| APM Trace Coverage | % of guild API requests with complete traces | ≥ 95% trace coverage |  |  |
+| Custom Metric Freshness | Last reported timestamp for each `citadel.guild.*` metric | All metrics reported within last 5 min |  |  |
+| Cross-Guild Latency | p95 latency of all inter-guild NATS event flows | Within SLO targets per guild pair |  |  |
+| Error Budget Burn Rate | SLO error budget consumption rate per guild | < 50% budget consumed in audit window |  |  |
+| Log Volume Anomaly | Log volume per guild vs 7-day baseline | No > 3x spikes or > 90% drops |  |  |
+
+### 5.3 PostHog Audit Verification
+
+
+[CALLOUT] 🦔 **Verify all PostHog events, feature flags, and dashboards are capturing accurate product data for every guild.**
+
+- [ ] **Server-side events firing** — All guild route prefixes emit `guild_page_viewed`, `guild_service_activated`, `guild_stripe_checkout`, `guild_stripe_payment` events
+- [ ] **Client-side tracking active** — PostHog JS snippet loaded on all `/guilds/*` pages, autocapture enabled
+- [ ] **Feature flags evaluated** — All Phase 3.0 flags (`guild_*_launch`, `guild_social_layer`, `guild_crossflow_events`) evaluated correctly per rollout schedule
+- [ ] **Distinct ID consistency** — All events for the same user/tenant use consistent `distinct_id` (tenant UUID), verified via PostHog person merge
+- [ ] **Event property completeness** — ≥ 95% of events have all required properties populated (no `null` in required fields)
+- [ ] **Funnel accuracy** — Guild Adoption Funnel (view → activate → pay → cross-use) matches Stripe data within 2% margin
+- [ ] **Session recording active** — PostHog session recordings enabled on guild pages for UX review
+- [ ] **Dashboards live** — "Guild Adoption Funnel", "Guild Revenue Attribution", "Cross-Guild Stickiness", "Social Layer Engagement", and "Feature Flag Rollout Impact" dashboards populated
+| **Audit Metric** | **What It Measures** | **Pass Criteria** |
+| Event Ingestion Rate | Events per minute across all guild sources | > 0 events/min during business hours for all active guilds |
+| Flag Evaluation Accuracy | Feature flag decisions vs expected rollout % | Within ± 5% of target rollout percentage |
+| Funnel Drop-off | Conversion rates at each funnel stage | No stage with > 90% drop-off (indicates broken tracking) |
+| Property Fill Rate | % of events with all required properties | ≥ 95% fill rate across all event types |
+| Data Freshness | Time between event emission and PostHog availability | < 60s ingestion lag |
+| Revenue Match | PostHog `guild_stripe_payment` total vs Stripe dashboard | Within 2% of Stripe reported revenue |
+
+### 5.4 REFLEX & Incident Verification
+
+- [ ] REFLEX triggers active for each guild (6 trigger types from Social Pipeline: `pipeline_stall`, `delivery_failure`, `spam_burst`, `ws_drop`, `engagement_anomaly`, `push_lag`)
+- [ ] Health monitor heartbeats received from all guild services
+- [ ] Incident auto-creation wired via `citadel.dev.incident.create`
+- [ ] Datadog → Slack → Linear incident pipeline tested end-to-end
+- [ ] PostHog session recordings flagged for incidents (link back to user session on error)
+
+---
+
+
+## Audit 6 — Brand & Copy Verification
+
+- [ ] All 8 guild landing pages render correctly at `/guilds/{name}`
+- [ ] Guild color system applied (8 distinct brand colors verified)
+- [ ] Guild icons visible in navigation dropdown
+- [ ] Hero headlines match approved copy from rebrand blueprint
+- [ ] SEO redirects working (301 from old `/services/*` URLs)
+- [ ] Open Graph meta tags updated with guild names and descriptions
+- [ ] Footer links updated to guild names
+- [ ] "How Guilds Work Together" section on main landing page
+- [ ] Promo code landing page copy updated
+
+---
+
+
+## Audit Execution Plan
+
+| **Phase** | **What** | **When** | **Owner** |
+| 4.0a | Automated health checks — infra, data, events (scripts) | After Phase 3.0 Track 1–3 complete | VCC + Sentinel |
+| 4.0b | Cross-guild integration smoke tests | After Phase 3.0 Track 4 complete | VCC + OAD |
+| 4.0c | CAPS/FATE scoring + Sentinel watchdog enrollment | After 4.0a + 4.0b pass | Sentinel + Guardian |
+| 4.0d | Security pen test + compliance verification | After 4.0c pass | Nemesis |
+| 4.0e | Brand + copy + UX review | Parallel with 4.0d | Manual review |
+| 4.0f | **Final sign-off** — all guilds ≥ threshold grades | After all sub-phases pass | mr.nobody |
+
+---
+
+
+## Automated Audit Scripts
+
+```python
+# tools/guild_audit.py
+import httpx
+import asyncio
+
+GUILDS = {
+    "commerce":      {"port": 8000, "color": "#3B82F6", "nats": "citadel.commerce.*"},
+    "intelligence":  {"port": 8000, "color": "#22C55E", "nats": "citadel.intel.*"},
+    "research":      {"port": 8200, "color": "#EAB308", "nats": "citadel.research.*"},
+    "creator":       {"port": 8000, "color": "#EC4899", "nats": "citadel.creator.*"},
+    "builder":       {"port": 8443, "color": "#F97316", "nats": "citadel.builder.*"},
+    "finance":       {"port": 8092, "color": "#059669", "nats": "citadel.finance.*"},
+    "entertainment": {"port": 8400, "color": "#A855F7", "nats": "citadel.ent.*"},
+    "writer":        {"port": 8200, "color": "#D97706", "nats": "citadel.writer.*"},
+}
+
+async def audit_guild(name: str, config: dict) -> dict:
+    results = {"guild": name, "scores": {}}
+    
+    # 1. Health check
+    try:
+        r = await httpx.AsyncClient().get(
+            f"https://api.citadel-nexus.com/api/{name}/health",
+            timeout=10
+        )
+        results["scores"]["infra"] = "A" if r.status_code == 200 else "F"
+    except:
+        results["scores"]["infra"] = "F"
+    
+    # 2. Landing page check
+    try:
+        r = await httpx.AsyncClient().get(
+            f"https://citadel-nexus.com/guilds/{name}",
+            timeout=10
+        )
+        results["scores"]["ui"] = "A" if r.status_code == 200 else "F"
+    except:
+        results["scores"]["ui"] = "F"
+    
+    # 3. NATS subject check (via /api/nats/check)
+    # 4. Supabase table check (via REST API)
+    # 5. Stripe metadata check
+    
+    return results
+
+async def run_full_audit():
+    tasks = [audit_guild(n, c) for n, c in GUILDS.items()]
+    results = await asyncio.gather(*tasks)
+    # Generate audit report → push to Notion
+```
+
+---
+
+
+## Cross-References
+
+- Phase 2.0 — VCC CREW Agent Integration & Systems Development
+- Phase 3.0 — Guild Build-Out & Service Rebrand — VCC Deployment Plan
+- Citadel Guilds — Service Rebrand Blueprint — Feb 27, 2026
+- 🏰 Guild House + Social Platform — Missing Layer Architecture
+- Development Guild — Full Blueprint
+- Nemesis L6 Compliance
+- Guildmaster System — Agent Governance, Twins, FATE, Rehydration Integration
+
+---
+
+
+[CALLOUT] 🚨 **Hard gate:** No guild goes to production without scoring ≥ threshold on all 7 audit dimensions. Guilds that fail audit get a remediation ticket in Linear with a 48-hour SLA.
+
+
+[CALLOUT] 🔗 **Phase chain:** Phase 2.0 (CREW integration) → Phase 3.0 (Guild build-out) → **Phase 4.0 (Guild audit)** → Production launch. Each phase validates the previous.

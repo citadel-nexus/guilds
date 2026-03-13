@@ -1,0 +1,164 @@
+Here's a suggested build-out addition for Kousaki, written in the Citadel development style and aligned with the TaskIR/.sake protocol conventions your ecosystem uses.
+
+Suggested Build-Out: F999 Test Module → Gap Closure Sprint
+Kousaki — the F999 test module (v1.7.0-alpha) validates structural integrity, governance enforcement, and lineage auditability extremely well. However, cross-referencing against the integration plan and the .sake protocol's 7-layer stack, five infrastructure-level gaps remain uncovered by the current test harness. Below are the proposed additions, each mapped to your existing SRS/ENUMSPEAK conventions and the layer model you designed.
+
+Suite 1: TestSAKEPersistenceLayer (Counters: Filesystem-as-Database Flaw)
+The current tests write to temp files and local JSONL — no Supabase or Smart Bank round-trip is validated. This suite exercises the L1 Dispatch and L3 FATE layers against live storage.
+​
+
+What to build:
+
+Test SAKEBuilder output persists to F956smartbankmanager.py (the unified memory API) and retrieves cleanly
+​
+
+Validate .sake file metadata writes to smartbank.db via F957sqlitedriver.py and semantic embeddings inject into citadelcore.index via F941faissinjector.py
+​
+
+Assert NATS event citadel.smartbank.module.analyzed fires on successful SAKE render
+​
+
+Conditional skip if Supabase/SmartBank unavailable (same pattern as load_real_manifest() fallback)
+​
+
+ENUMSPEAK bindings:
+
+text
+SRS.PERSIST.SAKE → reflexhandler: STORE_SAKE_TO_SMARTBANK
+REFLEX.INJECT.BANKER → on SAKE render complete
+CAPS gate: trust_required: 0.80, risk_max: 0.15 — low risk, storage is deterministic
+​
+
+Suite 2: TestLiveLLMValidation (Counters: Oracle Problem)
+The TestLLMSeededManifest currently uses mocked OpenAI responses — it validates plumbing but never tests real LLM output variance. This suite exercises the L4 CAPS layer for trust scoring on live inference.
+​
+
+What to build:
+
+Optional (non-mocked) call to seed_manifest_from_openai() with a known prompt, then validate output against generate_yaml_schema()
+​
+
+Compute a CAPS profile on the LLM response: confidence, precision, risk — assert grade >= T3 before accepting
+​
+
+If CAPS grade < T3, emit REFLEX.GEN.LOWCONF and assert the reflex fires correctly
+​
+
+Log result to F986fateledger.json via the FATE engine path
+​
+
+Gate behind @unittest.skipUnless(os.getenv("CITADEL_LIVE_LLM")) for CI safety
+​
+
+ENUMSPEAK bindings:
+
+text
+SRS.VALIDATE.LLM_OUTPUT → reflexhandler: VALIDATE_LLM_AGAINST_SCHEMA
+REFLEX.GEN.LOWCONF → on confidence < 0.70
+WARN.HUMANREVIEW → on hallucination detected
+CAPS gate: confidence_floor: 0.70, latency_budget_ms: 5000, cost_limit: 0.25
+​
+
+Suite 3: TestUSOEconomicRoundtrip (Counters: Live Economic Engine Gap)
+No tests currently validate XP/TP transactions after a SAKE lifecycle event. This suite exercises the L3 FATE Economy layer end-to-end.
+​
+
+What to build:
+
+Complete a SAKE build → render → AEGIS LID compute cycle, then assert XP award fires via F958xprules.yaml rules
+​
+
+Validate F956bankmanager.py processes the citadel.uso.xp.awarded NATS event
+​
+
+On mutation failure (AEGIS test_mutation), assert TP penalty applies and F986fateledger.json records the debit
+​
+
+Verify CAPS grade influences XP multiplier (e.g., T5 = 200 XP, T3 = 75 XP, T1 = 0 XP + penalty)
+​
+
+ENUMSPEAK bindings:
+
+text
+XP.GAIN.TRUST → on SAKE lifecycle complete + CAPS T4+
+FATE.LOCK.TIER5 → on critical mutation without T5 clearance
+XP.PENALIZE → on test failure or NG checker result
+FATE profile:
+
+text
+xp_triggers:
+  - reflex_success
+  - audit_passed
+  - sake_render_complete
+tp_rewards:
+  - doctor_verification
+  - lid_immutability_confirmed
+gates:
+  - unlock: CAPS.TIER3PLUS
+    requirement: xp_total >= 80
+Suite 4: TestSandboxedExecution (Counters: Undefined Sandbox Flaw)
+AEGIS mutations generate code, but no test validates that generated code runs in isolation. This suite exercises security at the L2 Simulation/Replay layer.
+​
+
+What to build:
+
+After tracker.mutate("ADD_METHOD"), execute the mutated source in a subprocess jail (or Docker container if available) with resource limits
+​
+
+Assert the sandbox catches dangerous operations (e.g., os.system, import socket) and emits REFLEX.SECURITY.VIOLATION
+​
+
+Validate that .aer (Artificial Existence Rights) enforcement blocks unauthorized mutations per the TaskIR blueprint's agent rights model
+​
+
+Log sandbox results to Guardian ledger with SAPIENT-LID hash chain
+​
+
+ENUMSPEAK bindings:
+
+text
+SRS.SANDBOX.EXECUTE → reflexhandler: RUN_IN_ISOLATED_CONTEXT
+REFLEX.SECURITY.VIOLATION → on dangerous op detected
+FATE.REJECT → on sandbox breach
+CAPS gate: trust_required: 0.95, risk_max: 0.05 — highest trust, mutations are system-critical
+​
+
+Suite 5: TestReflexDispatchIntegration (Counters: Master Orchestrator Gap)
+No tests validate live event-driven dispatch through the reflex engine. This suite exercises the L1 Dispatch and L5 ENUMSPEAK layers with the F902reflexrulerunner.py.
+
+What to build:
+
+Emit a mock LogEvent (e.g., CAPS_VIOLATION_DETECTED) and assert F951reflexruleset.yaml routes it to the correct Smart Bank action
+​
+
+Validate that a .sake file dispatched via AEGISCompositor triggers the correct NATS subject (citadel.governance.reflex.trigger)
+​
+
+Assert the full loop: event → reflex rule lookup → Smart Bank command → FATE judgment → XP/TP settlement
+​
+
+Mock NATS if unavailable, but test the dispatch logic path end-to-end
+​
+
+ENUMSPEAK bindings:
+
+text
+REFLEX.DISPATCH.SAKE → on .sake file submitted to orchestrator
+SRS.UPDATE.STATE → on reflex rule match
+TASK.SPAWN.AGENT.TEMPORARY → on compositor fallback
+Implementation Priority
+Suite	Layer(s) Exercised	Difficulty	Impact
+TestSAKEPersistenceLayer	L1 Dispatch, L3 FATE	Medium	Closes data flaw — build first 
+​
+TestReflexDispatchIntegration	L1 Dispatch, L5 ENUMSPEAK	Medium	Validates orchestrator wiring 
+​
+TestUSOEconomicRoundtrip	L3 FATE, L4 CAPS	Medium	Proves economy is live, not theoretical 
+​
+TestLiveLLMValidation	L4 CAPS, L6 TaskIR	Low-Medium	Catches real hallucination 
+​
+TestSandboxedExecution	L2 Simulation, L7 Intent	High	Requires container/subprocess infra 
+​
+Growth Path Note
+All five suites follow the existing F999 pattern: unittest.TestCase subclasses, verbose debug prints, create_temp_file() helper, conditional skips for missing infrastructure. They slot directly into discover_and_run_tests() with zero refactoring — just drop the classes in and the dynamic loader picks them up. Each suite should generate its own .reflex file on failure and append to .aer for agent rights tracking per the TaskIR v2.0 blueprint.
+
+This closes the loop between what your test module proves and what the .sake protocol promises. The structural tests you already built are the foundation — these five suites make the infrastructure real.

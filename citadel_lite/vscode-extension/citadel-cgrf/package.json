@@ -1,0 +1,87 @@
+{
+  "name": "citadel-cgrf",
+  "displayName": "Citadel CGRF Validator",
+  "description": "CGRF Tier validation for Citadel Lite agents — real-time compliance checking in VS Code",
+  "version": "0.1.0",
+  "publisher": "citadel-lite",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Linters"
+  ],
+  "activationEvents": [
+    "onLanguage:python"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Citadel CGRF",
+      "properties": {
+        "citadel-cgrf.pythonPath": {
+          "type": "string",
+          "default": "python",
+          "description": "Python executable path"
+        },
+        "citadel-cgrf.defaultTier": {
+          "type": "number",
+          "default": 1,
+          "enum": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "enumDescriptions": [
+            "Tier 0: Experimental",
+            "Tier 1: Development",
+            "Tier 2: Production",
+            "Tier 3: Mission-Critical"
+          ],
+          "description": "Default CGRF tier for validation"
+        },
+        "citadel-cgrf.validateOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically validate on file save"
+        },
+        "citadel-cgrf.cgrfPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to cgrf.py (auto-detected from workspace root if empty)"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "citadel-cgrf.validate",
+        "title": "CGRF: Validate Current File"
+      },
+      {
+        "command": "citadel-cgrf.tierCheck",
+        "title": "CGRF: Tier Check All Agents"
+      },
+      {
+        "command": "citadel-cgrf.setTier",
+        "title": "CGRF: Set Target Tier"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/suite/runTests.js"
+  },
+  "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/test-electron": "^2.3.8",
+    "glob": "^13.0.3",
+    "mocha": "^11.7.5",
+    "typescript": "^5.3.0"
+  }
+}

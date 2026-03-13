@@ -1,0 +1,39 @@
+# Azure Configuration for Citadel Lite
+# Copy this file to azure.yaml and fill in your connection strings.
+# Alternatively, set the equivalent environment variables.
+
+# Azure Service Bus (event queue)
+# Env: AZURE_SERVICEBUS_CONNECTION, AZURE_SERVICEBUS_QUEUE
+service_bus:
+  connection_string: ""
+  queue_name: "citadel-events"
+
+# Azure Cosmos DB (incident memory store)
+# Env: AZURE_COSMOS_CONNECTION, AZURE_COSMOS_DATABASE, AZURE_COSMOS_CONTAINER
+cosmos:
+  connection_string: ""
+  database: "citadel-lite"
+  container: "incidents"
+
+# Azure OpenAI / Foundry (LLM for agents)
+# Env: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_KEY, AZURE_OPENAI_DEPLOYMENT
+openai:
+  endpoint: ""
+  api_key: ""
+  deployment: "gpt-4o"
+
+# Azure Foundry Agent Service
+# Env: AZURE_FOUNDRY_ENDPOINT, AZURE_FOUNDRY_KEY
+foundry:
+  endpoint: ""
+  api_key: ""
+
+# Application Insights (telemetry)
+# Env: APPLICATIONINSIGHTS_CONNECTION_STRING
+app_insights:
+  connection_string: ""
+
+# Azure Storage (artifact storage)
+# Env: AZURE_STORAGE_CONNECTION
+storage:
+  connection_string: ""

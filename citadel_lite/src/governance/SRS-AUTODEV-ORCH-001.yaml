@@ -1,0 +1,793 @@
+# SRS-AUTODEV-ORCH-001.yaml
+# Blueprint Autodev Orchestrator — Software Requirements & Reflex Specification
+# ==============================================================================
+# CGRF v2.0 | Status: Production | Created: 2026-02-22
+#
+# This artifact provides:
+#   1. SRS traceability codes for every phase of the autodev pipeline
+#   2. REFLEX definitions that govern automated responses to pipeline events
+#   3. CAPS grade requirements per reflex tier
+#   4. FATE autonomy levels for each reflex
+#
+# SRS code format:  AOD-<CATEGORY>-<NNN>
+# Reflex code format: RFX-AOD-<NNN>
+
+_document_schema: CGRF-v2.0
+_module: autodev.orchestrator
+_srs_code: SRS-AUTODEV-ORCH-001
+_purpose: >-
+  SRS codes and reflex definitions for the Blueprint Autodev Orchestrator —
+  the autonomous AI development loop that builds Citadel Lite from blueprints
+  using Azure AI Foundry / GPT-4o.
+_owner: CNWB
+_compliance: CGRF v2.0
+_status: Production
+
+# =============================================================================
+# SECTION 1: SRS REQUIREMENTS
+# =============================================================================
+#
+# Each requirement maps to a pipeline phase and the code that implements it.
+# Status values: planned | in_progress | implemented | deprecated
+
+# ── Phase: READ ──────────────────────────────────────────────────────────────
+
+AOD-READ-001:
+  title: System State Collection
+  description: >-
+    READ phase collects test results, git status, file counts, recent commits,
+    and cost spend before every cycle to give THINK full situational awareness.
+  priority: critical
+  status: implemented
+  file: citadel_lite/blueprint_autodev_orchestrator.py
+  function: phase_read
+  caps_minimum: D
+  acceptance_criteria:
+    - Returns test pass/fail counts from previous cycle
+    - Returns git uncommitted file count
+    - Returns src and test file counts
+    - Completes in < 5s
+
+AOD-READ-002:
+  title: Git Status Integration
+  description: >-
+    Captures uncommitted files and recent commit log to detect drift and
+    inform THINK about work already committed.
+  priority: high
+  status: implemented
+  function: phase_read
+  caps_minimum: D
+
+# ── Phase: BLUEPRINT ─────────────────────────────────────────────────────────
+
+AOD-BP-001:
+  title: Blueprint File Parsing
+  description: >-
+    BLUEPRINT phase reads markdown blueprint files, extracts checkbox and
+    numbered-heading milestones, and classifies each as done or pending.
+  priority: critical
+  status: implemented
+  file: citadel_lite/blueprint_autodev_orchestrator.py
+  function: phase_blueprint
+  caps_minimum: C
+
+AOD-BP-002:
+  title: Git-Log Cross-Reference
+  description: >-
+    Cross-references pending milestones with recent git log to detect
+    milestones already completed via commits but not yet checked off.
+  priority: high
+  status: implemented
+  function: phase_blueprint
+  caps_minimum: C
+
+AOD-BP-003:
+  title: Blueprint Selection Priority
+  description: >-
+    If no explicit blueprint_filter is set, defaults to CITADEL_NEXUS_LITE-MVP.en.md,
+    then any .md in blueprints/. Persists current_blueprint in LoopState.
+  priority: medium
+  status: implemented
+  function: phase_blueprint
+
+# ── Phase: THINK ─────────────────────────────────────────────────────────────
+
+AOD-THINK-001:
+  title: LLM Task Selection
+  description: >-
+    THINK phase calls Azure AI Foundry (GPT-4o) to analyze system state
+    and blueprint, selecting the single highest-priority task to implement.
+  priority: critical
+  status: implemented
+  file: citadel_lite/blueprint_autodev_orchestrator.py
+  function: phase_think
+  caps_minimum: B
+  llm_backend: azure
+
+AOD-THINK-002:
+  title: Task Deduplication
+  description: >-
+    THINK receives attempted_tasks from LoopState and is instructed via
+    system prompt to NEVER pick a task already attempted in this run.
+    Prevents infinite loops on the same milestone.
+  priority: critical
+  status: implemented
+  function: phase_think
+  test: Loop picks different task every cycle
+
+AOD-THINK-003:
+  title: CAPS Grade Assignment
+  description: >-
+    Each task selected by THINK is assigned a CAPS grade (D/C/B/A/S) based
+    on keyword matching and complexity. Grade gates downstream execution and
+    is journaled for audit.
+  priority: high
+  status: implemented
+  function: _resolve_task_caps
+  grades:
+    S: Core contracts and event schemas (critical path)
+    A: Pipeline agents (sentinel, sherlock, fixer, guardian)
+    B: Integration, memory, Azure services
+    C: Tooling, CLI, test coverage
+    D: Documentation, comments, cleanup
+
+AOD-THINK-004:
+  title: Heuristic Fallback
+  description: >-
+    When LLM call fails, falls back to: fix failing tests first, then next
+    pending blueprint milestone. Heuristic output includes caps_grade.
+  priority: medium
+  status: implemented
+  function: phase_think
+
+# ── Phase: ASSESS ────────────────────────────────────────────────────────────
+
+AOD-ASSESS-001:
+  title: Implementation Score
+  description: >-
+    ASSESS computes implementation_score as done_milestones / total_milestones.
+    Provides gap list (top 5 pending) for BUILD context.
+  priority: high
+  status: implemented
+  file: citadel_lite/blueprint_autodev_orchestrator.py
+  function: phase_assess
+
+# ── Phase: BUILD ─────────────────────────────────────────────────────────────
+
+AOD-BUILD-001:
+  title: LLM Code Generation
+  description: >-
+    BUILD sends task context to Azure AI Foundry and requests production-quality
+    Python 3.11+ code. Writes generated files to disk (src/ and tests/).
+  priority: critical
+  status: implemented
+  file: citadel_lite/blueprint_autodev_orchestrator.py
+  function: phase_build
+  caps_minimum: B
+  safety:
+    - Does not overwrite files > 50KB
+    - All writes are relative to citadel_lite/ root
+
+AOD-BUILD-002:
+  title: File Write Safety Guard
+  description: >-
+    Generated files > 50KB are rejected with a warning. Prevents accidental
+    clobbering of large hand-written source files.
+  priority: high
+  status: implemented
+  function: phase_build
+
+# ── Phase: DIFF ──────────────────────────────────────────────────────────────
+
+AOD-DIFF-001:
+  title: Assessment vs Outcome Diff
+  description: >-
+    DIFF Metric 1 compares what ASSESS predicted (score, gaps) vs what BUILD
+    actually produced (files written, lines of code, gaps addressed).
+    Alignment is "aligned" if files were written, "diverged" if not.
+  priority: high
+  status: implemented
+  file: citadel_lite/blueprint_autodev_orchestrator.py
+  function: phase_diff
+  output_fields:
+    - predicted_score_pct
+    - predicted_gaps
+    - actual_files_written
+    - actual_lines_written
+    - gaps_addressed
+    - gaps_remaining
+    - alignment
+
+AOD-DIFF-002:
+  title: Outcome vs Codebase Diff
+  description: >-
+    DIFF Metric 2 runs git diff --stat and --numstat to measure what actually
+    changed in the working tree. Reports lines_added, lines_removed,
+    changed_files, new_untracked_files, and src_file_delta.
+  priority: high
+  status: implemented
+  function: phase_diff
+  output_fields:
+    - lines_added
+    - lines_removed
+    - changed_files
+    - new_untracked_files
+    - src_file_delta
+    - diff_stat_summary
+
+# ── Phase: TEST ──────────────────────────────────────────────────────────────
+
+AOD-TEST-001:
+  title: Targeted Test Run
+  description: >-
+    TEST phase first runs only the new test files from the BUILD cycle
+    (60s timeout). This catches regressions in generated code quickly without
+    running the full 900+ test suite every cycle.
+  priority: critical
+  status: implemented
+  file: citadel_lite/blueprint_autodev_orchestrator.py
+  function: phase_test
+
+AOD-TEST-002:
+  title: Full Suite Fallback
+  description: >-
+    If targeted tests pass (or no new test files exist), runs the full test
+    suite with 120s timeout. Skips test_pipeline_e2e.py (requires localhost:1234).
+  priority: high
+  status: implemented
+  function: phase_test
+
+AOD-TEST-003:
+  title: Test Timeout Guard
+  description: >-
+    SubprocessTimeoutExpired is caught and reported as errors=1 to prevent
+    the cycle from hanging indefinitely.
+  priority: high
+  status: implemented
+  function: phase_test
+
+# ── Phase: WRITE ─────────────────────────────────────────────────────────────
+
+AOD-WRITE-001:
+  title: Conditional Git Commit
+  description: >-
+    WRITE commits generated files only when all tests pass. If tests fail,
+    logs a warning and skips commit. This prevents broken code from entering
+    the git history.
+  priority: critical
+  status: implemented
+  file: citadel_lite/blueprint_autodev_orchestrator.py
+  function: phase_write
+  caps_minimum: B
+
+AOD-WRITE-002:
+  title: Milestone Completion Tracking
+  description: >-
+    On successful commit, the task is appended to state.completed_milestones.
+    This prevents the same milestone from being re-selected as pending in
+    future cycles.
+  priority: high
+  status: implemented
+  function: phase_write
+
+# ── Phase: AUDIT (Bedrock Claude secondary layer) ────────────────────────────
+
+AOD-AUDIT-001:
+  title: BedrockAuditClient Initialization
+  description: >-
+    BedrockAuditClient is initialized with a configurable model_key (haiku|sonnet)
+    and strictness level (lenient|standard|strict). It maintains per-instance
+    token tracking (tokens_in, tokens_out, call_count, call_log) entirely
+    separate from the primary Azure/OpenAI cost tracker.
+  priority: critical
+  status: implemented
+  file: citadel_lite/blueprint_autodev_orchestrator.py
+  function: BedrockAuditClient.__init__
+  caps_minimum: B
+  llm_backend: bedrock
+  acceptance_criteria:
+    - Initializes with haiku model by default
+    - Accepts model_key and strictness as constructor params
+    - Maintains isolated token counters (tokens_in, tokens_out, call_count)
+    - Stores call_log list for full prompt/response audit trail
+
+AOD-AUDIT-002:
+  title: Bedrock Audit Review Invocation
+  description: >-
+    BedrockAuditClient.audit() sends the BUILD output, DIFF metrics, acceptance
+    criteria, and SRS refs to Claude via AWS Bedrock (us-west-2). The prompt
+    instructs Claude to return a structured JSON verdict with verdict, issues,
+    risk_score (0.0-1.0), srs_refs_satisfied, token_efficiency, and rationale.
+    Verdict values are "approved", "needs_revision", or "rejected".
+  priority: critical
+  status: implemented
+  file: citadel_lite/blueprint_autodev_orchestrator.py
+  function: BedrockAuditClient.audit
+  caps_minimum: B
+  llm_backend: bedrock
+  acceptance_criteria:
+    - Always uses boto3 bedrock-runtime client, never Azure or OpenAI
+    - Returns structured dict with keys: verdict, issues, risk_score, srs_refs_satisfied, token_efficiency, rationale
+    - verdict must be one of "approved" | "needs_revision" | "rejected"
+    - Appends full prompt/response to call_log for audit trail
+    - Updates tokens_in, tokens_out, call_count on every successful call
+
+AOD-AUDIT-003:
+  title: Audit Usage Summary and State Integration
+  description: >-
+    BedrockAuditClient.usage_summary() returns cumulative audit stats.
+    After each phase_audit() call, state.audit_tokens, state.audit_cost_usd,
+    and state.audit_calls are updated independently of the primary LLM cost
+    tracker. state.audit_history retains the last 10 verdicts for trend analysis.
+  priority: high
+  status: implemented
+  file: citadel_lite/blueprint_autodev_orchestrator.py
+  function: BedrockAuditClient.usage_summary
+  caps_minimum: C
+  acceptance_criteria:
+    - usage_summary() returns tokens_in, tokens_out, call_count, total_cost_usd
+    - state.audit_tokens accumulates across all cycles
+    - state.audit_history is capped at 10 most recent entries
+    - Final run summary prints Primary LLM cost and Audit Layer cost separately
+
+AOD-AUDIT-004:
+  title: Audit Unavailability Safe Default
+  description: >-
+    _audit_unavailable() returns a safe-pass verdict {"verdict": "approved"}
+    when Bedrock is not reachable (no boto3, no AWS credentials, or --dry-run).
+    This ensures the pipeline never blocks on audit failures — the pipeline
+    degrades gracefully rather than halting.
+  priority: high
+  status: implemented
+  file: citadel_lite/blueprint_autodev_orchestrator.py
+  function: _audit_unavailable
+  caps_minimum: C
+  acceptance_criteria:
+    - Returns dict with verdict="approved" and reason field explaining why audit was skipped
+    - Called when boto3 is not installed, AWS credentials are absent, or dry_run is True
+    - Does NOT increment audit_tokens or audit_cost_usd
+
+
+# =============================================================================
+# SECTION 2: REFLEX DEFINITIONS
+# =============================================================================
+#
+# Reflexes govern automated responses to pipeline events.
+# Format follows CGRF v2.0 reflex schema.
+
+REFLEX_AUTODEV_PIPELINE_V1:
+  family_id: REFLEX_AUTODEV_PIPELINE_V1
+  version: "1.1.0"
+  srs_code: SRS-AUTODEV-ORCH-001
+  description: >-
+    REFLEX family for the Blueprint Autodev Orchestrator pipeline.
+    Covers budget overruns, test failures, code generation failures,
+    infinite loops, Azure API errors, and Bedrock audit layer events.
+    v1.1.0 adds RFX-AOD-030..033 for audit verdicts and Bedrock availability.
+
+  # ── Tier 1: Automated (no human required) ─────────────────────────────────
+
+  tier_1_automated:
+    description: >-
+      Low-severity pipeline events that resolve automatically.
+      Logged for audit but no human notification required.
+
+    RFX-AOD-001:
+      title: Budget Cap Reached
+      description: >-
+        Triggered when total_cost_usd >= budget_cap. The loop stops gracefully,
+        writes final state to loop_state.json, and logs a summary.
+      srs_ref: AOD-READ-001
+      triggers:
+        - F_AOD_001  # total_cost_usd >= budget_cap
+      actions:
+        - A_AOD_001  # Halt loop gracefully
+        - A_AOD_002  # Write final LoopState to disk
+        - A_AOD_003  # Log cost summary
+      expected_resolutions:
+        - R_AOD_001  # Loop halted, state saved
+      max_autonomy: 4        # AUTONOMOUS
+      caps_minimum: D
+
+    RFX-AOD-002:
+      title: All Milestones Complete
+      description: >-
+        Triggered when pending_count == 0 and tests pass. The loop exits
+        cleanly with a success message.
+      srs_ref: AOD-BP-001
+      triggers:
+        - F_AOD_002  # pending_count == 0 and failed == 0
+      actions:
+        - A_AOD_004  # Log completion
+        - A_AOD_002  # Write final LoopState
+      expected_resolutions:
+        - R_AOD_002  # All milestones done
+      max_autonomy: 4        # AUTONOMOUS
+      caps_minimum: D
+
+    RFX-AOD-003:
+      title: Targeted Test Pass — Full Suite Skipped
+      description: >-
+        When the targeted test run passes and there are no further test files
+        to run, the WRITE phase proceeds and the full suite is deferred to the
+        next cycle's READ phase results.
+      srs_ref: AOD-TEST-001
+      triggers:
+        - F_AOD_003  # targeted_passed and no_new_test_files
+      actions:
+        - A_AOD_005  # Log targeted pass, proceed to WRITE
+      expected_resolutions:
+        - R_AOD_003  # Commit executed
+      max_autonomy: 4        # AUTONOMOUS
+      caps_minimum: C
+
+    RFX-AOD-030:
+      title: Audit Approved — Normal Flow Continues
+      description: >-
+        Triggered when BedrockAuditClient.audit() returns verdict="approved"
+        OR when the audit is unavailable and _audit_unavailable() returns the
+        safe-pass default. Pipeline continues to TEST and WRITE as normal.
+        Audit result is journaled with risk_score and token_efficiency.
+      srs_ref: AOD-AUDIT-002
+      triggers:
+        - F_AOD_030  # audit_output["verdict"] == "approved"
+        - F_AOD_031  # audit unavailable → _audit_unavailable() safe default
+      actions:
+        - A_AOD_030  # Log audit approval with verdict, risk_score, rationale
+        - A_AOD_031  # Append to state.audit_history
+        - A_AOD_032  # Update state.audit_tokens + state.audit_cost_usd
+      expected_resolutions:
+        - R_AOD_030  # Pipeline proceeds to TEST phase
+      max_autonomy: 4        # AUTONOMOUS
+      caps_minimum: C
+      requires_fate_advisory: false
+      fate_bypass_allowed: true
+
+  # ── Tier 2: Supervised (automated action, human notified) ─────────────────
+
+  tier_2_supervised:
+    description: >-
+      Medium-severity events that execute initial corrective actions
+      autonomously but log alerts for operator review.
+
+    RFX-AOD-010:
+      title: Test Failure After Build
+      description: >-
+        Triggered when tests fail after BUILD produces code. The generated
+        files are retained (not deleted) for inspection. WRITE is skipped.
+        The failure is journaled and the task is retried next cycle.
+      srs_ref: AOD-TEST-001
+      triggers:
+        - F_AOD_010  # failed > 0 after BUILD
+      actions:
+        - A_AOD_010  # Skip WRITE commit
+        - A_AOD_011  # Journal failure with output_tail
+        - A_AOD_012  # Retain generated files for inspection
+      expected_resolutions:
+        - R_AOD_010  # Failure journaled, files retained
+      max_autonomy: 3        # MONITORED
+      caps_minimum: C
+      escalate_if_repeated: 3
+
+    RFX-AOD-011:
+      title: LLM Code Generation Failure
+      description: >-
+        Triggered when BUILD receives a non-success response from the LLM
+        (API error, parse failure, empty files list). BUILD returns empty
+        files_written. DIFF and TEST still run but produce zero-file results.
+      srs_ref: AOD-BUILD-001
+      triggers:
+        - F_AOD_011  # resp.success == False in phase_build
+      actions:
+        - A_AOD_013  # Log LLM error with details
+        - A_AOD_014  # Advance cycle (do not retry same task)
+      expected_resolutions:
+        - R_AOD_011  # Error logged, task added to attempted
+      max_autonomy: 3        # MONITORED
+      caps_minimum: C
+      escalate_if_repeated: 5
+
+    RFX-AOD-012:
+      title: Test Suite Timeout
+      description: >-
+        Triggered when pytest exceeds its timeout (60s targeted or 120s full).
+        Treated as errors=1, which blocks WRITE commit.
+      srs_ref: AOD-TEST-003
+      triggers:
+        - F_AOD_012  # subprocess.TimeoutExpired
+      actions:
+        - A_AOD_015  # Log timeout, report errors=1
+        - A_AOD_016  # Continue loop (do not halt)
+      expected_resolutions:
+        - R_AOD_012  # Timeout logged, cycle continues
+      max_autonomy: 3        # MONITORED
+      caps_minimum: C
+
+    RFX-AOD-013:
+      title: Task Deduplication Violation
+      description: >-
+        If the LLM returns a task already in attempted_tasks (dedup failure),
+        the orchestrator logs a warning and forces the fallback heuristic to
+        pick the next pending blueprint milestone.
+      srs_ref: AOD-THINK-002
+      triggers:
+        - F_AOD_013  # selected task in state.attempted_tasks
+      actions:
+        - A_AOD_017  # Log dedup violation
+        - A_AOD_018  # Force fallback task selection
+      expected_resolutions:
+        - R_AOD_013  # Different task selected
+      max_autonomy: 4        # AUTONOMOUS
+      caps_minimum: B
+
+    RFX-AOD-031:
+      title: Audit Needs Revision — Conditional Commit
+      description: >-
+        Triggered when BedrockAuditClient.audit() returns verdict="needs_revision".
+        Issues are logged and appended to the journal. The WRITE phase still
+        proceeds if tests pass — this allows imperfect-but-functional code to
+        be committed while flagging it for human review. risk_score and all
+        issues are included in the commit message.
+      srs_ref: AOD-AUDIT-002
+      triggers:
+        - F_AOD_035  # audit_output["verdict"] == "needs_revision"
+      actions:
+        - A_AOD_035  # Log needs_revision with full issues list
+        - A_AOD_031  # Append to state.audit_history
+        - A_AOD_032  # Update state.audit_tokens + state.audit_cost_usd
+        - A_AOD_036  # Allow WRITE if tests pass (not blocked)
+      expected_resolutions:
+        - R_AOD_031  # Commit proceeds if tests pass; issues flagged in journal
+      max_autonomy: 3        # MONITORED — logged but no human gate
+      caps_minimum: B
+      requires_fate_advisory: false
+      escalate_if_repeated: 3   # 3 consecutive needs_revision → supervisor alert
+      min_tp: 40
+
+  # ── Tier 3: Approval (high-consequence, requires operator sign-off) ─────────
+
+  tier_3_approval:
+    description: >-
+      High-severity events that halt the loop and require operator action
+      before resuming.
+
+    RFX-AOD-020:
+      title: File Overwrite Safety Blocked
+      description: >-
+        Triggered when BUILD attempts to overwrite a file > 50KB. This
+        is treated as a safety violation — the write is blocked, logged,
+        and the operator must manually review the generated content.
+      srs_ref: AOD-BUILD-002
+      triggers:
+        - F_AOD_020  # file.stat().st_size > 50_000
+      actions:
+        - A_AOD_020  # Block write, log warning
+        - A_AOD_021  # Journal the attempted overwrite path and size
+      expected_resolutions:
+        - R_AOD_020  # Write blocked, operator notified
+      requires_fate_advisory: true
+      max_autonomy: 2        # SUPERVISED
+      caps_minimum: A
+
+    RFX-AOD-021:
+      title: Azure API Consecutive Failures
+      description: >-
+        Triggered when Azure returns non-200 responses for 3+ consecutive
+        THINK or BUILD calls. The loop halts after logging the error chain
+        to prevent wasting credits.
+      srs_ref: AOD-THINK-001
+      triggers:
+        - F_AOD_021  # azure_failures >= 3 consecutive
+      actions:
+        - A_AOD_022  # Halt loop with AZURE_FAILURE status
+        - A_AOD_002  # Write LoopState to disk
+        - A_AOD_023  # Log error chain for debugging
+      expected_resolutions:
+        - R_AOD_021  # Loop halted, state preserved
+      requires_fate_advisory: true
+      max_autonomy: 1        # CRITICAL
+      caps_minimum: A
+
+    RFX-AOD-032:
+      title: Audit Rejected — Commit Blocked
+      description: >-
+        Triggered when BedrockAuditClient.audit() returns verdict="rejected".
+        WRITE is unconditionally blocked — tests passing is NOT sufficient to
+        override a rejection. The rejected build output is retained on disk for
+        inspection. The cycle is journaled with the full issues list, risk_score,
+        and rationale. The task is added to attempted_tasks but NOT to
+        completed_milestones. Operator review is required before the same task
+        can be retried.
+      srs_ref: AOD-AUDIT-002
+      triggers:
+        - F_AOD_040  # audit_output["verdict"] == "rejected"
+      actions:
+        - A_AOD_040  # Log rejection with issues, risk_score, rationale
+        - A_AOD_041  # Block phase_write commit (return early)
+        - A_AOD_031  # Append to state.audit_history
+        - A_AOD_032  # Update state.audit_tokens + state.audit_cost_usd
+        - A_AOD_042  # Retain generated files for operator inspection
+      expected_resolutions:
+        - R_AOD_032  # Commit blocked, files retained, cycle journaled
+      requires_fate_advisory: true
+      requires_fate_approval: false    # Advisory only — operator may override
+      fate_bypass_allowed: false       # Cannot bypass audit rejection
+      max_autonomy: 2        # SUPERVISED
+      caps_minimum: A
+      escalate_if_repeated: 2   # 2 consecutive rejections → escalate
+      min_tp: 55
+      timeout: 5min
+
+    RFX-AOD-033:
+      title: Bedrock Unavailable — Audit Skipped Safely
+      description: >-
+        Triggered when BedrockAuditClient cannot reach AWS Bedrock: boto3 is
+        not installed, AWS credentials are absent or expired, or --dry-run is
+        active. _audit_unavailable() returns a safe-pass dict so the pipeline
+        never blocks on infrastructure absence. The skip reason is journaled.
+        This is a supervised event because audit gaps should be visible to
+        operators even if the pipeline continues.
+      srs_ref: AOD-AUDIT-004
+      triggers:
+        - F_AOD_045  # boto3 ImportError
+        - F_AOD_046  # NoCredentialsError / ClientError from boto3
+        - F_AOD_047  # dry_run == True
+      actions:
+        - A_AOD_045  # Call _audit_unavailable(reason) → safe-pass dict
+        - A_AOD_046  # Journal skip with reason and timestamp
+        - A_AOD_047  # Do NOT increment audit_tokens or audit_cost_usd
+      expected_resolutions:
+        - R_AOD_033  # Pipeline continues; skip logged; no cost charged
+      requires_fate_advisory: false
+      max_autonomy: 3        # MONITORED
+      caps_minimum: C
+      escalate_if_repeated: 5  # 5 consecutive skips → warn operator to check AWS creds
+
+
+# =============================================================================
+# SECTION 3: CAPS GATE TABLE
+# =============================================================================
+#
+# Minimum CAPS grade required to gate each reflex tier.
+# Mirrors the CGRF tier model from caps_stub.py.
+
+CAPS_GATE_TABLE:
+  description: >-
+    Maps orchestrator actions to the minimum CAPS grade required to execute.
+    Agents or tasks below the required grade are blocked and escalated.
+
+  gates:
+    phase_think_lm_call:
+      srs_ref: AOD-THINK-001
+      caps_minimum: B          # Production pipeline agents need B+
+      rationale: LLM calls consume Azure credits; must be B-grade or higher
+
+    phase_build_file_write:
+      srs_ref: AOD-BUILD-001
+      caps_minimum: B          # Writing to disk requires production grade
+      rationale: File writes are irreversible without git revert
+
+    phase_write_git_commit:
+      srs_ref: AOD-WRITE-001
+      caps_minimum: B          # Commits affect shared history
+      rationale: Commits are permanent; require verified test pass
+
+    task_s_grade:
+      description: Core contracts and event schemas
+      caps_minimum: S
+      example_tasks: ["event contract", "handoff packet", "core types"]
+      rationale: These are the most foundational components
+
+    task_a_grade:
+      description: Pipeline agents (sentinel/sherlock/fixer/guardian)
+      caps_minimum: A
+      rationale: Agents directly affect CI/CD and governance decisions
+
+    task_b_grade:
+      description: Integration and memory components
+      caps_minimum: B
+      rationale: Production-quality integration work
+
+    task_c_grade:
+      description: Tooling and test coverage
+      caps_minimum: C
+      rationale: Supporting work, lower risk
+
+    task_d_grade:
+      description: Documentation and comments
+      caps_minimum: D
+      rationale: No executable impact
+
+    phase_audit_bedrock_call:
+      srs_ref: AOD-AUDIT-002
+      caps_minimum: B          # Bedrock calls consume real AWS credits
+      rationale: >-
+        Audit invocations cost real USD on AWS Bedrock. Must be B-grade+
+        to prevent runaway spend in low-quality pipelines. Haiku model
+        preferred for cost efficiency; Sonnet only for high-risk tasks.
+      description: >-
+        Gates invocation of BedrockAuditClient.audit(). The audit call
+        uses AWS Bedrock (us-west-2) with Claude Haiku or Sonnet.
+        Tokens and cost are tracked separately from primary LLM.
+      example_tasks:
+        - Any task with CAPS grade A or S (always audit)
+        - Any task with risk_level == "high" or "critical"
+        - Any task targeting core contracts or event schemas
+
+    phase_audit_verdict_block:
+      srs_ref: AOD-AUDIT-002
+      caps_minimum: A          # Blocking a commit is a high-stakes action
+      rationale: >-
+        A "rejected" verdict from the audit layer prevents a git commit.
+        This is a high-impact gate. Only A-grade+ agents should be operating
+        in pipelines where audit rejection is possible.
+      description: >-
+        Governs the audit-gate in phase_write(). When verdict == "rejected",
+        WRITE returns early without committing. Applies regardless of test
+        pass/fail status.
+
+
+# =============================================================================
+# SECTION 4: FATE ENGINE CONFIGURATION
+# =============================================================================
+
+FATE_ENGINE:
+  family: REFLEX_AUTODEV_PIPELINE_V1
+  description: >-
+    FATE configuration for the autodev orchestrator. Relatively permissive
+    TP thresholds since orchestrator runs in a sandboxed development context
+    with git as the safety net. v1.1.0: Bedrock audit layer adds a secondary
+    Claude review gate (RFX-AOD-030..033). Audit rejections (RFX-AOD-032)
+    require TP >= 55 and operator advisory before override.
+
+  autonomy_levels:
+    0: EMERGENCY      # Immediate halt, no resume without human
+    1: CRITICAL       # Halt, requires explicit operator restart
+    2: SUPERVISED     # Automated action + human notification
+    3: MONITORED      # Automated + journal entry
+    4: AUTONOMOUS     # Fully automated, logged only
+
+  tp_thresholds:
+    autonomous: 60     # TP >= 60 → execute autonomously
+    advisory: 45       # TP >= 45 → FATE advisory sufficient
+    approval: 35       # TP >= 35 → operator approval required
+    override: 25       # TP >= 25 → leadership override permitted
+
+  escalation_matrix:
+    - occurrences: 1
+      severity: WARNING
+      notify:
+        - orchestrator_log
+    - occurrences: 3
+      severity: ERROR
+      notify:
+        - orchestrator_log
+        - discord_webhook
+    - occurrences: 1
+      severity: CRITICAL
+      notify:
+        - all
+    # ── Audit-specific escalation entries ──────────────────────────────────
+    - occurrences: 2
+      severity: ERROR
+      notify:
+        - orchestrator_log
+        - discord_webhook
+      reflex: RFX-AOD-032   # 2 consecutive audit rejections
+    - occurrences: 3
+      severity: WARNING
+      notify:
+        - orchestrator_log
+      reflex: RFX-AOD-031   # 3 consecutive needs_revision
+    - occurrences: 5
+      severity: WARNING
+      notify:
+        - orchestrator_log
+        - discord_webhook
+      reflex: RFX-AOD-033   # 5 consecutive Bedrock skips (credentials issue)
+
+  fate_decision_audit:
+    backend: loop_journal.jsonl
+    retention_days: 90
+    audit_layer_backend: bedrock_claude
+    audit_cost_tracked_separately: true

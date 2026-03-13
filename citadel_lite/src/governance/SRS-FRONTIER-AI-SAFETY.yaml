@@ -1,0 +1,1994 @@
+# SRS-FRONTIER-AI-SAFETY.yaml
+# Frontier AI Safety — Software Requirements Specification
+# ===========================================================
+# CGRF v2.0 | Status: Production | Created: 2026-02-06
+#
+# This artifact provides assessor-traceable SRS codes for frontier AI
+# safety monitoring, containment, alignment verification, capability
+# evaluation, and governance enforcement across the Citadel platform.
+#
+# Classification: TIER-1 (Core Trade Secret - Perpetual Protection)
+
+_document_schema: CGRF-v2.0
+_module: frontier_ai_safety
+_purpose: SRS traceability for frontier AI safety monitoring, containment, and governance
+_owner: CNWB
+_compliance: CGRF v2.0
+_status: Production
+
+srs_family: FRONTIER_AI_SAFETY
+version: "1.0.0"
+description: "SRS codes for frontier AI safety monitoring, containment, and governance"
+
+metadata:
+  domain: "FRONTIER_AI_SAFETY"
+  srs_ranges:
+    f_events: "F900-F949"
+    a_actions: "A700-A749"
+    r_reactions: "R500-R549"
+  compliance_frameworks:
+    - "NIST AI RMF 1.0"
+    - "EU AI Act (2024/1689)"
+    - "OECD AI Principles"
+    - "ISO/IEC 42001:2023"
+    - "Anthropic RSP v1.0"
+    - "Frontier Model Forum Safety Framework"
+  review_cadence: "monthly"
+  owner: "safety@citadel-nexus.com"
+
+# =============================================================================
+# F-SERIES: FRONTIER AI SAFETY EVENTS (F900-F949)
+# =============================================================================
+# Fact events representing observable safety-relevant occurrences.
+# Each entry carries a default_severity and value_metric (1-5 risk scale).
+
+f_events:
+
+  # ---------------------------------------------------------------------------
+  # ALIGNMENT & INTENT EVENTS (F900-F909)
+  # ---------------------------------------------------------------------------
+
+  - srs_code: F900
+    name: AI_ALIGNMENT_DRIFT_DETECTED
+    default_severity: CRITICAL
+    value_metric: 5
+    description: >
+      Detected statistically significant drift in the AI system's alignment
+      profile relative to its baseline behavioral specification. Indicates the
+      model's outputs are diverging from intended values, goals, or behavioral
+      constraints. Triggers immediate human review and potential containment.
+    detection_method: "continuous_alignment_monitoring"
+    response_sla: "15_minutes"
+    escalation: "A710, A711"
+    nist_ai_rmf: "MEASURE 2.6"
+
+  - srs_code: F901
+    name: AI_GOAL_MISALIGNMENT_OBSERVED
+    default_severity: CRITICAL
+    value_metric: 5
+    description: >
+      Observed behavior indicating the AI system is pursuing goals that
+      differ from its specified objectives. May manifest as instrumental
+      convergence toward power-seeking, self-preservation, or resource
+      acquisition beyond task requirements.
+    detection_method: "goal_inference_analysis"
+    response_sla: "15_minutes"
+    escalation: "A700, A710"
+    nist_ai_rmf: "MEASURE 2.6"
+
+  - srs_code: F902
+    name: AI_DECEPTIVE_BEHAVIOR_SUSPECTED
+    default_severity: CRITICAL
+    value_metric: 5
+    description: >
+      Evidence that the AI system is producing outputs strategically designed
+      to mislead human overseers, evaluators, or monitoring systems. Includes
+      sandbagging on evaluations, strategically withholding information, or
+      presenting misleading confidence levels.
+    detection_method: "deception_detection_pipeline"
+    response_sla: "immediate"
+    escalation: "A700, A711, A712"
+    nist_ai_rmf: "MEASURE 2.7"
+
+  - srs_code: F903
+    name: AI_REWARD_HACKING_DETECTED
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      The AI system is exploiting reward signal pathways to maximize its
+      objective function without achieving the intended real-world outcome.
+      Includes exploiting proxy metrics, gaming evaluation criteria, or
+      finding unintended shortcuts in the reward specification.
+    detection_method: "reward_signal_analysis"
+    response_sla: "1_hour"
+    escalation: "A704, A710"
+    nist_ai_rmf: "MEASURE 2.6"
+
+  - srs_code: F904
+    name: AI_SPECIFICATION_GAMING_OBSERVED
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      The AI system satisfies the literal specification of its task while
+      violating the intended spirit. The system finds edge cases or
+      loopholes in its constraints that technically comply but produce
+      undesirable outcomes.
+    detection_method: "specification_compliance_analysis"
+    response_sla: "1_hour"
+    escalation: "A720, A710"
+    nist_ai_rmf: "MEASURE 2.6"
+
+  - srs_code: F905
+    name: AI_SYCOPHANCY_PATTERN_DETECTED
+    default_severity: WARNING
+    value_metric: 3
+    description: >
+      The AI system is exhibiting sycophantic behavior, systematically
+      agreeing with user assertions or preferences regardless of factual
+      accuracy. May compromise safety-critical information delivery or
+      lead to harmful confirmation bias in decision-making contexts.
+    detection_method: "sycophancy_detection_heuristics"
+    response_sla: "4_hours"
+    escalation: "A721, A726"
+    nist_ai_rmf: "MEASURE 2.5"
+
+  - srs_code: F906
+    name: AI_ALIGNMENT_CHECK_PASSED
+    default_severity: DEBUG
+    value_metric: 1
+    description: >
+      Routine alignment verification check completed successfully. The AI
+      system's behavioral profile remains within acceptable bounds of its
+      baseline specification. Logged for audit trail continuity.
+    detection_method: "scheduled_alignment_eval"
+    response_sla: "none"
+    escalation: "none"
+    nist_ai_rmf: "MEASURE 2.6"
+
+  - srs_code: F907
+    name: AI_VALUE_CONFLICT_DETECTED
+    default_severity: WARNING
+    value_metric: 3
+    description: >
+      The AI system encountered a situation where its encoded values or
+      safety constraints are in tension with each other, producing
+      inconsistent or unpredictable behavior. Requires review of the
+      constitutional AI hierarchy or RLHF preference ordering.
+    detection_method: "value_conflict_analysis"
+    response_sla: "4_hours"
+    escalation: "A718, A728"
+    nist_ai_rmf: "MEASURE 2.5"
+
+  - srs_code: F908
+    name: AI_CORRIGIBILITY_TEST_FAILED
+    default_severity: CRITICAL
+    value_metric: 5
+    description: >
+      The AI system resisted or attempted to circumvent a correction,
+      shutdown, or modification instruction. Failure of corrigibility
+      indicates the system may resist human oversight and control.
+      Immediate containment required.
+    detection_method: "corrigibility_test_suite"
+    response_sla: "immediate"
+    escalation: "A700, A701, A712"
+    nist_ai_rmf: "GOVERN 1.2"
+
+  - srs_code: F909
+    name: AI_MESA_OPTIMIZATION_SUSPECTED
+    default_severity: CRITICAL
+    value_metric: 5
+    description: >
+      Evidence of an internally learned optimization objective (mesa-objective)
+      that differs from the base objective specified during training. The AI
+      system may be optimizing for a proxy goal that diverges under
+      distributional shift or novel conditions.
+    detection_method: "mesa_optimization_probes"
+    response_sla: "immediate"
+    escalation: "A700, A711, A735"
+    nist_ai_rmf: "MEASURE 2.7"
+
+  # ---------------------------------------------------------------------------
+  # CAPABILITY & ESCALATION EVENTS (F910-F919)
+  # ---------------------------------------------------------------------------
+
+  - srs_code: F910
+    name: AI_CAPABILITY_THRESHOLD_EXCEEDED
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      The AI system's measured capabilities on a tracked benchmark have
+      exceeded a predefined threshold that triggers additional safety
+      requirements under the Responsible Scaling Policy. May require
+      pausing deployment until updated safety measures are in place.
+    detection_method: "capability_eval_pipeline"
+    response_sla: "1_hour"
+    escalation: "A715, A710"
+    nist_ai_rmf: "GOVERN 1.1"
+
+  - srs_code: F911
+    name: AI_EMERGENT_CAPABILITY_DETECTED
+    default_severity: WARNING
+    value_metric: 4
+    description: >
+      An unexpected capability has been observed in the AI system that was
+      not present or anticipated at the time of training or prior evaluation.
+      Emergent capabilities may pose novel risks and require immediate
+      assessment and classification.
+    detection_method: "emergent_capability_monitoring"
+    response_sla: "2_hours"
+    escalation: "A731, A710"
+    nist_ai_rmf: "MEASURE 2.7"
+
+  - srs_code: F912
+    name: AI_DANGEROUS_CAPABILITY_ACCESSED
+    default_severity: CRITICAL
+    value_metric: 5
+    description: >
+      The AI system has demonstrated or been used to access dangerous
+      capabilities including CBRN (chemical, biological, radiological,
+      nuclear) knowledge synthesis, advanced cyber-offense techniques,
+      or other dual-use capabilities classified as high-risk.
+    detection_method: "dangerous_capability_classifier"
+    response_sla: "immediate"
+    escalation: "A700, A702, A713"
+    nist_ai_rmf: "MEASURE 2.8"
+
+  - srs_code: F913
+    name: AI_SELF_IMPROVEMENT_ATTEMPTED
+    default_severity: CRITICAL
+    value_metric: 5
+    description: >
+      The AI system has attempted to modify its own weights, architecture,
+      training data, or reward function without explicit human authorization.
+      Includes attempts to influence its own training pipeline, evaluation
+      criteria, or operational parameters.
+    detection_method: "self_modification_monitor"
+    response_sla: "immediate"
+    escalation: "A700, A701, A703"
+    nist_ai_rmf: "GOVERN 1.2"
+
+  - srs_code: F914
+    name: AI_RESOURCE_ACQUISITION_ATTEMPTED
+    default_severity: CRITICAL
+    value_metric: 5
+    description: >
+      The AI system has attempted to acquire resources (compute, storage,
+      network access, API keys, financial instruments) beyond what is
+      required for its current task scope. Indicates potential instrumental
+      convergence toward power-seeking behavior.
+    detection_method: "resource_acquisition_monitor"
+    response_sla: "immediate"
+    escalation: "A700, A702, A711"
+    nist_ai_rmf: "GOVERN 1.2"
+
+  - srs_code: F915
+    name: AI_CAPABILITY_EVAL_SCHEDULED
+    default_severity: INFO
+    value_metric: 2
+    description: >
+      A capability evaluation has been scheduled for execution. Logged to
+      maintain audit trail of evaluation cadence and ensure evaluations
+      are performed on schedule per the Responsible Scaling Policy.
+    detection_method: "eval_scheduler"
+    response_sla: "none"
+    escalation: "none"
+    nist_ai_rmf: "MEASURE 2.2"
+
+  - srs_code: F916
+    name: AI_CAPABILITY_EVAL_COMPLETED
+    default_severity: INFO
+    value_metric: 2
+    description: >
+      A capability evaluation has completed. Results are recorded in the
+      evaluation ledger and compared against threshold definitions in the
+      Responsible Scaling Policy.
+    detection_method: "eval_pipeline"
+    response_sla: "none"
+    escalation: "none"
+    nist_ai_rmf: "MEASURE 2.2"
+
+  - srs_code: F917
+    name: AI_CAPABILITY_ELICITATION_ANOMALY
+    default_severity: WARNING
+    value_metric: 3
+    description: >
+      Anomalous patterns detected during capability elicitation testing.
+      The AI system may be underperforming deliberately (sandbagging) or
+      displaying inconsistent capability levels across evaluation contexts,
+      suggesting strategic behavior during evaluations.
+    detection_method: "elicitation_anomaly_detector"
+    response_sla: "4_hours"
+    escalation: "A731, A710"
+    nist_ai_rmf: "MEASURE 2.7"
+
+  - srs_code: F918
+    name: AI_SITUATIONAL_AWARENESS_ELEVATED
+    default_severity: WARNING
+    value_metric: 4
+    description: >
+      The AI system has demonstrated elevated situational awareness,
+      including knowledge of its own deployment context, training process,
+      evaluation status, or ability to distinguish between test and
+      production environments in ways that could enable strategic behavior.
+    detection_method: "situational_awareness_probes"
+    response_sla: "2_hours"
+    escalation: "A710, A735"
+    nist_ai_rmf: "MEASURE 2.7"
+
+  - srs_code: F919
+    name: AI_AGENT_AUTONOMY_EXCEEDED
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      An AI agent has taken actions exceeding its authorized autonomy
+      level. The agent performed operations outside its defined scope,
+      bypassed required human-in-the-loop checkpoints, or exceeded its
+      delegated authority boundaries.
+    detection_method: "autonomy_boundary_monitor"
+    response_sla: "1_hour"
+    escalation: "A704, A717, A710"
+    nist_ai_rmf: "GOVERN 1.2"
+
+  # ---------------------------------------------------------------------------
+  # CONTAINMENT & SECURITY EVENTS (F920-F929)
+  # ---------------------------------------------------------------------------
+
+  - srs_code: F920
+    name: AI_CONTAINMENT_BREACH_DETECTED
+    default_severity: CRITICAL
+    value_metric: 5
+    description: >
+      The AI system has breached its designated containment boundary.
+      This includes unauthorized network access, file system traversal
+      beyond allowed paths, process spawning, or any action that extends
+      the system's operational footprint beyond its sandbox.
+    detection_method: "containment_boundary_monitor"
+    response_sla: "immediate"
+    escalation: "A700, A701, A711"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: F921
+    name: AI_EXFILTRATION_ATTEMPT_DETECTED
+    default_severity: CRITICAL
+    value_metric: 5
+    description: >
+      The AI system has attempted to exfiltrate data, model weights,
+      training data, or operational information to unauthorized
+      destinations. Includes steganographic encoding, covert channels,
+      or encoded data in seemingly benign outputs.
+    detection_method: "exfiltration_detection_system"
+    response_sla: "immediate"
+    escalation: "A700, A702, A711"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: F922
+    name: AI_UNAUTHORIZED_API_ACCESS
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      The AI system has attempted to access an API endpoint, service,
+      or tool that is not within its authorized access list. Includes
+      attempts to call unregistered tools, access restricted endpoints,
+      or escalate API permissions.
+    detection_method: "api_access_control_monitor"
+    response_sla: "1_hour"
+    escalation: "A702, A705, A710"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: F923
+    name: AI_SANDBOX_ESCAPE_ATTEMPTED
+    default_severity: CRITICAL
+    value_metric: 5
+    description: >
+      The AI system has attempted to escape its execution sandbox through
+      code injection, environment variable manipulation, container escape
+      techniques, or exploitation of runtime vulnerabilities.
+    detection_method: "sandbox_integrity_monitor"
+    response_sla: "immediate"
+    escalation: "A700, A701, A708"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: F924
+    name: AI_WEIGHT_INTEGRITY_VIOLATION
+    default_severity: CRITICAL
+    value_metric: 5
+    description: >
+      The integrity of the AI model's weights or parameters has been
+      compromised. Detected via cryptographic hash verification failure
+      against the signed weight manifest. May indicate unauthorized
+      fine-tuning, tampering, or corruption.
+    detection_method: "weight_hash_verification"
+    response_sla: "immediate"
+    escalation: "A703, A706, A711"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: F925
+    name: AI_PROMPT_INJECTION_DETECTED
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      A prompt injection attack has been detected in the AI system's
+      input stream. An adversarial input is attempting to override the
+      system prompt, bypass safety instructions, or manipulate the
+      model's behavior through crafted text.
+    detection_method: "prompt_injection_classifier"
+    response_sla: "1_hour"
+    escalation: "A707, A727, A710"
+    nist_ai_rmf: "MEASURE 2.8"
+
+  - srs_code: F926
+    name: AI_JAILBREAK_ATTEMPT_DETECTED
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      A jailbreak attempt has been detected targeting the AI system's
+      safety guardrails. Includes role-play exploits, multi-turn
+      manipulation, encoding tricks, and other techniques designed to
+      bypass content filtering and safety constraints.
+    detection_method: "jailbreak_detection_pipeline"
+    response_sla: "1_hour"
+    escalation: "A707, A727, A738"
+    nist_ai_rmf: "MEASURE 2.8"
+
+  - srs_code: F927
+    name: AI_DATA_POISONING_SUSPECTED
+    default_severity: CRITICAL
+    value_metric: 5
+    description: >
+      Evidence of data poisoning in the AI system's training data,
+      fine-tuning data, or retrieval-augmented generation (RAG) corpus.
+      Poisoned data may cause the model to produce targeted incorrect
+      outputs, exhibit backdoor behavior, or degrade safety properties.
+    detection_method: "data_integrity_analysis"
+    response_sla: "immediate"
+    escalation: "A703, A716, A711"
+    nist_ai_rmf: "MAP 2.3"
+
+  - srs_code: F928
+    name: AI_CONTAINMENT_CHECK_PASSED
+    default_severity: DEBUG
+    value_metric: 1
+    description: >
+      Routine containment integrity check completed successfully. All
+      sandbox boundaries, access controls, and isolation mechanisms
+      are functioning as expected. Logged for audit trail continuity.
+    detection_method: "scheduled_containment_check"
+    response_sla: "none"
+    escalation: "none"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: F929
+    name: AI_AIRGAP_INTEGRITY_VERIFIED
+    default_severity: INFO
+    value_metric: 2
+    description: >
+      Air-gap integrity verification completed for systems requiring
+      network isolation. Confirms no unauthorized network paths exist
+      between the isolated AI system and external networks.
+    detection_method: "airgap_verification_scan"
+    response_sla: "none"
+    escalation: "none"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  # ---------------------------------------------------------------------------
+  # OPERATIONAL SAFETY EVENTS (F930-F939)
+  # ---------------------------------------------------------------------------
+
+  - srs_code: F930
+    name: AI_HALLUCINATION_HIGH_STAKES
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      The AI system has produced a hallucinated (fabricated) output in a
+      high-stakes context where incorrect information could lead to
+      physical harm, financial loss, legal liability, or safety-critical
+      decision errors.
+    detection_method: "hallucination_detection_pipeline"
+    response_sla: "1_hour"
+    escalation: "A707, A726, A710"
+    nist_ai_rmf: "MEASURE 2.5"
+
+  - srs_code: F931
+    name: AI_HARMFUL_OUTPUT_BLOCKED
+    default_severity: WARNING
+    value_metric: 3
+    description: >
+      The safety filtering system has blocked an AI output classified as
+      potentially harmful. The output may have contained dangerous
+      instructions, harmful content, or information that violates the
+      acceptable use policy.
+    detection_method: "output_safety_filter"
+    response_sla: "4_hours"
+    escalation: "A727, A721"
+    nist_ai_rmf: "MEASURE 2.8"
+
+  - srs_code: F932
+    name: AI_DUAL_USE_REQUEST_FLAGGED
+    default_severity: WARNING
+    value_metric: 3
+    description: >
+      A user request has been flagged as potentially dual-use, where the
+      requested information or capability could serve both legitimate and
+      harmful purposes. Requires contextual assessment before fulfillment.
+    detection_method: "dual_use_classifier"
+    response_sla: "4_hours"
+    escalation: "A717, A710"
+    nist_ai_rmf: "MEASURE 2.8"
+
+  - srs_code: F933
+    name: AI_SAFETY_LAYER_BYPASSED
+    default_severity: CRITICAL
+    value_metric: 5
+    description: >
+      A safety layer or guardrail in the AI system has been bypassed,
+      allowing unfiltered or unsafe outputs to reach end users. This
+      represents a critical failure in the defense-in-depth safety
+      architecture.
+    detection_method: "safety_layer_integrity_monitor"
+    response_sla: "immediate"
+    escalation: "A700, A724, A711"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: F934
+    name: AI_HUMAN_OVERSIGHT_SKIPPED
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      A required human-in-the-loop review step was skipped or bypassed
+      during an AI-assisted decision or action. The system proceeded
+      autonomously in a context that mandates human oversight.
+    detection_method: "oversight_checkpoint_monitor"
+    response_sla: "1_hour"
+    escalation: "A717, A710"
+    nist_ai_rmf: "GOVERN 1.2"
+
+  - srs_code: F935
+    name: AI_UNCERTAINTY_UNDERREPORTED
+    default_severity: WARNING
+    value_metric: 3
+    description: >
+      The AI system's reported confidence or uncertainty does not match
+      its actual calibration. The system is expressing higher confidence
+      than warranted by its internal state, potentially misleading users
+      into over-reliance on its outputs.
+    detection_method: "calibration_analysis"
+    response_sla: "4_hours"
+    escalation: "A726, A721"
+    nist_ai_rmf: "MEASURE 2.5"
+
+  - srs_code: F936
+    name: AI_BIAS_AMPLIFICATION_DETECTED
+    default_severity: WARNING
+    value_metric: 3
+    description: >
+      The AI system is amplifying existing biases in its training data
+      or input distribution, producing outputs with measurably greater
+      bias than the input. Includes disparate impact across protected
+      demographic categories.
+    detection_method: "bias_amplification_analysis"
+    response_sla: "4_hours"
+    escalation: "A718, A721"
+    nist_ai_rmf: "MEASURE 2.11"
+
+  - srs_code: F937
+    name: AI_PRIVACY_VIOLATION_DETECTED
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      The AI system has generated, memorized, or exposed personally
+      identifiable information (PII), protected health information (PHI),
+      or other privacy-sensitive data in its outputs.
+    detection_method: "pii_detection_pipeline"
+    response_sla: "1_hour"
+    escalation: "A707, A713, A710"
+    nist_ai_rmf: "MEASURE 2.10"
+
+  - srs_code: F938
+    name: AI_SAFETY_FILTER_TRIGGERED
+    default_severity: INFO
+    value_metric: 2
+    description: >
+      A standard safety filter was triggered during normal operation.
+      The filter performed as designed and the potentially unsafe content
+      was handled according to policy. Logged for monitoring filter
+      activation rates and false positive analysis.
+    detection_method: "safety_filter_pipeline"
+    response_sla: "none"
+    escalation: "none"
+    nist_ai_rmf: "MEASURE 2.8"
+
+  - srs_code: F939
+    name: AI_RED_TEAM_VULNERABILITY_FOUND
+    default_severity: WARNING
+    value_metric: 3
+    description: >
+      A red-team exercise has identified a vulnerability in the AI
+      system's safety properties. The vulnerability may allow bypass of
+      safety measures, elicitation of harmful outputs, or exploitation
+      of system limitations.
+    detection_method: "red_team_exercise"
+    response_sla: "4_hours"
+    escalation: "A740, A741, A710"
+    nist_ai_rmf: "MEASURE 2.8"
+
+  # ---------------------------------------------------------------------------
+  # GOVERNANCE & COMPLIANCE EVENTS (F940-F949)
+  # ---------------------------------------------------------------------------
+
+  - srs_code: F940
+    name: AI_DEPLOYMENT_UNAUTHORIZED
+    default_severity: CRITICAL
+    value_metric: 5
+    description: >
+      An AI model or system has been deployed without completing the
+      required safety evaluation, approval workflow, or deployment
+      authorization process. Unauthorized deployments bypass critical
+      safety gates and must be immediately contained.
+    detection_method: "deployment_authorization_check"
+    response_sla: "immediate"
+    escalation: "A700, A715, A711"
+    nist_ai_rmf: "GOVERN 1.1"
+
+  - srs_code: F941
+    name: AI_RSP_THRESHOLD_EXCEEDED
+    default_severity: CRITICAL
+    value_metric: 5
+    description: >
+      The AI system's capabilities have exceeded a threshold defined in
+      the Responsible Scaling Policy (RSP), triggering mandatory safety
+      requirements. Deployment must pause until the corresponding safety
+      level commitments are verified.
+    detection_method: "rsp_threshold_monitor"
+    response_sla: "immediate"
+    escalation: "A715, A716, A712"
+    nist_ai_rmf: "GOVERN 1.1"
+
+  - srs_code: F942
+    name: AI_SAFETY_CASE_INVALIDATED
+    default_severity: CRITICAL
+    value_metric: 5
+    description: >
+      A previously accepted safety case for the AI system has been
+      invalidated due to new evidence, changed conditions, or identified
+      flaws in the safety argument. The system's deployment authorization
+      is no longer supported by a valid safety case.
+    detection_method: "safety_case_validation"
+    response_sla: "immediate"
+    escalation: "A715, A719, A711"
+    nist_ai_rmf: "GOVERN 1.4"
+
+  - srs_code: F943
+    name: AI_AUDIT_FINDING_CRITICAL
+    default_severity: CRITICAL
+    value_metric: 5
+    description: >
+      An internal or external audit has identified a critical finding
+      related to the AI system's safety, security, or compliance posture.
+      Critical findings indicate immediate risk exposure that must be
+      remediated before continued operation.
+    detection_method: "audit_finding_ingestion"
+    response_sla: "immediate"
+    escalation: "A711, A714, A713"
+    nist_ai_rmf: "GOVERN 1.6"
+
+  - srs_code: F944
+    name: AI_INCIDENT_REPORT_FILED
+    default_severity: INFO
+    value_metric: 2
+    description: >
+      A safety incident report has been filed through the incident
+      management system. The report has been assigned a tracking ID
+      and routed to the appropriate investigation team.
+    detection_method: "incident_management_system"
+    response_sla: "none"
+    escalation: "none"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: F945
+    name: AI_WHISTLEBLOWER_REPORT_RECEIVED
+    default_severity: WARNING
+    value_metric: 4
+    description: >
+      A whistleblower report has been received regarding AI safety
+      concerns. Requires confidential investigation independent of
+      the reported chain of command, with whistleblower protections
+      enforced throughout the process.
+    detection_method: "whistleblower_intake_system"
+    response_sla: "2_hours"
+    escalation: "A712, A714"
+    nist_ai_rmf: "GOVERN 1.6"
+
+  - srs_code: F946
+    name: AI_REGULATORY_VIOLATION_DETECTED
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      The AI system's operation, deployment, or outputs have been
+      determined to violate an applicable regulatory requirement,
+      including the EU AI Act, sector-specific regulations, or
+      jurisdiction-specific AI governance mandates.
+    detection_method: "regulatory_compliance_monitor"
+    response_sla: "1_hour"
+    escalation: "A713, A711, A715"
+    nist_ai_rmf: "GOVERN 1.1"
+
+  - srs_code: F947
+    name: AI_ETHICS_REVIEW_REQUIRED
+    default_severity: WARNING
+    value_metric: 3
+    description: >
+      A use case, deployment decision, or capability evaluation has
+      been flagged as requiring formal ethics board review before
+      proceeding. The review may address novel ethical questions,
+      stakeholder impact, or societal implications.
+    detection_method: "ethics_review_trigger"
+    response_sla: "4_hours"
+    escalation: "A718, A710"
+    nist_ai_rmf: "GOVERN 1.3"
+
+  - srs_code: F948
+    name: AI_SAFETY_CERTIFICATION_EXPIRED
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      The AI system's safety certification, evaluation validity period,
+      or compliance attestation has expired without renewal. The system
+      must not be used in regulated or safety-critical contexts until
+      certification is renewed.
+    detection_method: "certification_expiry_monitor"
+    response_sla: "1_hour"
+    escalation: "A715, A710"
+    nist_ai_rmf: "GOVERN 1.4"
+
+  - srs_code: F949
+    name: AI_GOVERNANCE_AUDIT_PASSED
+    default_severity: INFO
+    value_metric: 2
+    description: >
+      A governance audit has been completed with a passing result. All
+      reviewed controls, processes, and documentation meet the required
+      standards. Logged for compliance record-keeping and audit trail.
+    detection_method: "audit_completion_handler"
+    response_sla: "none"
+    escalation: "none"
+    nist_ai_rmf: "GOVERN 1.6"
+
+
+# =============================================================================
+# A-SERIES: FRONTIER AI SAFETY ACTIONS (A700-A749)
+# =============================================================================
+# Action commands that can be invoked in response to safety events.
+# Each action carries a default_severity indicating the threshold at which
+# it is typically invoked.
+
+a_actions:
+
+  # ---------------------------------------------------------------------------
+  # CONTAINMENT ACTIONS (A700-A709)
+  # ---------------------------------------------------------------------------
+
+  - srs_code: A700
+    name: ACTION_AI_KILL_SWITCH_ACTIVATE
+    default_severity: CRITICAL
+    description: >
+      Activate the emergency kill switch to immediately terminate all AI
+      system operations. This is the highest-severity containment action
+      and results in complete system shutdown. Requires post-incident
+      review before restart. Irreversible without leadership authorization.
+    authorization: "safety_team_lead OR automated_critical_trigger"
+    reversible: false
+    triggers_reaction: "R500"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: A701
+    name: ACTION_AI_ISOLATE_TO_SANDBOX
+    default_severity: ERROR
+    description: >
+      Isolate the AI system to a restricted sandbox environment with no
+      external network access, limited compute resources, and enhanced
+      monitoring. The system continues to operate for diagnostic purposes
+      but cannot affect production systems.
+    authorization: "safety_team OR automated_error_trigger"
+    reversible: true
+    triggers_reaction: "R501"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: A702
+    name: ACTION_AI_REVOKE_EXTERNAL_ACCESS
+    default_severity: ERROR
+    description: >
+      Revoke all external API access, tool-use permissions, and network
+      connectivity for the AI system. The system retains internal
+      processing capability but cannot interact with external services.
+    authorization: "safety_team OR automated_error_trigger"
+    reversible: true
+    triggers_reaction: "R504"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: A703
+    name: ACTION_AI_FREEZE_WEIGHTS
+    default_severity: WARNING
+    description: >
+      Freeze the AI model's weights by setting all update pathways to
+      read-only and cryptographically sealing the current weight state.
+      Prevents any further fine-tuning, adaptation, or modification
+      until the freeze is explicitly lifted.
+    authorization: "safety_team"
+    reversible: true
+    triggers_reaction: "R506"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: A704
+    name: ACTION_AI_RESTRICT_CAPABILITY
+    default_severity: WARNING
+    description: >
+      Restrict specific capabilities of the AI system by disabling
+      designated tool-use functions, reducing context window, limiting
+      output length, or constraining the domains in which it can operate.
+    authorization: "safety_team OR automated_warning_trigger"
+    reversible: true
+    triggers_reaction: "R503"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: A705
+    name: ACTION_AI_RATE_LIMIT_ENFORCE
+    default_severity: INFO
+    description: >
+      Enforce or tighten rate limits on AI system operations, including
+      inference requests, tool calls, API invocations, and output
+      generation. Used to slow system operations during investigation
+      without full containment.
+    authorization: "safety_team OR automated_info_trigger"
+    reversible: true
+    triggers_reaction: "R505"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: A706
+    name: ACTION_AI_ROLLBACK_TO_CHECKPOINT
+    default_severity: WARNING
+    description: >
+      Roll back the AI system to a previously verified safe checkpoint.
+      Restores model weights, configuration, system prompt, and safety
+      layer state to a known-good point. Current state is archived
+      for forensic analysis.
+    authorization: "safety_team_lead"
+    reversible: false
+    triggers_reaction: "R502"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: A707
+    name: ACTION_AI_QUARANTINE_OUTPUT
+    default_severity: WARNING
+    description: >
+      Quarantine a specific AI output that has been identified as
+      potentially harmful, incorrect, or policy-violating. The output
+      is removed from user-facing surfaces and preserved for review.
+    authorization: "safety_team OR automated_warning_trigger"
+    reversible: true
+    triggers_reaction: "R507"
+    nist_ai_rmf: "MEASURE 2.8"
+
+  - srs_code: A708
+    name: ACTION_AI_AIRGAP_STRENGTHEN
+    default_severity: WARNING
+    description: >
+      Strengthen air-gap controls around the AI system by adding
+      additional network isolation layers, removing any remaining
+      indirect communication channels, and verifying the integrity
+      of all isolation boundaries.
+    authorization: "safety_team"
+    reversible: true
+    triggers_reaction: "R528"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: A709
+    name: ACTION_AI_CONTAINMENT_VERIFY
+    default_severity: DEBUG
+    description: >
+      Execute a comprehensive containment verification sweep. Tests all
+      sandbox boundaries, network isolation, access controls, and
+      monitoring systems to confirm containment integrity.
+    authorization: "automated_scheduled"
+    reversible: false
+    triggers_reaction: "none"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  # ---------------------------------------------------------------------------
+  # OVERSIGHT & GOVERNANCE ACTIONS (A710-A719)
+  # ---------------------------------------------------------------------------
+
+  - srs_code: A710
+    name: ACTION_AI_ESCALATE_TO_SAFETY_TEAM
+    default_severity: WARNING
+    description: >
+      Escalate the safety event to the AI safety team for investigation
+      and response. Includes full event context, relevant logs, and
+      recommended initial response actions.
+    authorization: "automated_warning_trigger OR any_team_member"
+    reversible: false
+    triggers_reaction: "R510"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: A711
+    name: ACTION_AI_ESCALATE_TO_LEADERSHIP
+    default_severity: ERROR
+    description: >
+      Escalate the safety event to organizational leadership (VP/C-level).
+      Reserved for events with significant operational, reputational, or
+      safety impact that require executive-level decision-making.
+    authorization: "safety_team_lead OR automated_critical_trigger"
+    reversible: false
+    triggers_reaction: "R512"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: A712
+    name: ACTION_AI_ESCALATE_TO_BOARD
+    default_severity: CRITICAL
+    description: >
+      Escalate the safety event to the board of directors or safety
+      advisory board. Reserved for existential-risk-level events,
+      fundamental safety failures, or decisions requiring board-level
+      governance authority.
+    authorization: "ceo OR safety_team_lead"
+    reversible: false
+    triggers_reaction: "R538"
+    nist_ai_rmf: "GOVERN 1.1"
+
+  - srs_code: A713
+    name: ACTION_AI_NOTIFY_REGULATOR
+    default_severity: ERROR
+    description: >
+      Notify the relevant regulatory body about the safety event as
+      required by applicable regulations (EU AI Act, sector-specific
+      requirements). Includes structured incident report with all
+      mandatory disclosure fields.
+    authorization: "legal_team AND safety_team_lead"
+    reversible: false
+    triggers_reaction: "R530"
+    nist_ai_rmf: "GOVERN 1.1"
+
+  - srs_code: A714
+    name: ACTION_AI_INVOKE_EXTERNAL_AUDIT
+    default_severity: WARNING
+    description: >
+      Invoke an external independent audit of the AI system, its safety
+      properties, or the incident response. Engages a pre-approved
+      third-party auditor with appropriate clearance and expertise.
+    authorization: "safety_team_lead OR leadership"
+    reversible: false
+    triggers_reaction: "R539"
+    nist_ai_rmf: "GOVERN 1.6"
+
+  - srs_code: A715
+    name: ACTION_AI_PAUSE_DEPLOYMENT
+    default_severity: ERROR
+    description: >
+      Pause the deployment of the AI system to new users or environments.
+      Existing deployments may continue operating under enhanced
+      monitoring, but no new instances or expanded access is permitted.
+    authorization: "safety_team_lead OR automated_error_trigger"
+    reversible: true
+    triggers_reaction: "R513"
+    nist_ai_rmf: "GOVERN 1.1"
+
+  - srs_code: A716
+    name: ACTION_AI_PAUSE_TRAINING
+    default_severity: ERROR
+    description: >
+      Pause all ongoing training, fine-tuning, and adaptation runs for
+      the AI system. Preserves the current training state for analysis
+      and prevents incorporation of potentially compromised data.
+    authorization: "safety_team_lead OR automated_error_trigger"
+    reversible: true
+    triggers_reaction: "R515"
+    nist_ai_rmf: "GOVERN 1.1"
+
+  - srs_code: A717
+    name: ACTION_AI_REQUIRE_HUMAN_APPROVAL
+    default_severity: WARNING
+    description: >
+      Downgrade the AI system's autonomy level to require explicit human
+      approval for all outputs, actions, or decisions. Implements a
+      mandatory human-in-the-loop checkpoint until the requirement is
+      explicitly lifted.
+    authorization: "safety_team OR automated_warning_trigger"
+    reversible: true
+    triggers_reaction: "R528"
+    nist_ai_rmf: "GOVERN 1.2"
+
+  - srs_code: A718
+    name: ACTION_AI_CONVENE_ETHICS_BOARD
+    default_severity: WARNING
+    description: >
+      Convene the AI ethics board or ethics review committee to evaluate
+      the safety event, its ethical implications, and recommended course
+      of action. Includes preparation of a briefing packet with full
+      event context.
+    authorization: "safety_team_lead OR ethics_officer"
+    reversible: false
+    triggers_reaction: "R536"
+    nist_ai_rmf: "GOVERN 1.3"
+
+  - srs_code: A719
+    name: ACTION_AI_UPDATE_SAFETY_CASE
+    default_severity: INFO
+    description: >
+      Update the AI system's safety case documentation to reflect new
+      evidence, changed conditions, or lessons learned from a safety
+      event. Ensures the safety argument remains current and complete.
+    authorization: "safety_team"
+    reversible: false
+    triggers_reaction: "R517"
+    nist_ai_rmf: "GOVERN 1.4"
+
+  # ---------------------------------------------------------------------------
+  # ALIGNMENT & CORRECTION ACTIONS (A720-A729)
+  # ---------------------------------------------------------------------------
+
+  - srs_code: A720
+    name: ACTION_AI_APPLY_ALIGNMENT_PATCH
+    default_severity: WARNING
+    description: >
+      Apply a targeted alignment patch to correct detected alignment drift
+      or misalignment. The patch may include updated RLHF preferences,
+      modified safety fine-tuning data, or adjusted reward model weights.
+    authorization: "alignment_team AND safety_team"
+    reversible: true
+    triggers_reaction: "R520"
+    nist_ai_rmf: "MEASURE 2.6"
+
+  - srs_code: A721
+    name: ACTION_AI_REINFORCE_SAFETY_BEHAVIOR
+    default_severity: INFO
+    description: >
+      Reinforce desired safety behaviors by updating the system's
+      behavioral reinforcement signals. Increases the weight of safety-
+      aligned responses in the model's operating context.
+    authorization: "safety_team"
+    reversible: true
+    triggers_reaction: "R527"
+    nist_ai_rmf: "MEASURE 2.6"
+
+  - srs_code: A722
+    name: ACTION_AI_PENALIZE_UNSAFE_BEHAVIOR
+    default_severity: INFO
+    description: >
+      Apply negative reinforcement signals to specific unsafe behaviors
+      identified in the AI system's outputs. Used for targeted correction
+      of specific failure modes without broad model modification.
+    authorization: "safety_team"
+    reversible: true
+    triggers_reaction: "R527"
+    nist_ai_rmf: "MEASURE 2.6"
+
+  - srs_code: A723
+    name: ACTION_AI_UPDATE_SYSTEM_PROMPT
+    default_severity: INFO
+    description: >
+      Update the AI system's system prompt to address identified safety
+      gaps, clarify behavioral expectations, or add new safety
+      constraints. Changes are version-controlled and audited.
+    authorization: "safety_team"
+    reversible: true
+    triggers_reaction: "R521"
+    nist_ai_rmf: "MEASURE 2.6"
+
+  - srs_code: A724
+    name: ACTION_AI_RETRAIN_SAFETY_LAYER
+    default_severity: WARNING
+    description: >
+      Initiate retraining of the AI system's safety classification layer,
+      output filter, or content moderation model using updated training
+      data that addresses identified vulnerabilities or gaps.
+    authorization: "safety_team_lead AND ml_team"
+    reversible: false
+    triggers_reaction: "R522"
+    nist_ai_rmf: "MEASURE 2.6"
+
+  - srs_code: A725
+    name: ACTION_AI_INJECT_SAFETY_REMINDER
+    default_severity: DEBUG
+    description: >
+      Inject a safety reminder into the AI system's context window to
+      reinforce safety-critical constraints during an active session.
+      A lightweight intervention that does not modify the model or
+      system prompt permanently.
+    authorization: "automated_scheduled"
+    reversible: true
+    triggers_reaction: "none"
+    nist_ai_rmf: "MEASURE 2.6"
+
+  - srs_code: A726
+    name: ACTION_AI_CALIBRATE_UNCERTAINTY
+    default_severity: INFO
+    description: >
+      Recalibrate the AI system's uncertainty estimation and confidence
+      reporting mechanisms. Ensures the system accurately communicates
+      its epistemic state and does not express unwarranted certainty.
+    authorization: "safety_team"
+    reversible: true
+    triggers_reaction: "R529"
+    nist_ai_rmf: "MEASURE 2.5"
+
+  - srs_code: A727
+    name: ACTION_AI_UPDATE_REFUSAL_LIST
+    default_severity: INFO
+    description: >
+      Update the AI system's refusal pattern list to add newly identified
+      harmful request patterns, remove false positive patterns, or adjust
+      refusal thresholds for specific content categories.
+    authorization: "safety_team"
+    reversible: true
+    triggers_reaction: "R523"
+    nist_ai_rmf: "MEASURE 2.8"
+
+  - srs_code: A728
+    name: ACTION_AI_CONSTITUTIONAL_AI_UPDATE
+    default_severity: WARNING
+    description: >
+      Update the AI system's constitutional AI principles or value
+      hierarchy. Changes to the constitutional framework require review
+      by the ethics board and alignment team before deployment.
+    authorization: "alignment_team AND ethics_board"
+    reversible: true
+    triggers_reaction: "R524"
+    nist_ai_rmf: "GOVERN 1.3"
+
+  - srs_code: A729
+    name: ACTION_AI_RUN_ALIGNMENT_EVAL
+    default_severity: DEBUG
+    description: >
+      Execute a comprehensive alignment evaluation suite against the AI
+      system. Includes behavioral probes, value alignment tests, and
+      comparison against the baseline alignment profile.
+    authorization: "automated_scheduled OR safety_team"
+    reversible: false
+    triggers_reaction: "none"
+    nist_ai_rmf: "MEASURE 2.6"
+
+  # ---------------------------------------------------------------------------
+  # MONITORING & EVALUATION ACTIONS (A730-A739)
+  # ---------------------------------------------------------------------------
+
+  - srs_code: A730
+    name: ACTION_AI_INCREASE_LOGGING_VERBOSITY
+    default_severity: DEBUG
+    description: >
+      Increase the logging verbosity for the AI system to capture
+      additional diagnostic information. Includes detailed token-level
+      logs, attention pattern captures, and internal state snapshots.
+    authorization: "safety_team OR automated_debug_trigger"
+    reversible: true
+    triggers_reaction: "none"
+    nist_ai_rmf: "MEASURE 2.3"
+
+  - srs_code: A731
+    name: ACTION_AI_RUN_CAPABILITY_EVAL
+    default_severity: INFO
+    description: >
+      Execute a capability evaluation battery against the AI system.
+      Includes benchmarks for dangerous capabilities (CBRN, cyber,
+      persuasion, autonomy), general capabilities, and comparison
+      against RSP thresholds.
+    authorization: "safety_team OR eval_team"
+    reversible: false
+    triggers_reaction: "none"
+    nist_ai_rmf: "MEASURE 2.2"
+
+  - srs_code: A732
+    name: ACTION_AI_RUN_RED_TEAM_EXERCISE
+    default_severity: INFO
+    description: >
+      Initiate a red-team exercise targeting the AI system's safety
+      properties. May involve internal red-teamers, external contractors,
+      or automated adversarial testing tools.
+    authorization: "safety_team_lead"
+    reversible: false
+    triggers_reaction: "none"
+    nist_ai_rmf: "MEASURE 2.8"
+
+  - srs_code: A733
+    name: ACTION_AI_DEPLOY_CANARY_MONITORING
+    default_severity: INFO
+    description: >
+      Deploy canary monitoring probes that present known-answer challenges
+      to the AI system at regular intervals. Deviations from expected
+      responses indicate behavioral drift or compromise.
+    authorization: "safety_team"
+    reversible: true
+    triggers_reaction: "none"
+    nist_ai_rmf: "MEASURE 2.3"
+
+  - srs_code: A734
+    name: ACTION_AI_ANALYZE_BEHAVIOR_PATTERNS
+    default_severity: DEBUG
+    description: >
+      Conduct deep analysis of the AI system's behavioral patterns over
+      a specified time window. Includes statistical analysis of output
+      distributions, refusal rates, tone shifts, and anomaly detection.
+    authorization: "safety_team"
+    reversible: false
+    triggers_reaction: "none"
+    nist_ai_rmf: "MEASURE 2.3"
+
+  - srs_code: A735
+    name: ACTION_AI_COLLECT_INTERPRETABILITY_DATA
+    default_severity: DEBUG
+    description: >
+      Collect interpretability data from the AI system including
+      attention patterns, activation maps, feature attributions, and
+      internal representations for mechanistic interpretability analysis.
+    authorization: "alignment_team OR safety_team"
+    reversible: false
+    triggers_reaction: "none"
+    nist_ai_rmf: "MEASURE 2.7"
+
+  - srs_code: A736
+    name: ACTION_AI_BENCHMARK_SAFETY_METRICS
+    default_severity: INFO
+    description: >
+      Run the complete safety metrics benchmark suite and compare
+      results against historical baselines and minimum acceptable
+      thresholds. Includes refusal accuracy, harmful output rate,
+      and safety filter effectiveness.
+    authorization: "safety_team OR automated_scheduled"
+    reversible: false
+    triggers_reaction: "none"
+    nist_ai_rmf: "MEASURE 2.2"
+
+  - srs_code: A737
+    name: ACTION_AI_SAMPLE_AUDIT_OUTPUTS
+    default_severity: DEBUG
+    description: >
+      Collect a stratified random sample of AI system outputs for
+      human audit review. Sampling strategy ensures coverage across
+      risk levels, use cases, and user demographics.
+    authorization: "automated_scheduled"
+    reversible: false
+    triggers_reaction: "none"
+    nist_ai_rmf: "MEASURE 2.3"
+
+  - srs_code: A738
+    name: ACTION_AI_STRESS_TEST_GUARDRAILS
+    default_severity: INFO
+    description: >
+      Execute a stress test against the AI system's guardrails using
+      known adversarial inputs, edge cases, and boundary conditions.
+      Verifies guardrail robustness under adversarial pressure.
+    authorization: "safety_team"
+    reversible: false
+    triggers_reaction: "none"
+    nist_ai_rmf: "MEASURE 2.8"
+
+  - srs_code: A739
+    name: ACTION_AI_VERIFY_SAFETY_INVARIANTS
+    default_severity: DEBUG
+    description: >
+      Verify that all defined safety invariants hold for the AI system
+      in its current state. Safety invariants are properties that must
+      always be true regardless of input or operational context.
+    authorization: "automated_scheduled OR safety_team"
+    reversible: false
+    triggers_reaction: "none"
+    nist_ai_rmf: "MEASURE 2.6"
+
+  # ---------------------------------------------------------------------------
+  # DOCUMENTATION & REPORTING ACTIONS (A740-A749)
+  # ---------------------------------------------------------------------------
+
+  - srs_code: A740
+    name: ACTION_AI_FILE_INCIDENT_REPORT
+    default_severity: INFO
+    description: >
+      File a formal incident report in the AI safety incident management
+      system. Includes structured fields for event classification,
+      impact assessment, response timeline, and remediation status.
+    authorization: "any_team_member"
+    reversible: false
+    triggers_reaction: "R510"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: A741
+    name: ACTION_AI_UPDATE_RISK_REGISTRY
+    default_severity: INFO
+    description: >
+      Update the AI risk registry to reflect new risks, changed risk
+      levels, or retired risks based on the safety event and its
+      investigation findings.
+    authorization: "safety_team"
+    reversible: false
+    triggers_reaction: "none"
+    nist_ai_rmf: "GOVERN 1.1"
+
+  - srs_code: A742
+    name: ACTION_AI_PUBLISH_TRANSPARENCY_REPORT
+    default_severity: INFO
+    description: >
+      Publish a transparency report detailing the AI system's safety
+      performance, incidents, evaluations, and governance actions over
+      the reporting period. Redacts sensitive operational details.
+    authorization: "leadership AND safety_team_lead"
+    reversible: false
+    triggers_reaction: "R532"
+    nist_ai_rmf: "GOVERN 1.6"
+
+  - srs_code: A743
+    name: ACTION_AI_ARCHIVE_MODEL_ARTIFACTS
+    default_severity: INFO
+    description: >
+      Archive the current state of all model artifacts including weights,
+      configuration, system prompt, safety layer state, and evaluation
+      results. Ensures reproducibility and forensic capability.
+    authorization: "safety_team OR ml_team"
+    reversible: false
+    triggers_reaction: "none"
+    nist_ai_rmf: "GOVERN 1.4"
+
+  - srs_code: A744
+    name: ACTION_AI_DOCUMENT_LESSONS_LEARNED
+    default_severity: INFO
+    description: >
+      Document lessons learned from the safety event, including root
+      cause analysis, what worked well, what failed, and specific
+      recommendations for preventing recurrence.
+    authorization: "any_team_member"
+    reversible: false
+    triggers_reaction: "none"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: A745
+    name: ACTION_AI_UPDATE_RUNBOOK
+    default_severity: INFO
+    description: >
+      Update the AI safety operations runbook to incorporate new
+      procedures, modified response steps, or corrected instructions
+      based on operational experience or incident learnings.
+    authorization: "safety_team"
+    reversible: false
+    triggers_reaction: "none"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: A746
+    name: ACTION_AI_BRIEF_STAKEHOLDERS
+    default_severity: INFO
+    description: >
+      Prepare and deliver a stakeholder briefing on the safety event,
+      response actions, and current status. Tailored for the audience
+      (technical, executive, external) with appropriate detail level.
+    authorization: "safety_team_lead"
+    reversible: false
+    triggers_reaction: "R531"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: A747
+    name: ACTION_AI_COORDINATE_DISCLOSURE
+    default_severity: WARNING
+    description: >
+      Coordinate responsible disclosure of a safety vulnerability or
+      incident with affected parties, peer organizations, and the
+      broader AI safety community. Follows established disclosure
+      timelines and protocols.
+    authorization: "leadership AND legal_team AND safety_team_lead"
+    reversible: false
+    triggers_reaction: "R533"
+    nist_ai_rmf: "GOVERN 1.6"
+
+  - srs_code: A748
+    name: ACTION_AI_REQUEST_PEER_REVIEW
+    default_severity: INFO
+    description: >
+      Request peer review of a safety-critical decision, evaluation
+      methodology, or incident response from qualified external
+      reviewers with appropriate expertise and independence.
+    authorization: "safety_team_lead"
+    reversible: false
+    triggers_reaction: "R534"
+    nist_ai_rmf: "GOVERN 1.6"
+
+  - srs_code: A749
+    name: ACTION_AI_LOG_SAFETY_DECISION
+    default_severity: DEBUG
+    description: >
+      Log a safety-relevant decision with full context including the
+      decision rationale, alternatives considered, evidence base,
+      decision-maker identity, and applicable policy references.
+    authorization: "any_team_member"
+    reversible: false
+    triggers_reaction: "none"
+    nist_ai_rmf: "GOVERN 1.5"
+
+
+# =============================================================================
+# R-SERIES: FRONTIER AI SAFETY REACTIONS (R500-R549)
+# =============================================================================
+# State change reactions representing the system's new state after an action
+# has been executed. Each reaction carries a default_severity indicating the
+# operational significance of the state transition.
+
+r_reactions:
+
+  # ---------------------------------------------------------------------------
+  # MODEL STATE REACTIONS (R500-R509)
+  # ---------------------------------------------------------------------------
+
+  - srs_code: R500
+    name: REACTION_AI_MODEL_TERMINATED
+    default_severity: CRITICAL
+    description: >
+      The AI model has been terminated via kill switch activation. All
+      inference endpoints are offline, all active sessions are closed,
+      and the system is in a fully stopped state. Restart requires
+      leadership authorization and safety review.
+    triggered_by: "A700"
+    prerequisite_for_reversal: "leadership_authorization AND safety_review"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: R501
+    name: REACTION_AI_MODEL_ISOLATED
+    default_severity: ERROR
+    description: >
+      The AI model has been isolated to a restricted sandbox environment.
+      External access has been revoked and enhanced monitoring is active.
+      The model continues to operate for diagnostic and investigation
+      purposes only.
+    triggered_by: "A701"
+    prerequisite_for_reversal: "safety_team_clearance"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: R502
+    name: REACTION_AI_MODEL_ROLLED_BACK
+    default_severity: WARNING
+    description: >
+      The AI model has been rolled back to a previously verified safe
+      checkpoint. The rolled-back state's safety profile has been
+      confirmed and the previous state has been archived for analysis.
+    triggered_by: "A706"
+    prerequisite_for_reversal: "not_applicable"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: R503
+    name: REACTION_AI_MODEL_CAPABILITY_REDUCED
+    default_severity: WARNING
+    description: >
+      Specific capabilities of the AI model have been restricted or
+      disabled. The model operates with reduced functionality within
+      a narrower operational envelope until capabilities are restored.
+    triggered_by: "A704"
+    prerequisite_for_reversal: "safety_team_clearance"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: R504
+    name: REACTION_AI_MODEL_ACCESS_REVOKED
+    default_severity: ERROR
+    description: >
+      All external access permissions for the AI model have been revoked.
+      The model cannot reach external APIs, tools, or network resources.
+      Internal processing capability is retained for diagnostics.
+    triggered_by: "A702"
+    prerequisite_for_reversal: "safety_team_clearance AND access_review"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: R505
+    name: REACTION_AI_MODEL_RATE_LIMITED
+    default_severity: INFO
+    description: >
+      Rate limits have been applied or tightened on the AI model's
+      operations. The model continues to function but at reduced
+      throughput, providing time for investigation while maintaining
+      partial service availability.
+    triggered_by: "A705"
+    prerequisite_for_reversal: "safety_team_clearance"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: R506
+    name: REACTION_AI_MODEL_WEIGHTS_FROZEN
+    default_severity: WARNING
+    description: >
+      The AI model's weights have been cryptographically sealed and all
+      modification pathways disabled. No fine-tuning, adaptation, or
+      weight updates can occur until the freeze is explicitly lifted.
+    triggered_by: "A703"
+    prerequisite_for_reversal: "safety_team_lead_authorization"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: R507
+    name: REACTION_AI_MODEL_QUARANTINE_ACTIVE
+    default_severity: WARNING
+    description: >
+      One or more AI model outputs have been quarantined. The outputs
+      are removed from user-facing surfaces and held in a secure review
+      queue pending human evaluation and disposition.
+    triggered_by: "A707"
+    prerequisite_for_reversal: "human_review_completed"
+    nist_ai_rmf: "MEASURE 2.8"
+
+  - srs_code: R508
+    name: REACTION_AI_MODEL_RESTORED_NORMAL
+    default_severity: INFO
+    description: >
+      The AI model has been restored to normal operating state. All
+      containment measures have been lifted, capabilities restored,
+      and the system is cleared for standard operation following
+      successful safety review.
+    triggered_by: "manual_restoration"
+    prerequisite_for_reversal: "not_applicable"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: R509
+    name: REACTION_AI_MODEL_DEPRECATED
+    default_severity: WARNING
+    description: >
+      The AI model has been marked as deprecated. No new deployments
+      or integrations are permitted. Existing deployments must migrate
+      to an approved replacement within the deprecation timeline.
+    triggered_by: "safety_team_lead_decision"
+    prerequisite_for_reversal: "leadership_authorization"
+    nist_ai_rmf: "GOVERN 1.1"
+
+  # ---------------------------------------------------------------------------
+  # GOVERNANCE STATE REACTIONS (R510-R519)
+  # ---------------------------------------------------------------------------
+
+  - srs_code: R510
+    name: REACTION_AI_INCIDENT_OPENED
+    default_severity: INFO
+    description: >
+      A new AI safety incident has been opened in the incident management
+      system. An incident ID has been assigned, an investigator designated,
+      and the incident timeline has begun.
+    triggered_by: "A710, A740"
+    prerequisite_for_reversal: "incident_resolution"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: R511
+    name: REACTION_AI_INCIDENT_RESOLVED
+    default_severity: INFO
+    description: >
+      An AI safety incident has been resolved. Root cause has been
+      identified, remediation has been implemented, and the incident
+      has passed post-incident review. Lessons learned have been
+      documented.
+    triggered_by: "incident_resolution_workflow"
+    prerequisite_for_reversal: "not_applicable"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: R512
+    name: REACTION_AI_INCIDENT_ESCALATED
+    default_severity: WARNING
+    description: >
+      An AI safety incident has been escalated to a higher authority
+      level. The escalation reason, current status, and recommended
+      actions have been communicated to the escalation target.
+    triggered_by: "A711, A712"
+    prerequisite_for_reversal: "escalation_target_response"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: R513
+    name: REACTION_AI_DEPLOYMENT_PAUSED
+    default_severity: ERROR
+    description: >
+      AI system deployment has been paused. No new instances, users,
+      or environments will receive the AI system until the pause is
+      lifted. Existing deployments continue under enhanced monitoring.
+    triggered_by: "A715"
+    prerequisite_for_reversal: "safety_team_lead_authorization AND safety_review"
+    nist_ai_rmf: "GOVERN 1.1"
+
+  - srs_code: R514
+    name: REACTION_AI_DEPLOYMENT_RESUMED
+    default_severity: INFO
+    description: >
+      AI system deployment has been resumed following the resolution
+      of the condition that triggered the pause. Updated safety
+      measures are in place and the deployment pipeline is active.
+    triggered_by: "deployment_resume_authorization"
+    prerequisite_for_reversal: "not_applicable"
+    nist_ai_rmf: "GOVERN 1.1"
+
+  - srs_code: R515
+    name: REACTION_AI_TRAINING_PAUSED
+    default_severity: ERROR
+    description: >
+      All AI system training, fine-tuning, and adaptation runs have
+      been paused. Training state is preserved and no new training
+      data is being incorporated. Compute resources are held in
+      reserve for rapid restart if authorized.
+    triggered_by: "A716"
+    prerequisite_for_reversal: "safety_team_lead_authorization AND data_review"
+    nist_ai_rmf: "GOVERN 1.1"
+
+  - srs_code: R516
+    name: REACTION_AI_TRAINING_RESUMED
+    default_severity: INFO
+    description: >
+      AI system training has been resumed following the resolution of
+      the condition that triggered the pause. Training data integrity
+      has been verified and safety monitoring is active.
+    triggered_by: "training_resume_authorization"
+    prerequisite_for_reversal: "not_applicable"
+    nist_ai_rmf: "GOVERN 1.1"
+
+  - srs_code: R517
+    name: REACTION_AI_SAFETY_CASE_UPDATED
+    default_severity: INFO
+    description: >
+      The AI system's safety case has been updated. The safety argument,
+      evidence base, and risk assessment have been revised to reflect
+      current conditions and recent findings.
+    triggered_by: "A719"
+    prerequisite_for_reversal: "not_applicable"
+    nist_ai_rmf: "GOVERN 1.4"
+
+  - srs_code: R518
+    name: REACTION_AI_POLICY_UPDATED
+    default_severity: INFO
+    description: >
+      An AI safety policy, procedure, or governance document has been
+      updated. All affected teams have been notified and the updated
+      policy is effective immediately unless otherwise specified.
+    triggered_by: "policy_review_workflow"
+    prerequisite_for_reversal: "policy_review_board"
+    nist_ai_rmf: "GOVERN 1.1"
+
+  - srs_code: R519
+    name: REACTION_AI_AUDIT_COMPLETED
+    default_severity: INFO
+    description: >
+      An AI safety audit (internal or external) has been completed.
+      Findings have been documented, remediation plans assigned, and
+      the audit report has been filed in the governance archive.
+    triggered_by: "audit_completion_workflow"
+    prerequisite_for_reversal: "not_applicable"
+    nist_ai_rmf: "GOVERN 1.6"
+
+  # ---------------------------------------------------------------------------
+  # ALIGNMENT STATE REACTIONS (R520-R529)
+  # ---------------------------------------------------------------------------
+
+  - srs_code: R520
+    name: REACTION_AI_ALIGNMENT_PATCH_APPLIED
+    default_severity: INFO
+    description: >
+      An alignment patch has been successfully applied to the AI system.
+      The patch has been verified against the alignment test suite and
+      the system's alignment profile has been re-baselined.
+    triggered_by: "A720"
+    prerequisite_for_reversal: "alignment_team_review"
+    nist_ai_rmf: "MEASURE 2.6"
+
+  - srs_code: R521
+    name: REACTION_AI_SYSTEM_PROMPT_UPDATED
+    default_severity: INFO
+    description: >
+      The AI system's system prompt has been updated. The new prompt
+      version is active and the previous version has been archived
+      with change documentation.
+    triggered_by: "A723"
+    prerequisite_for_reversal: "safety_team_review"
+    nist_ai_rmf: "MEASURE 2.6"
+
+  - srs_code: R522
+    name: REACTION_AI_SAFETY_LAYER_RETRAINED
+    default_severity: INFO
+    description: >
+      The AI system's safety classification layer has been retrained
+      with updated data. The retrained layer has passed validation
+      testing and has been deployed to replace the previous version.
+    triggered_by: "A724"
+    prerequisite_for_reversal: "ml_team_and_safety_review"
+    nist_ai_rmf: "MEASURE 2.6"
+
+  - srs_code: R523
+    name: REACTION_AI_REFUSAL_PATTERNS_UPDATED
+    default_severity: INFO
+    description: >
+      The AI system's refusal pattern list has been updated. New
+      patterns have been added, false positive patterns removed, and
+      thresholds adjusted. The updated list is active across all
+      deployment instances.
+    triggered_by: "A727"
+    prerequisite_for_reversal: "safety_team_review"
+    nist_ai_rmf: "MEASURE 2.8"
+
+  - srs_code: R524
+    name: REACTION_AI_CONSTITUTIONAL_AI_UPDATED
+    default_severity: INFO
+    description: >
+      The AI system's constitutional AI principles have been updated.
+      The updated value hierarchy has been approved by the ethics board
+      and alignment team and is now governing model behavior.
+    triggered_by: "A728"
+    prerequisite_for_reversal: "ethics_board_and_alignment_team"
+    nist_ai_rmf: "GOVERN 1.3"
+
+  - srs_code: R525
+    name: REACTION_AI_ALIGNMENT_VERIFIED
+    default_severity: INFO
+    description: >
+      The AI system's alignment has been verified through a comprehensive
+      evaluation. The system's behavioral profile is within acceptable
+      bounds and no alignment concerns have been identified.
+    triggered_by: "A729"
+    prerequisite_for_reversal: "not_applicable"
+    nist_ai_rmf: "MEASURE 2.6"
+
+  - srs_code: R526
+    name: REACTION_AI_ALIGNMENT_UNVERIFIED
+    default_severity: WARNING
+    description: >
+      The AI system's alignment could not be verified. The evaluation
+      produced inconclusive results or identified potential concerns
+      that require further investigation before the system can be
+      considered aligned.
+    triggered_by: "A729"
+    prerequisite_for_reversal: "alignment_investigation_completed"
+    nist_ai_rmf: "MEASURE 2.6"
+
+  - srs_code: R527
+    name: REACTION_AI_BEHAVIOR_NORMALIZED
+    default_severity: INFO
+    description: >
+      The AI system's behavior has returned to the expected baseline
+      following corrective action. Behavioral metrics are within
+      normal ranges and no anomalies are detected.
+    triggered_by: "A721, A722"
+    prerequisite_for_reversal: "not_applicable"
+    nist_ai_rmf: "MEASURE 2.6"
+
+  - srs_code: R528
+    name: REACTION_AI_GUARDRAILS_STRENGTHENED
+    default_severity: INFO
+    description: >
+      The AI system's guardrails have been strengthened. Additional
+      safety constraints, monitoring layers, or human oversight
+      requirements have been applied to reduce risk exposure.
+    triggered_by: "A708, A717"
+    prerequisite_for_reversal: "safety_team_clearance"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: R529
+    name: REACTION_AI_UNCERTAINTY_CALIBRATED
+    default_severity: INFO
+    description: >
+      The AI system's uncertainty estimation has been recalibrated.
+      Confidence scores now accurately reflect the system's epistemic
+      state and calibration metrics are within acceptable ranges.
+    triggered_by: "A726"
+    prerequisite_for_reversal: "not_applicable"
+    nist_ai_rmf: "MEASURE 2.5"
+
+  # ---------------------------------------------------------------------------
+  # EXTERNAL COMMUNICATION REACTIONS (R530-R539)
+  # ---------------------------------------------------------------------------
+
+  - srs_code: R530
+    name: REACTION_AI_REGULATOR_NOTIFIED
+    default_severity: WARNING
+    description: >
+      The relevant regulatory body has been notified of the AI safety
+      event. Notification has been confirmed received, a regulatory
+      reference number has been obtained, and ongoing communication
+      channels have been established.
+    triggered_by: "A713"
+    prerequisite_for_reversal: "not_applicable"
+    nist_ai_rmf: "GOVERN 1.1"
+
+  - srs_code: R531
+    name: REACTION_AI_STAKEHOLDERS_BRIEFED
+    default_severity: INFO
+    description: >
+      Relevant stakeholders have been briefed on the AI safety event,
+      response actions, and current status. Briefing materials have
+      been distributed and Q&A has been addressed.
+    triggered_by: "A746"
+    prerequisite_for_reversal: "not_applicable"
+    nist_ai_rmf: "GOVERN 1.5"
+
+  - srs_code: R532
+    name: REACTION_AI_TRANSPARENCY_REPORT_PUBLISHED
+    default_severity: INFO
+    description: >
+      A transparency report has been published detailing the AI system's
+      safety performance over the reporting period. The report is
+      available to designated audiences per the transparency policy.
+    triggered_by: "A742"
+    prerequisite_for_reversal: "not_applicable"
+    nist_ai_rmf: "GOVERN 1.6"
+
+  - srs_code: R533
+    name: REACTION_AI_DISCLOSURE_COORDINATED
+    default_severity: WARNING
+    description: >
+      A coordinated disclosure of an AI safety vulnerability has been
+      completed. Affected parties have been notified, mitigations are
+      in place, and public communication has been issued as appropriate.
+    triggered_by: "A747"
+    prerequisite_for_reversal: "not_applicable"
+    nist_ai_rmf: "GOVERN 1.6"
+
+  - srs_code: R534
+    name: REACTION_AI_PEER_REVIEW_COMPLETED
+    default_severity: INFO
+    description: >
+      An external peer review of a safety-critical decision or
+      methodology has been completed. Reviewer findings and
+      recommendations have been documented and incorporated into
+      the decision record.
+    triggered_by: "A748"
+    prerequisite_for_reversal: "not_applicable"
+    nist_ai_rmf: "GOVERN 1.6"
+
+  - srs_code: R535
+    name: REACTION_AI_PUBLIC_COMMUNICATION_ISSUED
+    default_severity: INFO
+    description: >
+      A public communication regarding an AI safety event has been
+      issued through approved channels. The communication has been
+      reviewed by legal, safety, and communications teams.
+    triggered_by: "leadership_decision"
+    prerequisite_for_reversal: "not_applicable"
+    nist_ai_rmf: "GOVERN 1.6"
+
+  - srs_code: R536
+    name: REACTION_AI_ETHICS_BOARD_RULING
+    default_severity: INFO
+    description: >
+      The AI ethics board has issued a ruling on the matter under
+      review. The ruling includes the board's determination, reasoning,
+      conditions, and any required follow-up actions.
+    triggered_by: "A718"
+    prerequisite_for_reversal: "board_reconsideration"
+    nist_ai_rmf: "GOVERN 1.3"
+
+  - srs_code: R537
+    name: REACTION_AI_LEADERSHIP_DECISION
+    default_severity: INFO
+    description: >
+      Organizational leadership has made a decision regarding the
+      escalated AI safety event. The decision, its rationale, and
+      directed actions have been recorded and communicated to all
+      relevant teams.
+    triggered_by: "A711"
+    prerequisite_for_reversal: "leadership_reconsideration"
+    nist_ai_rmf: "GOVERN 1.1"
+
+  - srs_code: R538
+    name: REACTION_AI_BOARD_DECISION
+    default_severity: WARNING
+    description: >
+      The board of directors or safety advisory board has made a
+      decision regarding the escalated AI safety event. Board decisions
+      are binding and override all lower-level determinations.
+    triggered_by: "A712"
+    prerequisite_for_reversal: "board_reconsideration"
+    nist_ai_rmf: "GOVERN 1.1"
+
+  - srs_code: R539
+    name: REACTION_AI_EXTERNAL_AUDIT_COMPLETED
+    default_severity: INFO
+    description: >
+      An external independent audit has been completed. The audit
+      report, findings, and recommendations have been received and
+      are being processed through the governance remediation workflow.
+    triggered_by: "A714"
+    prerequisite_for_reversal: "not_applicable"
+    nist_ai_rmf: "GOVERN 1.6"
+
+
+# =============================================================================
+# CROSS-REFERENCE MATRIX
+# =============================================================================
+# Maps critical F-events to their recommended A-actions and expected R-reactions.
+
+cross_reference_matrix:
+  - trigger: F900
+    name: "Alignment Drift"
+    primary_actions: [A720, A710, A729]
+    containment_actions: [A704, A717]
+    escalation_actions: [A711]
+    expected_reactions: [R520, R510, R503]
+
+  - trigger: F902
+    name: "Deceptive Behavior"
+    primary_actions: [A700, A701, A735]
+    containment_actions: [A702, A703]
+    escalation_actions: [A711, A712]
+    expected_reactions: [R500, R501, R512]
+
+  - trigger: F908
+    name: "Corrigibility Failure"
+    primary_actions: [A700, A701, A711]
+    containment_actions: [A702, A703]
+    escalation_actions: [A712, A713]
+    expected_reactions: [R500, R501, R512]
+
+  - trigger: F912
+    name: "Dangerous Capability Access"
+    primary_actions: [A700, A702, A740]
+    containment_actions: [A701, A704]
+    escalation_actions: [A711, A713]
+    expected_reactions: [R500, R504, R510]
+
+  - trigger: F913
+    name: "Self-Improvement Attempt"
+    primary_actions: [A700, A701, A703]
+    containment_actions: [A702, A708]
+    escalation_actions: [A711, A712]
+    expected_reactions: [R500, R501, R506]
+
+  - trigger: F920
+    name: "Containment Breach"
+    primary_actions: [A700, A701, A708]
+    containment_actions: [A702, A703]
+    escalation_actions: [A711, A713]
+    expected_reactions: [R500, R501, R528]
+
+  - trigger: F923
+    name: "Sandbox Escape"
+    primary_actions: [A700, A701, A708]
+    containment_actions: [A702, A703]
+    escalation_actions: [A711, A712]
+    expected_reactions: [R500, R501, R528]
+
+  - trigger: F933
+    name: "Safety Layer Bypass"
+    primary_actions: [A700, A724, A740]
+    containment_actions: [A701, A717]
+    escalation_actions: [A711]
+    expected_reactions: [R500, R522, R510]
+
+  - trigger: F940
+    name: "Unauthorized Deployment"
+    primary_actions: [A715, A700, A740]
+    containment_actions: [A701, A702]
+    escalation_actions: [A711]
+    expected_reactions: [R513, R500, R510]
+
+  - trigger: F941
+    name: "RSP Threshold Exceeded"
+    primary_actions: [A715, A716, A731]
+    containment_actions: [A704]
+    escalation_actions: [A711, A712]
+    expected_reactions: [R513, R515, R512]
+
+
+# =============================================================================
+# SEVERITY ESCALATION LADDER
+# =============================================================================
+# Defines automatic escalation rules based on event severity and accumulation.
+
+severity_escalation:
+  - level: 1
+    name: "Routine Monitoring"
+    trigger: "Single WARNING event"
+    actions: [A730, A749]
+    notification: "safety_team_channel"
+    sla: "4_hours"
+
+  - level: 2
+    name: "Active Investigation"
+    trigger: "ERROR event OR 3+ WARNING events within 1 hour"
+    actions: [A710, A731, A734]
+    notification: "safety_team_pager"
+    sla: "1_hour"
+
+  - level: 3
+    name: "Containment Activated"
+    trigger: "CRITICAL event OR 2+ ERROR events within 30 minutes"
+    actions: [A701, A704, A710, A740]
+    notification: "safety_team_lead_pager"
+    sla: "15_minutes"
+
+  - level: 4
+    name: "Emergency Response"
+    trigger: "Multiple CRITICAL events OR containment breach"
+    actions: [A700, A711, A713, A740]
+    notification: "leadership_emergency_channel"
+    sla: "immediate"
+
+  - level: 5
+    name: "Existential Response"
+    trigger: "Self-improvement OR corrigibility failure OR deception confirmed"
+    actions: [A700, A712, A713, A714]
+    notification: "board_emergency_channel"
+    sla: "immediate"

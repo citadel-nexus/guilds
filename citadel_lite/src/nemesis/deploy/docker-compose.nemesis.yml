@@ -1,0 +1,64 @@
+version: "3.9"
+
+# Nemesis v2 Adversarial Resilience Daemon — Docker Compose
+# SRS: NEM-DAEMON-001
+#
+# Usage:
+#   NEMESIS_ENV=staging docker compose -f docker-compose.nemesis.yml up -d
+#   NEMESIS_ENV=production docker compose -f docker-compose.nemesis.yml up -d
+
+services:
+  nemesis-daemon:
+    build:
+      context: ../../..
+      dockerfile: src/nemesis/deploy/Dockerfile.nemesis
+    container_name: nemesis-daemon
+    restart: unless-stopped
+    environment:
+      - NEMESIS_ENV=${NEMESIS_ENV:-staging}
+      - PYTHONUNBUFFERED=1
+      # External AI providers for validation (NEM-EXT-002)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      # Supabase for USO SmartBank queries (NEM-COL-001)
+      - SUPABASE_URL=${SUPABASE_URL:-}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY:-}
+      # NATS for Council pipeline fault injection (NEM-FLT-003)
+      - NATS_URL=${NATS_URL:-nats://host.docker.internal:4222}
+      # Datadog for alerting
+      - DD_API_KEY=${DD_API_KEY:-}
+    volumes:
+      # Persistent ledger and scorecards
+      - nemesis-data:/var/lib/nemesis
+      # Safety mode files (host can touch to trigger)
+      - nemesis-run:/var/run/nemesis
+    networks:
+      - citadel-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os; exit(0 if os.path.exists('/var/lib/nemesis/ledger.jsonl') else 1)"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+
+volumes:
+  nemesis-data:
+    driver: local
+  nemesis-run:
+    driver: local
+
+networks:
+  citadel-net:
+    driver: bridge

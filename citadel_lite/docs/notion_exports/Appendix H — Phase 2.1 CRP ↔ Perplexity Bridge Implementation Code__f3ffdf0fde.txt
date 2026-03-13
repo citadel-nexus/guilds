@@ -1,0 +1,1334 @@
+# Appendix H — Phase 2.1 CRP ↔ Perplexity Bridge Implementation Code
+(Page ID: f3ffdf0f-dee6-4a56-a401-9937438d97fd)
+(URL: https://www.notion.so/Appendix-H-Phase-2-1-CRP-Perplexity-Bridge-Implementation-Code-f3ffdf0fdee64a56a4019937438d97fd)
+
+[Total top-level blocks: 50]
+
+**Status:** Implementation Reference | **Phase:** 2.1 | **CRP Version:** 2.1
+**Purpose:** Complete implementation code for all 9 BRIDGE codes (BRIDGE-001 through BRIDGE-009). Each file is ready for VCC to scaffold into the repo. All code follows the guardrails in §2–§3 of the parent Build Instructions.
+
+---
+
+
+## H.1 — NATS Bridge Stream Provisioning `BRIDGE-001`
+
+**File:** `scripts/provision_bridge_nats.sh`
+```bash
+#!/usr/bin/env bash
+# Provision VCC_BRIDGE JetStream stream and consumers.
+# Usage: ./scripts/provision_bridge_nats.sh
+# Requires: nats CLI, NATS_URL env var
+
+set -euo pipefail
+
+NATS_URL="${NATS_URL:?NATS_URL is required}"
+
+echo "[BRIDGE] Provisioning VCC_BRIDGE stream..."
+nats --server="$NATS_URL" stream add VCC_BRIDGE \
+  --subjects="citadel.vcc.cycle.completed,citadel.diagnostic.completed,citadel.vcc.build.pause,citadel.vcc.build.resume" \
+  --retention=limits \
+  --max-msgs=5000 \
+  --max-age=30d \
+  --storage=file \
+  --replicas=1 \
+  --discard=old \
+  --dupe-window=60s \
+  --no-allow-rollup \
+  --deny-delete \
+  --deny-purge
+
+echo "[BRIDGE] Adding durable consumer vcc-bridge-consumer..."
+nats --server="$NATS_URL" consumer add VCC_BRIDGE vcc-bridge-consumer \
+  --filter="" \
+  --ack=explicit \
+  --deliver=all \
+  --max-deliver=5 \
+  --ack-wait=30s \
+  --replay=instant \
+  --pull
+
+echo "[BRIDGE] ✅ VCC_BRIDGE stream and consumer provisioned."
+```
+**File:** `tools/lib/bridge_nats.py`
+```python
+#!/usr/bin/env python3
+"""NATS Bridge Publisher/Subscriber — shared by CRP, Perplexity, and Orchestrator.
+
+Provides typed publish/subscribe for all bridge NATS subjects.
+"""
+
+import os
+import json
+import logging
+from datetime import datetime, timezone
+from typing import Callable, Awaitable
+
+import nats
+from nats.js.api import StreamConfig, ConsumerConfig
+from pydantic import BaseModel, Field
+
+logger = logging.getLogger("bridge_nats")
+
+NATS_URL = os.environ.get("NATS_URL", "nats://localhost:4222")
+STREAM_NAME = "VCC_BRIDGE"
+
+
+# ── Payload Models ──────────────────────────────────────────────────────
+class CRPCyclePayload(BaseModel):
+    """Published by vcc_cycle_reporter.py after every CRP post."""
+    cycle_id: str
+    guild: str
+    phase: str
+    guardrail_pass: bool
+    drift_clean: bool
+    test_passed: int
+    test_failed: int
+    srs_codes_touched: list[str] = []
+    health_status: str = "unknown"  # "healthy" | "degraded" | "unhealthy"
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+
+class DiagnosticPayload(BaseModel):
+    """Published by perplexity_control_loop_v2.py after every diagnostic WRITE."""
+    diag_id: str
+    health_grade: str  # "HEALTHY" | "DEGRADING" | "CRITICAL" | "UNKNOWN"
+    health_score: int  # 0-100
+    blockers: list[str] = []
+    recommendations: list[str] = []
+    sources_read: list[str] = []
+    l3_verdict: str = ""
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+
+class BuildControlPayload(BaseModel):
+    """Published by orchestrator for pause/resume signals."""
+    action: str  # "pause" | "resume"
+    reason: str
+    merged_score: int = 0
+    consecutive_nogo: int = 0
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+
+# ── Bridge Client ───────────────────────────────────────────────────────
+class BridgeNATSClient:
+    """Typed NATS client for the VCC Bridge."""
+
+    SUBJECTS = {
+        "crp_completed": "citadel.vcc.cycle.completed",
+        "diagnostic_completed": "citadel.diagnostic.completed",
+        "build_pause": "citadel.vcc.build.pause",
+        "build_resume": "citadel.vcc.build.resume",
+    }
+
+    def __init__(self):
+        self._nc = None
+        self._js = None
+
+    async def connect(self):
+        """Connect to NATS and bind JetStream."""
+        self._nc = await nats.connect(NATS_URL)
+        self._js = self._nc.jetstream()
+        logger.info(f"[BRIDGE] Connected to NATS at {NATS_URL}")
+
+    async def close(self):
+        if self._nc:
+            await self._nc.close()
+
+    async def publish_crp_completed(self, payload: CRPCyclePayload):
+        """Publish CRP cycle completion event."""
+        subject = self.SUBJECTS["crp_completed"]
+        data = payload.model_dump_json().encode()
+        ack = await self._js.publish(subject, data)
+        logger.info(f"[BRIDGE] Published {subject} seq={ack.seq} cycle={payload.cycle_id}")
+        return ack
+
+    async def publish_diagnostic_completed(self, payload: DiagnosticPayload):
+        """Publish Perplexity diagnostic completion event."""
+        subject = self.SUBJECTS["diagnostic_completed"]
+        data = payload.model_dump_json().encode()
+        ack = await self._js.publish(subject, data)
+        logger.info(f"[BRIDGE] Published {subject} seq={ack.seq} diag={payload.diag_id}")
+        return ack
+
+    async def publish_build_control(self, action: str, reason: str, **kwargs):
+        """Publish build pause or resume signal."""
+        subject = self.SUBJECTS[f"build_{action}"]
+        payload = BuildControlPayload(action=action, reason=reason, **kwargs)
+        data = payload.model_dump_json().encode()
+        ack = await self._js.publish(subject, data)
+        logger.info(f"[BRIDGE] Published {subject} action={action}")
+        return ack
+
+    async def subscribe(
+        self,
+        subject_key: str,
+        callback: Callable[[dict], Awaitable[None]],
+        durable: str = "vcc-bridge-consumer",
+    ):
+        """Subscribe to a bridge subject with pull consumer."""
+        subject = self.SUBJECTS[subject_key]
+        sub = await self._js.pull_subscribe(subject, durable)
+        logger.info(f"[BRIDGE] Subscribed to {subject} durable={durable}")
+
+        async def _process():
+            while True:
+                try:
+                    msgs = await sub.fetch(batch=10, timeout=5)
+                    for msg in msgs:
+                        try:
+                            data = json.loads(msg.data.decode())
+                            await callback(data)
+                            await msg.ack()
+                        except Exception as e:
+                            logger.error(f"[BRIDGE] Error processing {subject}: {e}")
+                            await msg.nak(delay=10)
+                except nats.errors.TimeoutError:
+                    continue  # no messages, keep polling
+                except Exception as e:
+                    logger.error(f"[BRIDGE] Subscription error on {subject}: {e}")
+                    await asyncio.sleep(5)
+
+        import asyncio
+        return asyncio.create_task(_process())
+```
+
+---
+
+
+## H.2 — CRP NATS Publisher Integration `BRIDGE-002`
+
+**Patch:** Add to `tools/vcc_cycle_reporter.py` — after `post_to_notion()` completes:
+```python
+# ── Bridge NATS Integration ─────────────────────────────────────────────
+# Add at top of file:
+from tools.lib.bridge_nats import BridgeNATSClient, CRPCyclePayload
+
+# Add after post_to_notion(report) in the main cycle:
+async def publish_crp_to_bridge(report: dict):
+    """Publish CRP cycle completion to NATS bridge (BRIDGE-002).
+    
+    Called after every successful CRP post to Notion.
+    Triggers Perplexity loop to run immediately with CRP context.
+    """
+    try:
+        client = BridgeNATSClient()
+        await client.connect()
+        
+        payload = CRPCyclePayload(
+            cycle_id=report["cycle_id"],
+            guild=report.get("guild", "FIN"),
+            phase=report.get("phase", "unknown"),
+            guardrail_pass=report.get("guardrails", {}).get("passed", False),
+            drift_clean=all(
+                layer.get("clean", False)
+                for layer in report.get("drift_check", {}).values()
+            ),
+            test_passed=report.get("tests", {}).get("passed", 0),
+            test_failed=report.get("tests", {}).get("failed", 0),
+            srs_codes_touched=report.get("srs_codes_touched", []),
+            health_status=report.get("health", {}).get("overall", "unknown"),
+        )
+        
+        await client.publish_crp_completed(payload)
+        logger.info(f"[CRP→BRIDGE] Published cycle {payload.cycle_id} to bridge")
+        
+        await client.close()
+    except Exception as e:
+        # Bridge publish is non-blocking — CRP continues even if NATS is down
+        logger.warning(f"[CRP→BRIDGE] Failed to publish to bridge: {e}")
+```
+
+---
+
+
+## H.3 — Perplexity NATS Subscriber + CRP-Aware READ `BRIDGE-002` `BRIDGE-003`
+
+**Patch:** Add to `tools/perplexity_control_loop_v2.py`:
+```python
+# ── Bridge Integration: NATS Trigger + CRP Context Injection ────────────
+import asyncio
+from tools.lib.bridge_nats import BridgeNATSClient, DiagnosticPayload
+
+CRP_TRIGGER_DEDUP_WINDOW_S = 60  # ignore duplicate NATS messages within 60s
+_last_crp_trigger_ts = 0.0
+
+
+async def on_crp_cycle_completed(data: dict):
+    """NATS callback: CRP cycle completed → run Perplexity immediately.
+    
+    BRIDGE-002: Triggered by citadel.vcc.cycle.completed.
+    Injects CRP context into READ phase before running full pipeline.
+    """
+    global _last_crp_trigger_ts
+    import time
+    now = time.time()
+    
+    # Dedup: ignore if we got a trigger within the last 60s
+    if now - _last_crp_trigger_ts < CRP_TRIGGER_DEDUP_WINDOW_S:
+        logger.info(f"[PPLX←BRIDGE] Dedup: ignoring CRP trigger within {CRP_TRIGGER_DEDUP_WINDOW_S}s window")
+        return
+    _last_crp_trigger_ts = now
+    
+    cycle_id = data.get("cycle_id", "unknown")
+    phase = data.get("phase", "unknown")
+    guardrail_pass = data.get("guardrail_pass", True)
+    srs_codes = data.get("srs_codes_touched", [])
+    
+    logger.info(f"[TRIGGER] NATS: citadel.vcc.cycle.completed cycle={cycle_id} phase={phase}")
+    
+    # Build CRP-aware system prompt injection
+    crp_context = (
+        f"The VCC just completed cycle {cycle_id} in phase {phase}. "
+        f"Guardrails: {'PASS' if guardrail_pass else 'FAIL'}. "
+        f"SRS codes touched: {', '.join(srs_codes) if srs_codes else 'none'}. "
+        f"Tests passed: {data.get('test_passed', 0)}, failed: {data.get('test_failed', 0)}. "
+        f"Factor this deployment into your infrastructure analysis — "
+        f"check if new code introduced regressions."
+    )
+    
+    # Inject CRP as source 13 in the READ phase
+    crp_source = {
+        "source": "vcc_crp",
+        "data": data,
+        "context_prompt": crp_context,
+    }
+    
+    # Run full pipeline with CRP injection
+    await run_diagnostic_pipeline(extra_sources=[crp_source], trigger="nats")
+
+
+async def start_nats_listener():
+    """Start NATS bridge listener for CRP triggers.
+    
+    Runs alongside the cron fallback. If no NATS event arrives within
+    90 minutes, cron fires the loop anyway (existing behavior preserved).
+    """
+    try:
+        client = BridgeNATSClient()
+        await client.connect()
+        await client.subscribe("crp_completed", on_crp_cycle_completed)
+        logger.info("[PPLX←BRIDGE] Listening for CRP cycle events on NATS")
+    except Exception as e:
+        logger.warning(f"[PPLX←BRIDGE] NATS listener failed — falling back to cron only: {e}")
+
+
+async def publish_diagnostic_to_bridge(diagnostic: dict):
+    """Publish diagnostic completion to NATS bridge after WRITE phase.
+    
+    BRIDGE-003: Enables CRP to read Perplexity diagnostics via §7.4.
+    """
+    try:
+        client = BridgeNATSClient()
+        await client.connect()
+        
+        payload = DiagnosticPayload(
+            diag_id=diagnostic.get("diag_id", "unknown"),
+            health_grade=diagnostic.get("health_grade", "UNKNOWN"),
+            health_score=diagnostic.get("health_score", 0),
+            blockers=diagnostic.get("blockers", []),
+            recommendations=diagnostic.get("recommendations", [])[:10],
+            sources_read=diagnostic.get("sources_read", []),
+            l3_verdict=diagnostic.get("l3_verdict", ""),
+        )
+        
+        await client.publish_diagnostic_completed(payload)
+        logger.info(f"[PPLX→BRIDGE] Published diagnostic {payload.diag_id} to bridge")
+        
+        await client.close()
+    except Exception as e:
+        logger.warning(f"[PPLX→BRIDGE] Failed to publish diagnostic to bridge: {e}")
+```
+
+---
+
+
+## H.4 — CRP §7.4 Feedback Injection `BRIDGE-003`
+
+**Patch:** Add to `tools/vcc_cycle_reporter.py` — called during CRP §7 assembly:
+```python
+# ── Perplexity Diagnostic Reader (BRIDGE-003) ──────────────────────────
+import requests as http_requests
+
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+
+
+def read_last_diagnostic() -> dict | None:
+    """Read the latest Perplexity diagnostic from vcc_loop_state.
+    
+    Returns a dict with health_grade, health_score, blockers, etc.
+    Falls back to None if no diagnostic is available yet.
+    """
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        logger.warning("[CRP←BRIDGE] Supabase credentials not configured — skipping diagnostic read")
+        return None
+    
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/vcc_loop_state"
+        headers = {
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+        }
+        params = {
+            "loop_source": "eq.perplexity",
+            "order": "created_at.desc",
+            "limit": "1",
+        }
+        resp = http_requests.get(url, headers=headers, params=params, timeout=10)
+        resp.raise_for_status()
+        rows = resp.json()
+        
+        if not rows:
+            logger.info("[CRP←BRIDGE] No Perplexity diagnostic available yet")
+            return None
+        
+        row = rows[0]
+        return {
+            "health_grade": row.get("health_grade", "UNKNOWN"),
+            "health_score": row.get("health_score", 0),
+            "blockers": row.get("blockers", []),
+            "recommendations": row.get("recommendations", []),
+            "l3_verdict": row.get("l3_verdict", ""),
+            "cycle_id": row.get("cycle_id", "unknown"),
+            "created_at": row.get("created_at", ""),
+            "sources_read": row.get("sources_read", []),
+        }
+    except Exception as e:
+        logger.warning(f"[CRP←BRIDGE] Failed to read diagnostic: {e}")
+        return None
+
+
+def build_section_74(diagnostic: dict | None) -> str:
+    """Build CRP §7.4 — Perplexity Diagnostic (last run).
+    
+    Returns formatted text for injection into CRP §7.
+    """
+    if diagnostic is None:
+        return (
+            "§7.4 — Perplexity Diagnostic (last run)\n"
+            "  Status: No Perplexity diagnostic available yet\n"
+            "  Note: Diagnostics will appear after the first Perplexity loop run\n"
+        )
+    
+    grade = diagnostic["health_grade"]
+    score = diagnostic["health_score"]
+    blockers = diagnostic.get("blockers", [])[:3]
+    l3 = diagnostic.get("l3_verdict", "N/A")
+    
+    lines = [
+        f"§7.4 — Perplexity Diagnostic (last run)",
+        f"  Health Grade: {grade} ({score}/100)",
+        f"  L3 Verdict: {l3}",
+        f"  Top Blockers:",
+    ]
+    for b in blockers:
+        lines.append(f"    • {b}")
+    if not blockers:
+        lines.append("    • None")
+    
+    return "\n".join(lines)
+
+
+def evaluate_diagnostic_impact(diagnostic: dict | None) -> tuple[bool, str | None]:
+    """Evaluate if Perplexity diagnostic should affect CRP status.
+    
+    Returns:
+        (is_blocking, warning_message)
+        - is_blocking=True: CRP cycle is NO-GO
+        - warning_message: injected into §6 Next Cycle Intent if set
+    """
+    if diagnostic is None:
+        return False, None
+    
+    grade = diagnostic["health_grade"]
+    score = diagnostic["health_score"]
+    
+    if grade == "CRITICAL":
+        return True, None  # blocking — NO-GO
+    
+    if grade == "DEGRADING" and score < 60:
+        return False, (
+            "Infrastructure degrading (Perplexity score: {}/100) — "
+            "prioritize Perplexity blockers before continuing build order"
+        ).format(score)
+    
+    return False, None
+```
+
+---
+
+
+## H.5 — Unified Health Schema `BRIDGE-004`
+
+**File:** `tools/lib/health_schema.py`
+```python
+#!/usr/bin/env python3
+"""CitadelHealthSnapshot — Unified health schema populated by both loops.
+
+BRIDGE-004: Common schema so CRP and Perplexity produce comparable health data.
+"""
+
+from datetime import datetime, timezone
+from typing import Literal
+from pydantic import BaseModel, Field
+
+
+class ServiceHealth(BaseModel):
+    """Health of a single Citadel service."""
+    service_id: str
+    status: Literal["healthy", "degraded", "unhealthy", "unknown"] = "unknown"
+    response_time_ms: float | None = None
+    consecutive_failures: int = 0
+    dependencies: dict[str, str] = {}  # {"supabase": "connected", "nats": "connected"}
+
+
+class InfrastructureHealth(BaseModel):
+    """Infrastructure-level health metrics (Perplexity-populated)."""
+    cpu_pct: float | None = None
+    memory_pct: float | None = None
+    disk_pct: float | None = None
+    nats_connections: int | None = None
+    nats_total_connections: int | None = None
+    active_monitors: int = 0
+    alerting_monitors: int = 0
+
+
+class CodeHealth(BaseModel):
+    """Code quality and delivery metrics (both loops contribute)."""
+    pipeline_pass_rate: float | None = None  # 0-100, Perplexity
+    deploy_frequency_daily: float | None = None  # Perplexity
+    lead_time_hours: float | None = None  # Perplexity
+    change_failure_rate: float | None = None  # 0-100, Perplexity
+    test_count: int = 0  # CRP
+    coverage_pct: float | None = None  # CRP
+
+
+class RevenueHealth(BaseModel):
+    """Revenue metrics (Perplexity-populated via Stripe)."""
+    mrr_cents: int = 0
+    active_subscriptions: int = 0
+    trialing_subscriptions: int = 0
+    past_due_subscriptions: int = 0
+
+
+class CitadelHealthSnapshot(BaseModel):
+    """Unified health snapshot — the single source of truth for system state."""
+    snapshot_id: str
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    source: Literal["crp", "perplexity", "merged"] = "merged"
+
+    # Composite
+    overall_grade: Literal["HEALTHY", "DEGRADING", "CRITICAL", "UNKNOWN"] = "UNKNOWN"
+    overall_score: int = 0  # 0-100
+
+    # Domain sections
+    services: list[ServiceHealth] = []
+    infrastructure: InfrastructureHealth | None = None
+    code: CodeHealth | None = None
+    revenue: RevenueHealth | None = None
+
+    # CRP-specific
+    crp_cycle_id: str | None = None
+    guardrail_pass: bool | None = None
+    drift_clean: bool | None = None
+    sla_compliant: bool | None = None
+
+    # Perplexity-specific
+    diag_id: str | None = None
+    perplexity_score: int | None = None
+    l3_verdict: str | None = None
+    blockers: list[str] = []
+    recommendations: list[str] = []
+
+    def compute_overall_grade(self) -> str:
+        """Compute overall grade using worst-of-both-sources rule."""
+        grades = []
+        # CRP grade
+        if self.guardrail_pass is False or self.drift_clean is False:
+            grades.append("CRITICAL")
+        elif self.sla_compliant is False:
+            grades.append("DEGRADING")
+        elif self.guardrail_pass is True and self.drift_clean is True:
+            grades.append("HEALTHY")
+        # Perplexity grade
+        if self.perplexity_score is not None:
+            if self.perplexity_score >= 70:
+                grades.append("HEALTHY")
+            elif self.perplexity_score >= 40:
+                grades.append("DEGRADING")
+            else:
+                grades.append("CRITICAL")
+        # Worst-of-both
+        priority = {"CRITICAL": 0, "DEGRADING": 1, "HEALTHY": 2, "UNKNOWN": 3}
+        if not grades:
+            return "UNKNOWN"
+        return min(grades, key=lambda g: priority.get(g, 3))
+
+
+def merge_snapshots(crp: CitadelHealthSnapshot | None, pplx: CitadelHealthSnapshot | None) -> CitadelHealthSnapshot:
+    """Merge CRP-only and Perplexity-only snapshots into a unified merged snapshot."""
+    now = datetime.now(timezone.utc)
+    merged = CitadelHealthSnapshot(
+        snapshot_id=f"HEALTH-{now.strftime('%Y%m%d-%H%M')}",
+        source="merged",
+    )
+    if crp:
+        merged.services = crp.services
+        merged.crp_cycle_id = crp.crp_cycle_id
+        merged.guardrail_pass = crp.guardrail_pass
+        merged.drift_clean = crp.drift_clean
+        merged.sla_compliant = crp.sla_compliant
+        if crp.code:
+            if merged.code is None:
+                merged.code = CodeHealth()
+            merged.code.test_count = crp.code.test_count
+            merged.code.coverage_pct = crp.code.coverage_pct
+    if pplx:
+        merged.infrastructure = pplx.infrastructure
+        merged.revenue = pplx.revenue
+        merged.diag_id = pplx.diag_id
+        merged.perplexity_score = pplx.perplexity_score
+        merged.l3_verdict = pplx.l3_verdict
+        merged.blockers = pplx.blockers
+        merged.recommendations = pplx.recommendations
+        if pplx.code:
+            if merged.code is None:
+                merged.code = CodeHealth()
+            merged.code.pipeline_pass_rate = pplx.code.pipeline_pass_rate
+            merged.code.deploy_frequency_daily = pplx.code.deploy_frequency_daily
+            merged.code.lead_time_hours = pplx.code.lead_time_hours
+            merged.code.change_failure_rate = pplx.code.change_failure_rate
+    # Compute overall
+    merged.overall_grade = merged.compute_overall_grade()
+    merged.overall_score = _compute_merged_score(merged)
+    return merged
+
+
+def _compute_merged_score(snap: CitadelHealthSnapshot) -> int:
+    """Compute a 0-100 merged score from all available data."""
+    scores = []
+    weights = []
+    # Perplexity score (40% weight)
+    if snap.perplexity_score is not None:
+        scores.append(snap.perplexity_score)
+        weights.append(0.4)
+    # CRP guardrails (20% weight)
+    if snap.guardrail_pass is not None:
+        scores.append(100 if snap.guardrail_pass else 0)
+        weights.append(0.2)
+    # CRP drift (15% weight)
+    if snap.drift_clean is not None:
+        scores.append(100 if snap.drift_clean else 0)
+        weights.append(0.15)
+    # SLA (15% weight)
+    if snap.sla_compliant is not None:
+        scores.append(100 if snap.sla_compliant else 30)
+        weights.append(0.15)
+    # Service health (10% weight)
+    if snap.services:
+        healthy = sum(1 for s in snap.services if s.status == "healthy")
+        scores.append(int(100 * healthy / len(snap.services)))
+        weights.append(0.1)
+    if not scores:
+        return 0
+    total_weight = sum(weights)
+    return int(sum(s * w for s, w in zip(scores, weights)) / total_weight)
+```
+
+---
+
+
+## H.6 — Shared Issue Dedup Library `BRIDGE-005`
+
+**File:** `tools/lib/issue_dedup.py`
+```python
+#!/usr/bin/env python3
+"""Shared Issue Dedup — prevents duplicate Linear/GitLab issues across loops.
+
+BRIDGE-005: Used by CRP, Perplexity, and (later) OAD to avoid filing
+duplicate issues for the same root cause.
+
+Usage:
+    from tools.lib.issue_dedup import IssueDedup
+    dedup = IssueDedup()
+    
+    # Before creating an issue:
+    existing = await dedup.find_duplicate(title="NATS connections low", category="nats_health")
+    if existing:
+        await dedup.append_cross_reference(existing, source_loop="crp", cycle_id="CRP-042")
+    else:
+        issue = await dedup.create_issue(title="NATS connections low", ...)
+"""
+
+import os
+import re
+import logging
+from datetime import datetime, timezone, timedelta
+from dataclasses import dataclass, field
+
+import requests
+
+logger = logging.getLogger("issue_dedup")
+
+LINEAR_API = "https://api.linear.app/graphql"
+LINEAR_TOKEN = os.environ.get("LINEAR_API_TOKEN", "")
+GITLAB_API = os.environ.get("GITLAB_API_URL", "https://gitlab.com/api/v4")
+GITLAB_TOKEN = os.environ.get("GITLAB_TOKEN", "")
+GITLAB_PROJECT_ID = os.environ.get("GITLAB_PROJECT_ID", "")
+
+SIMILARITY_THRESHOLD = 0.75
+MAX_ISSUES_PER_LOOP_PER_CYCLE = 5
+CLOSED_EXCLUSION_HOURS = 24
+
+
+def jaccard_similarity(a: str, b: str) -> float:
+    """Compute Jaccard similarity on word tokens."""
+    tokens_a = set(re.findall(r'\w+', a.lower()))
+    tokens_b = set(re.findall(r'\w+', b.lower()))
+    if not tokens_a or not tokens_b:
+        return 0.0
+    intersection = tokens_a & tokens_b
+    union = tokens_a | tokens_b
+    return len(intersection) / len(union)
+
+
+@dataclass
+class DedupMatch:
+    """A matched existing issue."""
+    source: str  # "linear" | "gitlab"
+    issue_id: str
+    title: str
+    prefix: str  # "[CRP]" | "[CLv2]" | "[OAD]"
+    similarity: float
+    url: str = ""
+
+
+class IssueDedup:
+    """Cross-loop issue deduplication."""
+
+    PREFIXES = ["[CRP]", "[CLv2]", "[OAD]"]
+
+    def __init__(self):
+        self._cycle_issue_counts: dict[str, int] = {}  # "crp:CRP-042" -> count
+
+    def _rate_limit_key(self, loop: str, cycle_id: str) -> str:
+        return f"{loop}:{cycle_id}"
+
+    def check_rate_limit(self, loop: str, cycle_id: str) -> bool:
+        """Return True if under rate limit."""
+        key = self._rate_limit_key(loop, cycle_id)
+        count = self._cycle_issue_counts.get(key, 0)
+        return count < MAX_ISSUES_PER_LOOP_PER_CYCLE
+
+    def increment_rate_limit(self, loop: str, cycle_id: str):
+        key = self._rate_limit_key(loop, cycle_id)
+        self._cycle_issue_counts[key] = self._cycle_issue_counts.get(key, 0) + 1
+
+    def find_duplicate_linear(self, title: str, category: str | None = None) -> DedupMatch | None:
+        """Search Linear for matching open issues across all loop prefixes."""
+        if not LINEAR_TOKEN:
+            return None
+        
+        query = """
+        query($filter: IssueFilter) {
+            issues(filter: $filter, first: 50) {
+                nodes { id title state { name } url labels { nodes { name } } }
+            }
+        }
+        """
+        variables = {
+            "filter": {
+                "state": {"type": {"nin": ["completed", "canceled"]}},
+            }
+        }
+        headers = {"Authorization": LINEAR_TOKEN, "Content-Type": "application/json"}
+        
+        try:
+            resp = requests.post(LINEAR_API, json={"query": query, "variables": variables}, headers=headers, timeout=15)
+            resp.raise_for_status()
+            issues = resp.json().get("data", {}).get("issues", {}).get("nodes", [])
+        except Exception as e:
+            logger.warning(f"[DEDUP] Linear query failed: {e}")
+            return None
+        
+        for issue in issues:
+            ititle = issue["title"]
+            sim = jaccard_similarity(title, ititle)
+            
+            # Check category tag match
+            labels = [l["name"] for l in issue.get("labels", {}).get("nodes", [])]
+            if category and category in labels:
+                sim = max(sim, 0.9)  # category match = high confidence
+            
+            if sim >= SIMILARITY_THRESHOLD:
+                prefix = ""
+                for p in self.PREFIXES:
+                    if ititle.startswith(p):
+                        prefix = p
+                        break
+                return DedupMatch(
+                    source="linear",
+                    issue_id=issue["id"],
+                    title=ititle,
+                    prefix=prefix,
+                    similarity=sim,
+                    url=issue.get("url", ""),
+                )
+        return None
+
+    def find_duplicate_gitlab(self, title: str, category: str | None = None) -> DedupMatch | None:
+        """Search GitLab for matching open issues with vcc-bridge label."""
+        if not GITLAB_TOKEN or not GITLAB_PROJECT_ID:
+            return None
+        
+        headers = {"PRIVATE-TOKEN": GITLAB_TOKEN}
+        url = f"{GITLAB_API}/projects/{GITLAB_PROJECT_ID}/issues"
+        params = {"state": "opened", "labels": "vcc-bridge", "per_page": 50}
+        
+        try:
+            resp = requests.get(url, headers=headers, params=params, timeout=15)
+            resp.raise_for_status()
+            issues = resp.json()
+        except Exception as e:
+            logger.warning(f"[DEDUP] GitLab query failed: {e}")
+            return None
+        
+        for issue in issues:
+            ititle = issue["title"]
+            sim = jaccard_similarity(title, ititle)
+            if sim >= SIMILARITY_THRESHOLD:
+                prefix = ""
+                for p in self.PREFIXES:
+                    if ititle.startswith(p):
+                        prefix = p
+                        break
+                return DedupMatch(
+                    source="gitlab",
+                    issue_id=str(issue["iid"]),
+                    title=ititle,
+                    prefix=prefix,
+                    similarity=sim,
+                    url=issue.get("web_url", ""),
+                )
+        return None
+
+    def find_duplicate(self, title: str, category: str | None = None) -> DedupMatch | None:
+        """Search both Linear and GitLab for duplicates."""
+        match = self.find_duplicate_linear(title, category)
+        if match:
+            return match
+        return self.find_duplicate_gitlab(title, category)
+
+    def append_cross_reference(
+        self,
+        match: DedupMatch,
+        source_loop: str,
+        cycle_id: str,
+        severity: str = "medium",
+    ) -> bool:
+        """Append a cross-reference comment to an existing issue."""
+        comment = (
+            f"Also detected by {source_loop.upper()} in cycle {cycle_id}. "
+            f"Severity: {severity}. "
+            f"Cross-loop correlation confirmed."
+        )
+        label = f"confirmed-by-{source_loop}"
+        
+        if match.source == "linear":
+            return self._comment_linear(match.issue_id, comment, label)
+        elif match.source == "gitlab":
+            return self._comment_gitlab(match.issue_id, comment, label)
+        return False
+
+    def _comment_linear(self, issue_id: str, comment: str, label: str) -> bool:
+        """Add comment and label to Linear issue."""
+        if not LINEAR_TOKEN:
+            return False
+        mutation = """
+        mutation($issueId: String!, $body: String!) {
+            commentCreate(input: {issueId: $issueId, body: $body}) {
+                success
+            }
+        }
+        """
+        headers = {"Authorization": LINEAR_TOKEN, "Content-Type": "application/json"}
+        try:
+            resp = requests.post(
+                LINEAR_API,
+                json={"query": mutation, "variables": {"issueId": issue_id, "body": comment}},
+                headers=headers, timeout=10,
+            )
+            resp.raise_for_status()
+            return True
+        except Exception as e:
+            logger.warning(f"[DEDUP] Linear comment failed: {e}")
+            return False
+
+    def _comment_gitlab(self, issue_iid: str, comment: str, label: str) -> bool:
+        """Add comment and label to GitLab issue."""
+        if not GITLAB_TOKEN or not GITLAB_PROJECT_ID:
+            return False
+        headers = {"PRIVATE-TOKEN": GITLAB_TOKEN}
+        # Add comment
+        try:
+            url = f"{GITLAB_API}/projects/{GITLAB_PROJECT_ID}/issues/{issue_iid}/notes"
+            requests.post(url, headers=headers, json={"body": comment}, timeout=10)
+            # Add label
+            url = f"{GITLAB_API}/projects/{GITLAB_PROJECT_ID}/issues/{issue_iid}"
+            requests.put(url, headers=headers, json={"add_labels": label}, timeout=10)
+            return True
+        except Exception as e:
+            logger.warning(f"[DEDUP] GitLab comment/label failed: {e}")
+            return False
+```
+
+---
+
+
+## H.7 — Shared State Store Migration `BRIDGE-006`
+
+**File:** `supabase/migrations/20260228_vcc_loop_state.sql`
+```sql
+-- BRIDGE-006: Shared state store for VCC↔Perplexity bridge
+-- Canonical source of cross-loop state — both loops read and write here.
+
+CREATE TABLE IF NOT EXISTS public.vcc_loop_state (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    loop_source TEXT NOT NULL CHECK (loop_source IN ('crp', 'perplexity', 'orchestrator')),
+    cycle_id TEXT NOT NULL,
+    health_snapshot JSONB NOT NULL DEFAULT '{}',
+    crp_version TEXT,
+    guild TEXT,
+    phase TEXT,
+    guardrail_pass BOOLEAN,
+    drift_clean BOOLEAN,
+    sla_compliant BOOLEAN,
+    test_passed INT,
+    test_failed INT,
+    srs_codes_touched JSONB DEFAULT '[]',
+    health_grade TEXT CHECK (health_grade IN ('HEALTHY', 'DEGRADING', 'CRITICAL', 'UNKNOWN')),
+    health_score INT CHECK (health_score >= 0 AND health_score <= 100),
+    l3_verdict TEXT,
+    blockers JSONB DEFAULT '[]',
+    recommendations JSONB DEFAULT '[]',
+    sources_read JSONB DEFAULT '[]',
+    notion_diagnostic_page_id TEXT,
+    merged_grade TEXT,
+    merged_score INT,
+    go_no_go TEXT CHECK (go_no_go IN ('GO', 'NO-GO', 'WARNING')),
+    blocking_reasons JSONB DEFAULT '[]',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    expires_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '90 days')
+);
+
+CREATE INDEX IF NOT EXISTS idx_vcc_loop_state_source ON public.vcc_loop_state(loop_source);
+CREATE INDEX IF NOT EXISTS idx_vcc_loop_state_cycle ON public.vcc_loop_state(cycle_id);
+CREATE INDEX IF NOT EXISTS idx_vcc_loop_state_created ON public.vcc_loop_state(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_vcc_loop_state_grade ON public.vcc_loop_state(health_grade)
+    WHERE loop_source = 'perplexity';
+
+-- Auto-cleanup trigger
+CREATE OR REPLACE FUNCTION cleanup_vcc_loop_state() RETURNS trigger AS $$
+BEGIN
+    DELETE FROM public.vcc_loop_state WHERE expires_at < NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_cleanup_vcc_loop_state ON public.vcc_loop_state;
+CREATE TRIGGER trg_cleanup_vcc_loop_state
+    AFTER INSERT ON public.vcc_loop_state
+    EXECUTE FUNCTION cleanup_vcc_loop_state();
+```
+
+---
+
+
+## H.8 — Loop Orchestrator `BRIDGE-007`
+
+**File:** `tools/loop_orchestrator.py`
+```python
+#!/usr/bin/env python3
+"""Loop Orchestrator — Coordinates VCC (CRP) and Perplexity loops.
+
+BRIDGE-007: Persistent process that subscribes to both NATS subjects,
+merges health snapshots, evaluates GO/NO-GO, and auto-pauses/resumes VCC.
+
+Runtime: systemd service or ECS task (NOT cron — must listen continuously).
+Usage: python tools/loop_orchestrator.py
+"""
+
+import os
+import sys
+import json
+import asyncio
+import signal
+import logging
+from datetime import datetime, timezone, timedelta
+
+import requests
+
+from tools.lib.bridge_nats import BridgeNATSClient
+from tools.lib.health_schema import (
+    CitadelHealthSnapshot, merge_snapshots, ServiceHealth, CodeHealth,
+    InfrastructureHealth, RevenueHealth,
+)
+
+logger = logging.getLogger("loop_orchestrator")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s %(message)s")
+
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+NOTION_API = "https://api.notion.com/v1"
+NOTION_TOKEN = os.environ.get("NOTION_INTERNAL_TOKEN", "")
+NOTION_VERSION = "2022-06-28"
+VCC_PAGE_ID = os.environ.get("VCC_INSTRUCTIONS_PAGE_ID", "")
+
+CONSECUTIVE_NOGO_PAUSE_THRESHOLD = 3
+NOTION_SUMMARY_INTERVAL_S = 6 * 3600  # 6 hours
+
+
+class LoopOrchestrator:
+    """Bridge coordinator — merges CRP + Perplexity into unified GO/NO-GO."""
+
+    def __init__(self):
+        self.nats_client = BridgeNATSClient()
+        self.consecutive_nogo = 0
+        self.build_paused = False
+        self.last_crp_state: dict | None = None
+        self.last_pplx_state: dict | None = None
+        self.last_notion_summary_ts = 0.0
+
+    # ── State Store I/O ─────────────────────────────────────────────────
+    def _supabase_headers(self) -> dict:
+        return {
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "application/json",
+            "Prefer": "return=representation",
+        }
+
+    def write_state(self, row: dict):
+        """Write a row to vcc_loop_state."""
+        url = f"{SUPABASE_URL}/rest/v1/vcc_loop_state"
+        resp = requests.post(url, headers=self._supabase_headers(), json=row, timeout=10)
+        resp.raise_for_status()
+
+    def read_latest(self, loop_source: str) -> dict | None:
+        """Read the latest row for a given loop source."""
+        url = f"{SUPABASE_URL}/rest/v1/vcc_loop_state"
+        params = {"loop_source": f"eq.{loop_source}", "order": "created_at.desc", "limit": "1"}
+        resp = requests.get(url, headers=self._supabase_headers(), params=params, timeout=10)
+        resp.raise_for_status()
+        rows = resp.json()
+        return rows[0] if rows else None
+
+    # ── GO/NO-GO Evaluation ─────────────────────────────────────────────
+    def evaluate_go_no_go(self, crp: dict | None, pplx: dict | None) -> tuple[str, list[str]]:
+        """Evaluate merged GO/NO-GO verdict.
+        
+        Returns: (verdict, blocking_reasons)
+        """
+        blocking = []
+        warnings = []
+
+        if crp:
+            if not crp.get("guardrail_pass", True):
+                blocking.append("CRP guardrails failed")
+            if not crp.get("drift_clean", True):
+                blocking.append("CRP drift detected")
+
+        if pplx:
+            grade = pplx.get("health_grade", "UNKNOWN")
+            score = pplx.get("health_score", 100)
+            if grade == "CRITICAL":
+                blocking.append(f"Perplexity CRITICAL (score: {score})")
+            elif grade == "DEGRADING" and score < 50:
+                blocking.append(f"Perplexity DEGRADING below 50 (score: {score})")
+            elif grade == "DEGRADING" and score < 70:
+                warnings.append(f"Perplexity DEGRADING (score: {score})")
+
+        if blocking:
+            return "NO-GO", blocking
+        elif warnings:
+            return "WARNING", warnings
+        return "GO", []
+
+    # ── Event Handlers ──────────────────────────────────────────────────
+    async def on_crp_event(self, data: dict):
+        """Handle CRP cycle completion."""
+        cycle_id = data.get("cycle_id", "unknown")
+        logger.info(f"[ORCH] CRP cycle completed: {cycle_id}")
+
+        # Store CRP state
+        self.last_crp_state = data
+        crp_row = {
+            "loop_source": "crp",
+            "cycle_id": cycle_id,
+            "guild": data.get("guild", "FIN"),
+            "phase": data.get("phase"),
+            "guardrail_pass": data.get("guardrail_pass"),
+            "drift_clean": data.get("drift_clean"),
+            "test_passed": data.get("test_passed"),
+            "test_failed": data.get("test_failed"),
+            "srs_codes_touched": json.dumps(data.get("srs_codes_touched", [])),
+            "health_snapshot": json.dumps(data),
+        }
+        self.write_state(crp_row)
+
+        # Read latest Perplexity state and merge
+        pplx = self.read_latest("perplexity")
+        verdict, reasons = self.evaluate_go_no_go(data, pplx)
+        await self._process_verdict(verdict, reasons, cycle_id)
+
+    async def on_diagnostic_event(self, data: dict):
+        """Handle Perplexity diagnostic completion."""
+        diag_id = data.get("diag_id", "unknown")
+        logger.info(f"[ORCH] Perplexity diagnostic completed: {diag_id}")
+
+        # Store Perplexity state
+        self.last_pplx_state = data
+        pplx_row = {
+            "loop_source": "perplexity",
+            "cycle_id": diag_id,
+            "health_grade": data.get("health_grade"),
+            "health_score": data.get("health_score"),
+            "l3_verdict": data.get("l3_verdict"),
+            "blockers": json.dumps(data.get("blockers", [])),
+            "recommendations": json.dumps(data.get("recommendations", [])),
+            "sources_read": json.dumps(data.get("sources_read", [])),
+            "health_snapshot": json.dumps(data),
+        }
+        self.write_state(pplx_row)
+
+        # Read latest CRP state and merge
+        crp = self.read_latest("crp")
+        verdict, reasons = self.evaluate_go_no_go(crp, data)
+        await self._process_verdict(verdict, reasons, diag_id)
+
+    async def _process_verdict(self, verdict: str, reasons: list[str], trigger_id: str):
+        """Process GO/NO-GO verdict — handle pause/resume logic."""
+        # Write merged orchestrator row
+        merged_row = {
+            "loop_source": "orchestrator",
+            "cycle_id": f"ORCH-{trigger_id}",
+            "merged_grade": verdict,
+            "go_no_go": verdict,
+            "blocking_reasons": json.dumps(reasons),
+            "health_snapshot": json.dumps({
+                "crp_latest": self.last_crp_state,
+                "pplx_latest": self.last_pplx_state,
+                "verdict": verdict,
+                "reasons": reasons,
+            }),
+        }
+        self.write_state(merged_row)
+
+        if verdict == "NO-GO":
+            self.consecutive_nogo += 1
+            logger.warning(f"[ORCH] NO-GO #{self.consecutive_nogo}: {reasons}")
+            if self.consecutive_nogo >= CONSECUTIVE_NOGO_PAUSE_THRESHOLD and not self.build_paused:
+                await self._pause_build(reasons)
+        else:
+            if self.consecutive_nogo > 0:
+                logger.info(f"[ORCH] Resetting consecutive NO-GO counter (was {self.consecutive_nogo})")
+            self.consecutive_nogo = 0
+            if self.build_paused and verdict == "GO":
+                await self._resume_build()
+
+        # Periodic Notion summary
+        import time
+        if time.time() - self.last_notion_summary_ts > NOTION_SUMMARY_INTERVAL_S:
+            self._post_notion_summary(verdict, reasons)
+            self.last_notion_summary_ts = time.time()
+
+    async def _pause_build(self, reasons: list[str]):
+        """Publish build pause event."""
+        reason = f"{self.consecutive_nogo} consecutive NO-GO: {'; '.join(reasons[:3])}"
+        await self.nats_client.publish_build_control("pause", reason, consecutive_nogo=self.consecutive_nogo)
+        self.build_paused = True
+        logger.critical(f"[ORCH] 🛑 BUILD PAUSED — {reason}")
+
+    async def _resume_build(self):
+        """Publish build resume event."""
+        await self.nats_client.publish_build_control("resume", "Health recovered to GO")
+        self.build_paused = False
+        logger.info("[ORCH] ✅ BUILD RESUMED — health recovered")
+
+    def _post_notion_summary(self, verdict: str, reasons: list[str]):
+        """Post 6-hourly summary callout to VCC Build Instructions."""
+        if not NOTION_TOKEN or not VCC_PAGE_ID:
+            return
+        emoji = {"GO": "✅", "WARNING": "⚠️", "NO-GO": "🚫"}.get(verdict, "❓")
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        text = (
+            f"{emoji} Bridge Summary — {now}\n"
+            f"Verdict: {verdict}\n"
+            f"Last CRP: {(self.last_crp_state or {}).get('cycle_id', 'N/A')}\n"
+            f"Last Diagnostic: {(self.last_pplx_state or {}).get('diag_id', 'N/A')}\n"
+            f"Consecutive NO-GO: {self.consecutive_nogo}\n"
+            f"Build Paused: {self.build_paused}"
+        )
+        if reasons:
+            text += f"\nBlocking: {'; '.join(reasons[:3])}"
+        headers = {
+            "Authorization": f"Bearer {NOTION_TOKEN}",
+            "Notion-Version": NOTION_VERSION,
+            "Content-Type": "application/json",
+        }
+        color = "green_background" if verdict == "GO" else ("yellow_background" if verdict == "WARNING" else "red_background")
+        body = {
+            "children": [{
+                "object": "block", "type": "callout",
+                "callout": {
+                    "rich_text": [{"type": "text", "text": {"content": text[:2000]}}],
+                    "icon": {"type": "emoji", "emoji": emoji},
+                    "color": color,
+                },
+            }],
+        }
+        try:
+            requests.patch(f"{NOTION_API}/blocks/{VCC_PAGE_ID}/children", headers=headers, json=body, timeout=10)
+        except Exception as e:
+            logger.warning(f"[ORCH] Notion summary post failed: {e}")
+
+    # ── Main Run Loop ───────────────────────────────────────────────────
+    async def run(self):
+        """Start the orchestrator — listen to NATS and coordinate loops."""
+        logger.info("[ORCH] Starting Loop Orchestrator v2.1...")
+        await self.nats_client.connect()
+
+        # Subscribe to both subjects
+        await self.nats_client.subscribe("crp_completed", self.on_crp_event)
+        await self.nats_client.subscribe("diagnostic_completed", self.on_diagnostic_event)
+
+        logger.info("[ORCH] ✅ Orchestrator running — listening for CRP + Perplexity events")
+
+        # Keep alive
+        stop = asyncio.Event()
+        loop = asyncio.get_event_loop()
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            loop.add_signal_handler(sig, stop.set)
+        await stop.wait()
+
+        logger.info("[ORCH] Shutting down...")
+        await self.nats_client.close()
+
+
+if __name__ == "__main__":
+    orchestrator = LoopOrchestrator()
+    asyncio.run(orchestrator.run())
+```
+
+---
+
+
+## H.9 — CRP v2.1 Validator Extension `BRIDGE-008`
+
+**Patch:** Add to `tools/crp_validator.py`:
+```python
+# ── CRP v2.1 Schema Validation ──────────────────────────────────────────
+
+V21_REQUIRED_SUBSECTIONS = ["7.4", "7.5", "7.6"]
+V21_SUBSECTION_NAMES = {
+    "7.4": "Perplexity Diagnostic",
+    "7.5": "Bridge Status",
+    "7.6": "Merged Health",
+}
+GRACE_CYCLES = int(os.environ.get("VCC_BRIDGE_GRACE_CYCLES", "3"))
+
+
+def validate_v21_extensions(report: dict, cycle_number: int = 0) -> list[str]:
+    """Validate CRP v2.1 bridge extensions.
+    
+    Returns list of validation errors. Empty = valid.
+    """
+    errors = []
+    version = report.get("crp_version", "2.0")
+    
+    if version < "2.1" and cycle_number > GRACE_CYCLES:
+        errors.append(f"CRP version {version} is below 2.1 and grace period ({GRACE_CYCLES} cycles) expired")
+    
+    if version >= "2.1":
+        # Check required fields
+        if "perplexity_diagnostic" not in report:
+            errors.append("Missing field: perplexity_diagnostic (required in v2.1)")
+        if "bridge_status" not in report:
+            errors.append("Missing field: bridge_status (required in v2.1)")
+        if report.get("bridge_status") not in ("connected", "disconnected", "degraded", "unknown"):
+            errors.append(f"Invalid bridge_status: {report.get('bridge_status')}")
+        
+        # Check §7 subsections
+        health_section = report.get("health_metrics", {})
+        for subsection_id in V21_REQUIRED_SUBSECTIONS:
+            key = f"section_{subsection_id.replace('.', '_')}"
+            if key not in health_section and cycle_number > GRACE_CYCLES:
+                errors.append(f"Missing §{subsection_id} ({V21_SUBSECTION_NAMES[subsection_id]}) — required after grace period")
+    
+    return errors
+```
+
+---
+
+
+## H.10 — Test Files
+
+| **Test File** | **BRIDGE Code** | **Test Count** | **Key Assertions** |
+| `tests/phase21/test_bridge_nats_events.py` | BRIDGE-001 | 6 | Publish/subscribe, schema validation, persistence, ack/nak, dedup |
+| `tests/phase21/test_bridge_crp_trigger.py` | BRIDGE-002 | 5 | NATS trigger, CRP injection, cron fallback, dedup within 60s, system prompt |
+| `tests/phase21/test_bridge_feedback_injection.py` | BRIDGE-003 | 5 | read_last_diagnostic, CRITICAL blocks, DEGRADING warns, HEALTHY no-op, graceful fallback |
+| `tests/phase21/test_bridge_health_schema.py` | BRIDGE-004 | 5 | CRP-only validates, PPLX-only validates, merge works, worst-of-both grade, defaults |
+| `tests/phase21/test_bridge_dedup.py` | BRIDGE-005 | 6 | Duplicate caught, different passes, closed excluded, cross-ref comment, rate limit, fuzzy match |
+| `tests/phase21/test_bridge_state_store.py` | BRIDGE-006 | 6 | CRP write, PPLX write, merge GO/NO-GO, cleanup trigger, concurrent writes, read latest |
+| `tests/phase21/test_bridge_orchestrator.py` | BRIDGE-007 | 8 | CRP merge, PPLX merge, CRITICAL→NO-GO, HEALTHY→GO, 3×NO-GO→pause, resume, Notion post, reconnect |
+| `tests/phase21/test_bridge_crp_v21.py` | BRIDGE-008 | 5 | v2.1 validates, v2.0 grace, v2.0 rejected post-grace, §7.4/§7.5/§7.6 render, version check |
+**Total Phase 2.1 tests:** 46
+
+---
+
+
+## H.11 — GitLab CI Pipeline Additions
+
+**Patch:** Add to `.gitlab-ci.yml`:
+```yaml
+# ── Phase 2.1 Bridge CI Stages ──────────────────────────────────────────
+
+bridge-nats:
+  stage: bridge
+  script:
+    - python -c "import yaml; c=yaml.safe_load(open('config/crp_config.yaml')); assert 'citadel.vcc.cycle.completed' in c.get('nats_subjects',[]); assert 'citadel.diagnostic.completed' in c.get('nats_subjects',[])"
+  rules:
+    - changes:
+        - config/crp_config.yaml
+        - tools/lib/bridge_nats.py
+
+bridge-dedup:
+  stage: bridge
+  script:
+    - python tools/lib/issue_dedup.py --audit
+  allow_failure: true  # warn-only
+
+bridge-tests:
+  stage: test
+  script:
+    - python -m pytest tests/phase21/ -v --tb=short
+  rules:
+    - changes:
+        - tools/lib/**
+        - tools/loop_orchestrator.py
+        - tools/vcc_cycle_reporter.py
+
+crp-validate:
+  stage: quality
+  script:
+    - python tools/crp_validator.py --strict --version 2.1
+  rules:
+    - changes:
+        - tools/vcc_cycle_reporter.py
+        - tools/crp_validator.py
+```
+
+---
+
+
+[CALLOUT] ✅ **Appendix H is the implementation home for all 9 BRIDGE codes.** VCC scaffolds these files in order: `bridge_nats.py` → `health_schema.py` → `issue_dedup.py` → `vcc_loop_state.sql` → `loop_orchestrator.py` → CRP patches → CI patches. Tests run via `pytest tests/phase21/ -v`.

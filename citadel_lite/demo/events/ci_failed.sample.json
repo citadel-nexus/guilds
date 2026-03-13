@@ -1,0 +1,13 @@
+{
+  "schema_version": "event_json_v1",
+  "event_id": "demo-ci-failed-001",
+  "event_type": "ci_failed",
+  "source": "github_actions",
+  "repo": "guilds/citadel_lite_repo",
+  "ref": "main",
+  "summary": "CI failed on unit tests",
+  "artifacts": {
+    "log_excerpt": "ModuleNotFoundError: No module named 'requests'",
+    "links": ["https://example.com/log"]
+  }
+}

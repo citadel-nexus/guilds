@@ -1,0 +1,3020 @@
+[
+  {
+    "id": "mem-001",
+    "title": "CI failure: missing 'requests' module",
+    "snippet": "Previous incident resolved by adding 'requests' to requirements.txt. Root cause: new code imported requests but dependency was not declared.",
+    "tags": [
+      "ci_failed",
+      "missing_dependency",
+      "requirements",
+      "ModuleNotFoundError"
+    ],
+    "confidence": 0.95,
+    "link": "https://example.com/incident/001",
+    "occurred_at": "2026-01-15T10:00:00Z"
+  },
+  {
+    "id": "mem-002",
+    "title": "CI failure: environment variable not set",
+    "snippet": "Deploy failed because DATABASE_URL was not configured in CI environment. Fixed by adding the variable to GitHub Actions secrets.",
+    "tags": [
+      "ci_failed",
+      "env_var",
+      "configuration",
+      "KeyError",
+      "deploy"
+    ],
+    "confidence": 0.9,
+    "link": "https://example.com/incident/002",
+    "occurred_at": "2026-01-18T14:30:00Z"
+  },
+  {
+    "id": "mem-003",
+    "title": "CI failure: permission denied on deploy script",
+    "snippet": "Deploy script lacked execute permission. Fixed with chmod +x deploy.sh and committed the permission change.",
+    "tags": [
+      "ci_failed",
+      "permission_denied",
+      "deploy",
+      "PermissionError",
+      "chmod"
+    ],
+    "confidence": 0.88,
+    "link": "https://example.com/incident/003",
+    "occurred_at": "2026-01-20T09:15:00Z"
+  },
+  {
+    "id": "mem-110fedcf",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-01-31T12:34:38.494010+00:00",
+    "event_id": "demo-ci-failed-001"
+  },
+  {
+    "id": "mem-4993abeb",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-01-31T12:34:38.500125+00:00",
+    "event_id": "demo-security-alert-001"
+  },
+  {
+    "id": "mem-4179f966",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-01-31T12:34:38.505185+00:00",
+    "event_id": "demo-deploy-fail-001"
+  },
+  {
+    "id": "mem-629c3445",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-01-31T12:34:56.294933+00:00",
+    "event_id": "demo-ci-failed-001"
+  },
+  {
+    "id": "mem-dfab56f6",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-01-31T12:34:56.301128+00:00",
+    "event_id": "demo-deploy-fail-001"
+  },
+  {
+    "id": "mem-a3b2b547",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-01-31T12:34:56.306268+00:00",
+    "event_id": "demo-security-alert-001"
+  },
+  {
+    "id": "mem-b03f2024",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-01-31T12:43:32.538938+00:00",
+    "event_id": "demo-ci-failed-001"
+  },
+  {
+    "id": "mem-86948527",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-01-31T12:43:32.549520+00:00",
+    "event_id": "demo-security-alert-001"
+  },
+  {
+    "id": "mem-67cdf811",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-01-31T12:43:32.561454+00:00",
+    "event_id": "demo-deploy-fail-001"
+  },
+  {
+    "id": "mem-a64e25c1",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-01-31T12:43:41.649957+00:00",
+    "event_id": "demo-ci-failed-001"
+  },
+  {
+    "id": "mem-73d08b7e",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-01-31T12:43:41.660046+00:00",
+    "event_id": "demo-deploy-fail-001"
+  },
+  {
+    "id": "mem-097120c2",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-01-31T12:43:41.667613+00:00",
+    "event_id": "demo-security-alert-001"
+  },
+  {
+    "id": "mem-7b0ce88c",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-01-31T13:13:13.421475+00:00",
+    "event_id": "demo-ci-failed-001"
+  },
+  {
+    "id": "mem-c3f0618f",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-01-31T13:13:13.431535+00:00",
+    "event_id": "demo-security-alert-001"
+  },
+  {
+    "id": "mem-7e85ac7e",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-01-31T13:13:13.441076+00:00",
+    "event_id": "demo-deploy-fail-001"
+  },
+  {
+    "id": "mem-573ac7f8",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-01-31T13:21:32.113144+00:00",
+    "event_id": "demo-ci-failed-001"
+  },
+  {
+    "id": "mem-6d47783c",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-01-31T13:36:38.766433+00:00",
+    "event_id": "demo-ci-failed-001"
+  },
+  {
+    "id": "mem-6f34f73b",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-01-31T13:36:38.776483+00:00",
+    "event_id": "demo-security-alert-001"
+  },
+  {
+    "id": "mem-af120b58",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-01-31T13:36:38.786818+00:00",
+    "event_id": "demo-deploy-fail-001"
+  },
+  {
+    "id": "mem-299e71a9",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-01-31T13:53:26.283937+00:00",
+    "event_id": "demo-ci-failed-001"
+  },
+  {
+    "id": "mem-ac5764d1",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-01-31T13:53:26.293680+00:00",
+    "event_id": "demo-security-alert-001"
+  },
+  {
+    "id": "mem-03f41338",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-01-31T13:53:26.304391+00:00",
+    "event_id": "demo-deploy-fail-001"
+  },
+  {
+    "id": "mem-dc4dac24",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-01-31T13:53:50.283082+00:00",
+    "event_id": "demo-ci-failed-001"
+  },
+  {
+    "id": "mem-e9436b2b",
+    "title": "test",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "test_failure",
+      "manual"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-01-31T13:59:08.423249+00:00",
+    "event_id": "5ba1dfab-0974-42c6-9052-3f4f6b5b0a29"
+  },
+  {
+    "id": "mem-0ab81fb7",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-01T01:08:15.752767+00:00",
+    "event_id": "demo-ci-failed-001"
+  },
+  {
+    "id": "mem-eaadb0ec",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-01T01:08:15.946381+00:00",
+    "event_id": "demo-deploy-fail-001"
+  },
+  {
+    "id": "mem-7712e9ab",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-01T01:08:16.121349+00:00",
+    "event_id": "demo-security-alert-001"
+  },
+  {
+    "id": "mem-cc75e352",
+    "title": "",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      ""
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-01T01:08:16.287174+00:00",
+    "event_id": "75f830c2-0b4f-46e0-909a-d97b86ef3697"
+  },
+  {
+    "id": "mem-a248df80",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-01T04:18:39.427687+00:00",
+    "event_id": "demo-ci-failed-001"
+  },
+  {
+    "id": "mem-4d2102bd",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-01T04:18:39.623444+00:00",
+    "event_id": "demo-deploy-fail-001"
+  },
+  {
+    "id": "mem-148f9a87",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-01T04:18:39.817720+00:00",
+    "event_id": "demo-security-alert-001"
+  },
+  {
+    "id": "mem-877b429c",
+    "title": "",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      ""
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-01T04:18:40.002104+00:00",
+    "event_id": "ba443603-9fb9-4380-9b97-18024f6d3005"
+  },
+  {
+    "id": "mem-3ee716c2",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-01T04:29:07.357956+00:00",
+    "event_id": "demo-ci-failed-001"
+  },
+  {
+    "id": "mem-567ff4a7",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-01T04:29:07.547286+00:00",
+    "event_id": "demo-deploy-fail-001"
+  },
+  {
+    "id": "mem-8317af09",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-01T04:29:07.703653+00:00",
+    "event_id": "demo-security-alert-001"
+  },
+  {
+    "id": "mem-228ed094",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-01T04:53:00.849642+00:00",
+    "event_id": "demo-ci-failed-001"
+  },
+  {
+    "id": "mem-cd3cc58f",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-01T04:53:01.027108+00:00",
+    "event_id": "demo-deploy-fail-001"
+  },
+  {
+    "id": "mem-cf4d56e8",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-01T04:53:01.200237+00:00",
+    "event_id": "demo-security-alert-001"
+  },
+  {
+    "id": "mem-504d4b95",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-01T04:53:36.815656+00:00",
+    "event_id": "demo-ci-failed-001"
+  },
+  {
+    "id": "mem-27b5369f",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-01T04:53:36.990995+00:00",
+    "event_id": "demo-deploy-fail-001"
+  },
+  {
+    "id": "mem-facf8732",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-01T04:53:37.151810+00:00",
+    "event_id": "demo-security-alert-001"
+  },
+  {
+    "id": "mem-14e84cf5",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-01T05:00:35.576623+00:00",
+    "event_id": "demo-ci-failed-001"
+  },
+  {
+    "id": "mem-8979f962",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-01T05:00:35.751009+00:00",
+    "event_id": "demo-deploy-fail-001"
+  },
+  {
+    "id": "mem-04868e22",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-01T05:00:35.913495+00:00",
+    "event_id": "demo-security-alert-001"
+  },
+  {
+    "id": "mem-9cb21813",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-01T05:09:57.286910+00:00",
+    "event_id": "demo-ci-failed-001"
+  },
+  {
+    "id": "mem-e9541e3f",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-01T05:09:57.467693+00:00",
+    "event_id": "demo-deploy-fail-001"
+  },
+  {
+    "id": "mem-93645593",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-01T05:09:57.626133+00:00",
+    "event_id": "demo-security-alert-001"
+  },
+  {
+    "id": "mem-f72eeb64",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-01T05:19:56.405673+00:00",
+    "event_id": "demo-ci-failed-001"
+  },
+  {
+    "id": "mem-5d53739f",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-01T05:19:56.584203+00:00",
+    "event_id": "demo-deploy-fail-001"
+  },
+  {
+    "id": "mem-3901a372",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-01T05:19:56.737552+00:00",
+    "event_id": "demo-security-alert-001"
+  },
+  {
+    "id": "mem-a291577e",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-08T11:29:49.862554+00:00",
+    "event_id": "demo-ci-failed-001"
+  },
+  {
+    "id": "mem-2b192919",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-08T11:29:50.070078+00:00",
+    "event_id": "demo-deploy-fail-001"
+  },
+  {
+    "id": "mem-1c0a74df",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-08T11:29:50.259429+00:00",
+    "event_id": "demo-security-alert-001"
+  },
+  {
+    "id": "mem-e1d13d33",
+    "title": "",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      ""
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-08T11:29:50.430968+00:00",
+    "event_id": ""
+  },
+  {
+    "id": "mem-e55ade79",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-08T11:59:59.153486+00:00",
+    "event_id": "demo-ci-failed-001"
+  },
+  {
+    "id": "mem-0ede593d",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-08T11:59:59.349881+00:00",
+    "event_id": "demo-ci-failed-001"
+  },
+  {
+    "id": "mem-990fb8ab",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-08T11:59:59.555290+00:00",
+    "event_id": "demo-ci-failed-014"
+  },
+  {
+    "id": "mem-7e131aba",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-08T13:11:24.656812+00:00",
+    "event_id": "demo-ci-failed-001"
+  },
+  {
+    "id": "mem-d3586c14",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-08T13:11:24.849904+00:00",
+    "event_id": "demo-ci-failed-014"
+  },
+  {
+    "id": "mem-e1429ffe",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-08T13:11:25.043554+00:00",
+    "event_id": "demo-ci-failed-015"
+  },
+  {
+    "id": "mem-58a85a97",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-08T13:11:25.244216+00:00",
+    "event_id": "demo-deploy-fail-001"
+  },
+  {
+    "id": "mem-aae14655",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-08T13:11:25.460209+00:00",
+    "event_id": "demo-security-alert-001"
+  },
+  {
+    "id": "mem-ad91d566",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-09T14:54:45.366678+00:00",
+    "event_id": "demo-ci-failed-016",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Add missing module to requirements.txt and re-run pip install",
+    "verify_success": true,
+    "risk_score": 0.125,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import {module}\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-9b247b5a",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-09T14:56:26.179228+00:00",
+    "event_id": "demo-ci-failed-017",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Add missing module to requirements.txt and re-run pip install",
+    "verify_success": true,
+    "risk_score": 0.125,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import {module}\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-9b591478",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-09T14:58:11.122179+00:00",
+    "event_id": "demo-ci-failed-018",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Check the project's dependencies and ensure that all required modules are listed in the requirements file. If a module is missing, add it and update the CI configuration if necessary.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import {module}\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-912c8b28",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-09T14:59:28.958923+00:00",
+    "event_id": "demo-ci-failed-019",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Investigate and install the missing module required for the unit tests. This may involve updating the requirements file or the environment configuration.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import {module}\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-9732d1f3",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-09T15:10:01.613815+00:00",
+    "event_id": "demo-ci-failed-020",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Investigate and install the missing module or dependency that is causing the ModuleNotFoundError. If the issue is due to incorrect import statements, review and correct them in the unit tests.",
+    "verify_success": null,
+    "risk_score": 0.4,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import {module}\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-88888256",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-09T15:13:59.308575+00:00",
+    "event_id": "demo-ci-failed-020",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Add the missing module to the project dependencies in the requirements file and ensure the CI environment is configured correctly to include all necessary paths.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import {module}\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-9a48b5a8",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-11T07:46:29.151318+00:00",
+    "event_id": "demo-ci-failed-020",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Check the project's dependencies and ensure that all required modules are listed in the requirements file. If a module is missing, add it and update the CI configuration if necessary.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import {module}\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-c8da5b85",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-11T07:49:39.443936+00:00",
+    "event_id": "demo-ci-failed-021",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Check the project's dependencies and ensure that all required modules are listed in the requirements file. If a module is missing, add it and update the CI configuration if necessary.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import {module}\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-94259b0a",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-11T09:35:50.291870+00:00",
+    "event_id": "demo-ci-failed-001",
+    "sherlock_label": "",
+    "fix_summary": "",
+    "verify_success": null,
+    "risk_score": null,
+    "verification_steps": null,
+    "extras": {}
+  },
+  {
+    "id": "mem-0081bffc",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-11T09:36:05.856790+00:00",
+    "event_id": "demo-ci-failed-001",
+    "sherlock_label": "",
+    "fix_summary": "",
+    "verify_success": null,
+    "risk_score": null,
+    "verification_steps": null,
+    "extras": {}
+  },
+  {
+    "id": "mem-d7a465c1",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-11T09:37:46.896899+00:00",
+    "event_id": "demo-ci-failed-001",
+    "sherlock_label": "",
+    "fix_summary": "",
+    "verify_success": null,
+    "risk_score": null,
+    "verification_steps": null,
+    "extras": {}
+  },
+  {
+    "id": "mem-cc93e6c4",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-11T09:37:47.111451+00:00",
+    "event_id": "demo-deploy-fail-001",
+    "sherlock_label": "",
+    "fix_summary": "",
+    "verify_success": null,
+    "risk_score": null,
+    "verification_steps": null,
+    "extras": {}
+  },
+  {
+    "id": "mem-ca025bf5",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-11T09:37:47.294621+00:00",
+    "event_id": "demo-security-alert-001",
+    "sherlock_label": "",
+    "fix_summary": "",
+    "verify_success": null,
+    "risk_score": null,
+    "verification_steps": null,
+    "extras": {}
+  },
+  {
+    "id": "mem-ec9952ff",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-11T09:45:04.819518+00:00",
+    "event_id": "test-verify-retry-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Install the 'requests' module in the CI environment to resolve the ModuleNotFoundError.",
+    "verify_success": true,
+    "risk_score": 0.2,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-e38a566b",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-11T09:46:21.890003+00:00",
+    "event_id": "test-verify-retry-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Install the 'requests' module in the CI environment and ensure it is listed in the project's requirements file.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-7554aaf9",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-11T09:47:26.160688+00:00",
+    "event_id": "demo-ci-failed-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Install the 'requests' module in the CI environment to resolve the ModuleNotFoundError.",
+    "verify_success": true,
+    "risk_score": 0.2,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-df629205",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-13T17:39:55.671065+00:00",
+    "event_id": "demo-ci-failed-001",
+    "sherlock_label": "",
+    "fix_summary": "",
+    "verify_success": null,
+    "risk_score": null,
+    "verification_steps": null,
+    "extras": {}
+  },
+  {
+    "id": "mem-eca3b258",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-13T17:39:55.866683+00:00",
+    "event_id": "demo-deploy-fail-001",
+    "sherlock_label": "",
+    "fix_summary": "",
+    "verify_success": null,
+    "risk_score": null,
+    "verification_steps": null,
+    "extras": {}
+  },
+  {
+    "id": "mem-5465327f",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-13T17:39:56.031504+00:00",
+    "event_id": "demo-security-alert-001",
+    "sherlock_label": "",
+    "fix_summary": "",
+    "verify_success": null,
+    "risk_score": null,
+    "verification_steps": null,
+    "extras": {}
+  },
+  {
+    "id": "mem-0e652909",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-13T17:45:43.636548+00:00",
+    "event_id": "demo-ci-failed-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Install the 'requests' module in the CI environment to resolve the ModuleNotFoundError.",
+    "verify_success": true,
+    "risk_score": 0.2,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-2403e6b0",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-13T17:46:24.896532+00:00",
+    "event_id": "demo-deploy-fail-001",
+    "sherlock_label": "permission_denied",
+    "fix_summary": "Update the permissions of the deploy.sh script to ensure it is executable by the deployment user.",
+    "verify_success": null,
+    "risk_score": 0.2,
+    "verification_steps": [
+      "ls -l deploy.sh",
+      "test -r deploy.sh && echo OK_READ || echo NG_READ",
+      "test -x deploy.sh && echo OK_EXEC || echo NG_EXEC"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-a9d76a75",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-13T17:46:40.350324+00:00",
+    "event_id": "demo-security-alert-001",
+    "sherlock_label": "security_alert",
+    "fix_summary": "Upgrade lodash to version 4.17.21 or higher to mitigate the critical vulnerability. Approval from the team is required before proceeding with the upgrade.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "npm ls lodash || true",
+      "npm audit || true",
+      "npm audit fix || true",
+      "npm ls lodash || true"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-e8874683",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-15T01:44:31.312620+00:00",
+    "event_id": "test-verify-retry-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Add the 'requests' module to the project's dependencies and ensure it is installed in the CI environment.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-bcfe68c0",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-15T01:50:49.334165+00:00",
+    "event_id": "demo-ci-failed-001",
+    "sherlock_label": "",
+    "fix_summary": "",
+    "verify_success": null,
+    "risk_score": null,
+    "verification_steps": null,
+    "extras": {}
+  },
+  {
+    "id": "mem-21f75f0e",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-15T01:51:02.734065+00:00",
+    "event_id": "demo-security-alert-001",
+    "sherlock_label": "",
+    "fix_summary": "",
+    "verify_success": null,
+    "risk_score": null,
+    "verification_steps": null,
+    "extras": {}
+  },
+  {
+    "id": "mem-47560464",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-15T01:51:13.658704+00:00",
+    "event_id": "demo-deploy-fail-001",
+    "sherlock_label": "",
+    "fix_summary": "",
+    "verify_success": null,
+    "risk_score": null,
+    "verification_steps": null,
+    "extras": {}
+  },
+  {
+    "id": "mem-24dcb147",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-15T01:51:46.074261+00:00",
+    "event_id": "test-verify-retry-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Add the 'requests' module to the project's requirements file and ensure it is installed in the CI environment.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-7fd26112",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-15T02:00:21.819354+00:00",
+    "event_id": "demo-ci-failed-001",
+    "sherlock_label": "",
+    "fix_summary": "",
+    "verify_success": null,
+    "risk_score": null,
+    "verification_steps": null,
+    "extras": {}
+  },
+  {
+    "id": "mem-a6022e27",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-15T02:00:34.060546+00:00",
+    "event_id": "demo-security-alert-001",
+    "sherlock_label": "",
+    "fix_summary": "",
+    "verify_success": null,
+    "risk_score": null,
+    "verification_steps": null,
+    "extras": {}
+  },
+  {
+    "id": "mem-01e658bc",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-15T02:00:46.545471+00:00",
+    "event_id": "demo-deploy-fail-001",
+    "sherlock_label": "",
+    "fix_summary": "",
+    "verify_success": null,
+    "risk_score": null,
+    "verification_steps": null,
+    "extras": {}
+  },
+  {
+    "id": "mem-71a9391c",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-15T02:01:22.179200+00:00",
+    "event_id": "test-verify-retry-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Install the 'requests' module in the CI environment by updating the requirements file or the CI configuration to include it as a dependency.",
+    "verify_success": true,
+    "risk_score": 0.2,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-aa005c57",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-15T22:06:16.016589+00:00",
+    "event_id": "demo-ci-failed-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Add the 'requests' module to the project's dependencies in the requirements file and ensure it is installed in the CI environment.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-4327bfa7",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-15T22:06:49.823114+00:00",
+    "event_id": "demo-security-alert-001",
+    "sherlock_label": "security_alert",
+    "fix_summary": "Upgrade lodash to version 4.17.21 or later to mitigate the critical vulnerability.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "npm ls lodash || true",
+      "npm audit || true",
+      "npm audit fix || true",
+      "npm ls lodash || true"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-dca5fb79",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-15T22:07:28.297873+00:00",
+    "event_id": "demo-deploy-fail-001",
+    "sherlock_label": "permission_denied",
+    "fix_summary": "Update the permissions of the deploy.sh script to ensure it is executable by the user attempting the deployment.",
+    "verify_success": null,
+    "risk_score": 0.2,
+    "verification_steps": [
+      "ls -l deploy.sh",
+      "test -r deploy.sh && echo OK_READ || echo NG_READ",
+      "test -x deploy.sh && echo OK_EXEC || echo NG_EXEC"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-5ef740a3",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-15T22:08:00.830930+00:00",
+    "event_id": "test-verify-retry-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Add the 'requests' module to the project's requirements file and ensure it is installed in the CI environment.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-2459e667",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-21T09:32:39.613663+00:00",
+    "event_id": "demo-ci-failed-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Install the 'requests' module in the CI environment by updating the requirements file and ensuring the CI pipeline installs it during the build process.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-cf86a1e6",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-21T09:33:19.594551+00:00",
+    "event_id": "demo-security-alert-001",
+    "sherlock_label": "security_alert",
+    "fix_summary": "Upgrade lodash to version 4.17.21 or higher to mitigate the critical vulnerability. This requires approval due to the potential impact on the application.",
+    "verify_success": null,
+    "risk_score": 0.5,
+    "verification_steps": [
+      "npm ls lodash || true",
+      "npm audit || true",
+      "npm audit fix || true",
+      "npm ls lodash || true"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-06e4ae59",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-21T09:33:56.868423+00:00",
+    "event_id": "demo-deploy-fail-001",
+    "sherlock_label": "permission_denied",
+    "fix_summary": "Update the permissions of the deploy.sh script to ensure it is executable by the user attempting the deployment.",
+    "verify_success": null,
+    "risk_score": 0.2,
+    "verification_steps": [
+      "ls -l deploy.sh",
+      "test -r deploy.sh && echo OK_READ || echo NG_READ",
+      "test -x deploy.sh && echo OK_EXEC || echo NG_EXEC"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-5bed704e",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-21T09:34:24.899806+00:00",
+    "event_id": "test-verify-retry-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Add the 'requests' module to the project's requirements file and ensure it is installed in the CI environment.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-8785d2e9",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-21T13:28:05.416215+00:00",
+    "event_id": "demo-ci-failed-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Install the 'requests' module in the CI environment and ensure it is listed in the project's requirements file.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-a6ad4f87",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-21T13:28:42.702423+00:00",
+    "event_id": "demo-security-alert-001",
+    "sherlock_label": "security_alert",
+    "fix_summary": "Upgrade lodash to version 4.17.21 or higher to mitigate the critical vulnerability. This requires approval due to the potential impact on the application.",
+    "verify_success": null,
+    "risk_score": 0.5,
+    "verification_steps": [
+      "npm ls lodash || true",
+      "npm audit || true",
+      "npm audit fix || true",
+      "npm ls lodash || true"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-ccb35e77",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-21T13:29:19.595146+00:00",
+    "event_id": "demo-deploy-fail-001",
+    "sherlock_label": "permission_denied",
+    "fix_summary": "Update the permissions of the deploy.sh script to ensure it is executable by the user attempting the deployment.",
+    "verify_success": null,
+    "risk_score": 0.2,
+    "verification_steps": [
+      "ls -l deploy.sh",
+      "test -r deploy.sh && echo OK_READ || echo NG_READ",
+      "test -x deploy.sh && echo OK_EXEC || echo NG_EXEC"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-0dadda51",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-21T13:29:54.434737+00:00",
+    "event_id": "test-verify-retry-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Install the 'requests' module in the CI environment to resolve the ModuleNotFoundError.",
+    "verify_success": true,
+    "risk_score": 0.2,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-6bd4cff3",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-21T16:31:19.886240+00:00",
+    "event_id": "demo-ci-failed-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Install the 'requests' module in the CI environment to resolve the ModuleNotFoundError.",
+    "verify_success": true,
+    "risk_score": 0.2,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-ebecd594",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-21T16:31:57.048977+00:00",
+    "event_id": "demo-security-alert-001",
+    "sherlock_label": "security_alert",
+    "fix_summary": "Upgrade lodash to version 4.17.21 or later to mitigate the critical vulnerability. This requires approval due to the potential impact on the application.",
+    "verify_success": null,
+    "risk_score": 0.5,
+    "verification_steps": [
+      "npm ls lodash || true",
+      "npm audit || true",
+      "npm audit fix || true",
+      "npm ls lodash || true"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-7645c647",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-21T16:32:27.405560+00:00",
+    "event_id": "demo-deploy-fail-001",
+    "sherlock_label": "permission_denied",
+    "fix_summary": "Check and update the permissions of the deploy.sh script to ensure it is executable by the user attempting the deployment.",
+    "verify_success": null,
+    "risk_score": 0.2,
+    "verification_steps": [
+      "ls -l deploy.sh",
+      "test -r deploy.sh && echo OK_READ || echo NG_READ",
+      "test -x deploy.sh && echo OK_EXEC || echo NG_EXEC"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-2f020c35",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-21T16:33:00.142655+00:00",
+    "event_id": "test-verify-retry-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Add the 'requests' module to the project's requirements file and ensure it is installed in the CI environment.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-b43d509c",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-22T07:12:29.071322+00:00",
+    "event_id": "demo-ci-failed-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Add the 'requests' module to the project's requirements file to ensure it is installed in the CI environment.",
+    "verify_success": true,
+    "risk_score": 0.2,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-d3aabde2",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-22T07:13:03.351700+00:00",
+    "event_id": "demo-security-alert-001",
+    "sherlock_label": "security_alert",
+    "fix_summary": "Upgrade lodash to version 4.17.21 or higher to mitigate the critical vulnerability.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "npm ls lodash || true",
+      "npm audit || true",
+      "npm audit fix || true",
+      "npm ls lodash || true"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-f1f4ec46",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-22T07:13:33.321269+00:00",
+    "event_id": "demo-deploy-fail-001",
+    "sherlock_label": "permission_denied",
+    "fix_summary": "Update the permissions of the deploy.sh script to ensure it is executable by the user attempting the deployment.",
+    "verify_success": null,
+    "risk_score": 0.2,
+    "verification_steps": [
+      "ls -l deploy.sh",
+      "test -r deploy.sh && echo OK_READ || echo NG_READ",
+      "test -x deploy.sh && echo OK_EXEC || echo NG_EXEC"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-2984aa8f",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-22T07:14:02.611844+00:00",
+    "event_id": "test-verify-retry-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Install the 'requests' module in the CI environment to resolve the ModuleNotFoundError.",
+    "verify_success": true,
+    "risk_score": 0.2,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-09037ace",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-22T10:59:26.369598+00:00",
+    "event_id": "demo-ci-failed-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Add the 'requests' module to the project's dependencies and ensure it is installed in the CI environment.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-821f3a1b",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-22T10:59:55.743786+00:00",
+    "event_id": "demo-security-alert-001",
+    "sherlock_label": "security_alert",
+    "fix_summary": "Upgrade lodash to version 4.17.21 or higher to mitigate the critical vulnerability. This requires approval due to the potential impact on the application.",
+    "verify_success": null,
+    "risk_score": 0.5,
+    "verification_steps": [
+      "npm ls lodash || true",
+      "npm audit || true",
+      "npm audit fix || true",
+      "npm ls lodash || true"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-c6dbd957",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-22T11:00:31.375513+00:00",
+    "event_id": "demo-deploy-fail-001",
+    "sherlock_label": "permission_denied",
+    "fix_summary": "Check and update the permissions of the deploy.sh script to ensure it is executable by the user executing the deployment.",
+    "verify_success": null,
+    "risk_score": 0.2,
+    "verification_steps": [
+      "ls -l deploy.sh",
+      "test -r deploy.sh && echo OK_READ || echo NG_READ",
+      "test -x deploy.sh && echo OK_EXEC || echo NG_EXEC"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-3fb87b8e",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-22T11:01:05.802231+00:00",
+    "event_id": "test-verify-retry-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Add the 'requests' module to the project's requirements file and ensure it is installed in the CI environment.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-385bce61",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-22T17:15:06.162684+00:00",
+    "event_id": "demo-ci-failed-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Add the 'requests' module to the project's dependencies and ensure it is installed in the CI environment.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-66995c19",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-22T17:15:43.413553+00:00",
+    "event_id": "demo-security-alert-001",
+    "sherlock_label": "security_alert",
+    "fix_summary": "Upgrade lodash to version 4.17.21 or later to mitigate the critical vulnerability. This requires approval due to the potential impact on the application.",
+    "verify_success": null,
+    "risk_score": 0.5,
+    "verification_steps": [
+      "npm ls lodash || true",
+      "npm audit || true",
+      "npm audit fix || true",
+      "npm ls lodash || true"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-9c158fa8",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-22T17:16:17.963643+00:00",
+    "event_id": "demo-deploy-fail-001",
+    "sherlock_label": "permission_denied",
+    "fix_summary": "Change the permissions of the deploy.sh script to make it executable.",
+    "verify_success": true,
+    "risk_score": 0.2,
+    "verification_steps": [
+      "ls -l deploy.sh",
+      "test -r deploy.sh && echo OK_READ || echo NG_READ",
+      "test -x deploy.sh && echo OK_EXEC || echo NG_EXEC"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-63bf090f",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-22T17:24:13.806107+00:00",
+    "event_id": "demo-ci-failed-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Install the 'requests' module in the CI environment and ensure it is listed in the requirements file.",
+    "verify_success": true,
+    "risk_score": 0.2,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-848c4383",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-22T17:24:43.689312+00:00",
+    "event_id": "demo-security-alert-001",
+    "sherlock_label": "security_alert",
+    "fix_summary": "Upgrade lodash to version 4.17.21 or higher to mitigate the critical vulnerability. This requires approval before proceeding with the update.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "npm ls lodash || true",
+      "npm audit || true",
+      "npm audit fix || true",
+      "npm ls lodash || true"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-da15ce74",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-22T17:25:12.056336+00:00",
+    "event_id": "demo-deploy-fail-001",
+    "sherlock_label": "permission_denied",
+    "fix_summary": "Change the permissions of the deploy.sh script to ensure it is executable by the user attempting the deployment.",
+    "verify_success": null,
+    "risk_score": 0.2,
+    "verification_steps": [
+      "ls -l deploy.sh",
+      "test -r deploy.sh && echo OK_READ || echo NG_READ",
+      "test -x deploy.sh && echo OK_EXEC || echo NG_EXEC"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-2edd1e63",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-22T17:25:41.768809+00:00",
+    "event_id": "test-verify-retry-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Add the 'requests' module to the project's requirements file and ensure it is installed in the CI environment.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-46cbd600",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-27T14:42:32.491799+00:00",
+    "event_id": "demo-ci-failed-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Add the 'requests' module to the project's requirements file and ensure it is installed in the CI environment.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-19dad1ef",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-27T14:43:09.293190+00:00",
+    "event_id": "demo-security-alert-001",
+    "sherlock_label": "security_alert",
+    "fix_summary": "Upgrade lodash to version 4.17.21 or higher to mitigate the critical vulnerability. This requires approval due to past incidents with lodash updates.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "npm ls lodash || true",
+      "npm audit || true",
+      "npm audit fix || true",
+      "npm ls lodash || true"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-19c00f56",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-27T14:44:17.849127+00:00",
+    "event_id": "demo-ci-failed-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Add the 'requests' module to the project's dependencies and ensure it is installed in the CI environment.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-2987b1f7",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-27T14:44:57.227228+00:00",
+    "event_id": "demo-security-alert-001",
+    "sherlock_label": "security_alert",
+    "fix_summary": "Update lodash to version 4.17.21 or higher to mitigate the critical vulnerability.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "npm ls lodash || true",
+      "npm audit || true",
+      "npm audit fix || true",
+      "npm ls lodash || true"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-dea5d959",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-27T14:45:32.730356+00:00",
+    "event_id": "demo-deploy-fail-001",
+    "sherlock_label": "permission_denied",
+    "fix_summary": "Update the permissions of the deploy.sh script to ensure it is executable by the user attempting the deployment.",
+    "verify_success": null,
+    "risk_score": 0.2,
+    "verification_steps": [
+      "ls -l deploy.sh",
+      "test -r deploy.sh && echo OK_READ || echo NG_READ",
+      "test -x deploy.sh && echo OK_EXEC || echo NG_EXEC"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-f7abb6c0",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-27T14:46:13.416359+00:00",
+    "event_id": "test-verify-retry-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Install the 'requests' module in the CI environment and ensure it is listed in the requirements file.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-6ccf5159",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-27T15:14:16.422225+00:00",
+    "event_id": "demo-ci-failed-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Add the 'requests' module to the project's dependencies and ensure it is installed in the CI environment.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-22857e4d",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-27T15:14:52.735267+00:00",
+    "event_id": "demo-security-alert-001",
+    "sherlock_label": "security_alert",
+    "fix_summary": "Upgrade lodash to version 4.17.21 or higher to mitigate the critical vulnerability. This requires approval due to the potential impact on the application.",
+    "verify_success": null,
+    "risk_score": 0.5,
+    "verification_steps": [
+      "npm ls lodash || true",
+      "npm audit || true",
+      "npm audit fix || true",
+      "npm ls lodash || true"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-16888d8e",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-27T15:15:32.474262+00:00",
+    "event_id": "demo-deploy-fail-001",
+    "sherlock_label": "permission_denied",
+    "fix_summary": "Check and update the permissions of the deploy.sh script to ensure it is executable by the user executing the deployment.",
+    "verify_success": null,
+    "risk_score": 0.2,
+    "verification_steps": [
+      "ls -l deploy.sh",
+      "test -r deploy.sh && echo OK_READ || echo NG_READ",
+      "test -x deploy.sh && echo OK_EXEC || echo NG_EXEC"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-34787087",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-27T15:16:14.728649+00:00",
+    "event_id": "test-verify-retry-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Install the 'requests' module in the CI environment to resolve the ModuleNotFoundError.",
+    "verify_success": true,
+    "risk_score": 0.2,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-3fa1d426",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-27T17:07:55.643402+00:00",
+    "event_id": "demo-ci-failed-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Add the 'requests' module to the project's requirements file and ensure it is installed in the CI environment.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-d2b3d8dc",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-27T17:08:37.012765+00:00",
+    "event_id": "demo-deploy-fail-001",
+    "sherlock_label": "permission_denied",
+    "fix_summary": "Update the permissions of the deploy.sh script to ensure it is executable by the user attempting the deployment.",
+    "verify_success": null,
+    "risk_score": 0.2,
+    "verification_steps": [
+      "ls -l deploy.sh",
+      "test -r deploy.sh && echo OK_READ || echo NG_READ",
+      "test -x deploy.sh && echo OK_EXEC || echo NG_EXEC"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-3d9bd437",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-27T17:09:21.805531+00:00",
+    "event_id": "demo-security-alert-001",
+    "sherlock_label": "security_alert",
+    "fix_summary": "Upgrade lodash to version 4.17.21 or higher to mitigate the critical vulnerability. This requires approval due to the potential impact on the application.",
+    "verify_success": null,
+    "risk_score": 0.5,
+    "verification_steps": [
+      "npm ls lodash || true",
+      "npm audit || true",
+      "npm audit fix || true",
+      "npm ls lodash || true"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-f50f32b5",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-28T09:13:28.222481+00:00",
+    "event_id": "demo-ci-failed-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Add the 'requests' module to the project's requirements file and ensure it is installed in the CI environment.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-dd16042c",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-28T09:14:10.676159+00:00",
+    "event_id": "demo-security-alert-001",
+    "sherlock_label": "security_alert",
+    "fix_summary": "Upgrade lodash to version 4.17.21 or higher to mitigate the critical vulnerability. This requires approval from the relevant stakeholders before proceeding.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "npm ls lodash || true",
+      "npm audit || true",
+      "npm audit fix || true",
+      "npm ls lodash || true"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-07911c7d",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-28T09:14:48.875789+00:00",
+    "event_id": "demo-deploy-fail-001",
+    "sherlock_label": "permission_denied",
+    "fix_summary": "Change the permissions of the deploy.sh script to ensure it is executable by the user attempting the deployment.",
+    "verify_success": null,
+    "risk_score": 0.2,
+    "verification_steps": [
+      "ls -l deploy.sh",
+      "test -r deploy.sh && echo OK_READ || echo NG_READ",
+      "test -x deploy.sh && echo OK_EXEC || echo NG_EXEC"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-4e9f793c",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-28T09:15:23.220348+00:00",
+    "event_id": "test-verify-retry-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Add the 'requests' module to the project's dependencies and ensure it is installed in the CI environment.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-e7edfd42",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-28T09:20:40.757682+00:00",
+    "event_id": "demo-ci-failed-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Add the 'requests' module to the project's requirements file and ensure it is installed in the CI environment.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-d089477c",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-28T09:21:11.607175+00:00",
+    "event_id": "demo-deploy-fail-001",
+    "sherlock_label": "permission_denied",
+    "fix_summary": "Change the permissions of deploy.sh to ensure it is executable by the deployment user.",
+    "verify_success": null,
+    "risk_score": 0.2,
+    "verification_steps": [
+      "ls -l deploy.sh",
+      "test -r deploy.sh && echo OK_READ || echo NG_READ",
+      "test -x deploy.sh && echo OK_EXEC || echo NG_EXEC"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-d4c4c30c",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-28T09:21:45.636616+00:00",
+    "event_id": "demo-security-alert-001",
+    "sherlock_label": "security_alert",
+    "fix_summary": "Upgrade lodash to version 4.17.21 or later to mitigate the critical vulnerability. This requires approval due to the potential impact on the application.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "npm ls lodash || true",
+      "npm audit || true",
+      "npm audit fix || true",
+      "npm ls lodash || true"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-e6cf4627",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-28T09:43:51.243607+00:00",
+    "event_id": "demo-ci-failed-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Add the 'requests' module to the project's requirements file and ensure it is installed in the CI environment.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-90a6cbbf",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-28T09:44:28.547991+00:00",
+    "event_id": "demo-deploy-fail-001",
+    "sherlock_label": "permission_denied",
+    "fix_summary": "Change the permissions of the deploy.sh file to ensure it is executable. This may require approval from the team responsible for permissions.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "ls -l deploy.sh",
+      "test -r deploy.sh && echo OK_READ || echo NG_READ",
+      "test -x deploy.sh && echo OK_EXEC || echo NG_EXEC"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-d44dbfff",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-28T09:45:01.476388+00:00",
+    "event_id": "demo-security-alert-001",
+    "sherlock_label": "security_alert",
+    "fix_summary": "Upgrade lodash to version 4.17.21 or higher to mitigate the critical vulnerability. Approval from the team is required before proceeding with the upgrade.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "npm ls lodash || true",
+      "npm audit || true",
+      "npm audit fix || true",
+      "npm ls lodash || true"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-0e36000f",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failure",
+      "manual"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-02-28T11:34:07.435944+00:00",
+    "event_id": "f8af9d61-d1fe-4e01-b387-dc795e20eba6",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Install the 'requests' module in the CI environment to resolve the ModuleNotFoundError.",
+    "verify_success": true,
+    "risk_score": 0.2,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-fae93355",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-03-01T11:10:44.791406+00:00",
+    "event_id": "demo-ci-failed-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Add the 'requests' module to the project's dependencies and ensure it is installed in the CI environment.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-d0975513",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-03-01T11:11:18.960523+00:00",
+    "event_id": "demo-security-alert-001",
+    "sherlock_label": "security_alert",
+    "fix_summary": "Upgrade lodash to version 4.17.21 or higher to mitigate the critical vulnerability. This requires approval due to the potential impact on the application.",
+    "verify_success": null,
+    "risk_score": 0.5,
+    "verification_steps": [
+      "npm ls lodash || true",
+      "npm audit || true",
+      "npm audit fix || true",
+      "npm ls lodash || true"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-66de3965",
+    "title": "Deploy to staging failed: permission denied on deploy.sh",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "deploy_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-03-01T11:11:50.544670+00:00",
+    "event_id": "demo-deploy-fail-001",
+    "sherlock_label": "permission_denied",
+    "fix_summary": "Update the permissions of the deploy.sh script to ensure it is executable by the deployment user.",
+    "verify_success": true,
+    "risk_score": 0.2,
+    "verification_steps": [
+      "ls -l deploy.sh",
+      "test -r deploy.sh && echo OK_READ || echo NG_READ",
+      "test -x deploy.sh && echo OK_EXEC || echo NG_EXEC"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-a01e169b",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-03-01T11:12:22.512474+00:00",
+    "event_id": "test-verify-retry-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Add the 'requests' module to the project's requirements file and ensure it is installed in the CI environment.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-ccb2b26e",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-03-01T11:22:17.377754+00:00",
+    "event_id": "demo-ci-failed-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Add the 'requests' module to the project's requirements file and ensure it is installed in the CI environment.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-fd296de2",
+    "title": "CI failed on unit tests. ModuleNotFoundError: No module named 'requests'",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "ci_failure",
+      "manual"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-03-01T12:11:28.654982+00:00",
+    "event_id": "d82e4db3-0d94-4dbc-b4fe-222c7bb790dd",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Add the 'requests' module to the requirements file and ensure it is installed in the CI environment.",
+    "verify_success": null,
+    "risk_score": 0.3,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import {module}\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-2ed509ec",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-03-08T16:54:21.246443+00:00",
+    "event_id": "demo-security-alert-001",
+    "sherlock_label": "security_alert",
+    "fix_summary": "Upgrade affected dependency to patched version; Upgrade affected package to latest secure version",
+    "verify_success": null,
+    "risk_score": 0.608,
+    "verification_steps": [
+      "npm ls lodash || true",
+      "npm audit || true",
+      "npm audit fix || true",
+      "npm ls lodash || true"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-9702775c",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-03-08T16:57:30.860777+00:00",
+    "event_id": "demo-ci-failed-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Add missing module to requirements.txt and re-run pip install; Add missing module to requirements.txt and re-run pip install; Add missing module to requirements.txt and re-run pip install; Add missing module to requirements.txt and re-run pip install",
+    "verify_success": false,
+    "risk_score": 0.125,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-49cf7257",
+    "title": "Critical vulnerability detected in lodash < 4.17.21",
+    "snippet": "Outcome: need_approval",
+    "tags": [
+      "security_alert",
+      "dependabot"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-03-08T16:58:03.687700+00:00",
+    "event_id": "demo-security-alert-001",
+    "sherlock_label": "security_alert",
+    "fix_summary": "Upgrade affected dependency to patched version; Upgrade affected package to latest secure version",
+    "verify_success": null,
+    "risk_score": 0.608,
+    "verification_steps": [
+      "npm ls lodash || true",
+      "npm audit || true",
+      "npm audit fix || true",
+      "npm ls lodash || true"
+    ],
+    "extras": {}
+  },
+  {
+    "id": "mem-ff7bbe1f",
+    "title": "CI failed on unit tests",
+    "snippet": "Outcome: approve",
+    "tags": [
+      "ci_failed",
+      "github_actions"
+    ],
+    "confidence": 1.0,
+    "link": null,
+    "occurred_at": "2026-03-09T22:22:51.785849+00:00",
+    "event_id": "demo-ci-failed-001",
+    "sherlock_label": "deps_missing",
+    "fix_summary": "Add missing module to requirements.txt and re-run pip install; Add missing module to requirements.txt and re-run pip install; Add missing module to requirements.txt and re-run pip install; Add missing module to requirements.txt and re-run pip install",
+    "verify_success": false,
+    "risk_score": 0.125,
+    "verification_steps": [
+      "python -c \"import sys; print(sys.version)\"",
+      "pip install -r requirements.txt",
+      "python -c \"import requests\""
+    ],
+    "extras": {}
+  }
+]

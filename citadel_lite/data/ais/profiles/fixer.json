@@ -1,0 +1,811 @@
+{
+  "agent_id": "fixer",
+  "xp": 7535,
+  "tp": 5610,
+  "grade": "A",
+  "created_at": "2026-02-15T01:44:31.318099+00:00",
+  "last_updated": "2026-03-09T22:22:51.814049+00:00",
+  "transaction_log": [
+    {
+      "timestamp": "2026-02-21T13:28:05.421111+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5)",
+      "balance_xp": 2012,
+      "balance_tp": 670
+    },
+    {
+      "timestamp": "2026-02-21T13:28:42.709389+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +200 TP (security_alert)",
+      "balance_xp": 2087,
+      "balance_tp": 670
+    },
+    {
+      "timestamp": "2026-02-21T13:28:42.709394+00:00",
+      "type": "tp",
+      "amount": 200,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +200 TP (security_alert)",
+      "balance_xp": 2087,
+      "balance_tp": 870
+    },
+    {
+      "timestamp": "2026-02-21T13:29:19.601154+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +100 TP (deploy_failed)",
+      "balance_xp": 2162,
+      "balance_tp": 870
+    },
+    {
+      "timestamp": "2026-02-21T13:29:19.601159+00:00",
+      "type": "tp",
+      "amount": 100,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +100 TP (deploy_failed)",
+      "balance_xp": 2162,
+      "balance_tp": 970
+    },
+    {
+      "timestamp": "2026-02-21T13:29:54.439753+00:00",
+      "type": "xp",
+      "amount": 187,
+      "reason": "task_completion: 125 XP (base=50, tier=2, mult=2.5) | quality_bonus: +62 XP | low_risk_bonus: +20 TP (risk=0.20)",
+      "balance_xp": 2349,
+      "balance_tp": 970
+    },
+    {
+      "timestamp": "2026-02-21T13:29:54.439759+00:00",
+      "type": "tp",
+      "amount": 20,
+      "reason": "task_completion: 125 XP (base=50, tier=2, mult=2.5) | quality_bonus: +62 XP | low_risk_bonus: +20 TP (risk=0.20)",
+      "balance_xp": 2349,
+      "balance_tp": 990
+    },
+    {
+      "timestamp": "2026-02-21T16:31:19.915953+00:00",
+      "type": "xp",
+      "amount": 187,
+      "reason": "task_completion: 125 XP (base=50, tier=2, mult=2.5) | quality_bonus: +62 XP | low_risk_bonus: +20 TP (risk=0.20)",
+      "balance_xp": 2536,
+      "balance_tp": 990
+    },
+    {
+      "timestamp": "2026-02-21T16:31:19.915958+00:00",
+      "type": "tp",
+      "amount": 20,
+      "reason": "task_completion: 125 XP (base=50, tier=2, mult=2.5) | quality_bonus: +62 XP | low_risk_bonus: +20 TP (risk=0.20)",
+      "balance_xp": 2536,
+      "balance_tp": 1010
+    },
+    {
+      "timestamp": "2026-02-21T16:31:57.054286+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +200 TP (security_alert)",
+      "balance_xp": 2611,
+      "balance_tp": 1010
+    },
+    {
+      "timestamp": "2026-02-21T16:31:57.054291+00:00",
+      "type": "tp",
+      "amount": 200,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +200 TP (security_alert)",
+      "balance_xp": 2611,
+      "balance_tp": 1210
+    },
+    {
+      "timestamp": "2026-02-21T16:32:27.410086+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +100 TP (deploy_failed)",
+      "balance_xp": 2686,
+      "balance_tp": 1210
+    },
+    {
+      "timestamp": "2026-02-21T16:32:27.410100+00:00",
+      "type": "tp",
+      "amount": 100,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +100 TP (deploy_failed)",
+      "balance_xp": 2686,
+      "balance_tp": 1310
+    },
+    {
+      "timestamp": "2026-02-21T16:33:00.149125+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5)",
+      "balance_xp": 2761,
+      "balance_tp": 1310
+    },
+    {
+      "timestamp": "2026-02-22T07:12:29.114541+00:00",
+      "type": "xp",
+      "amount": 187,
+      "reason": "task_completion: 125 XP (base=50, tier=2, mult=2.5) | quality_bonus: +62 XP | low_risk_bonus: +20 TP (risk=0.20)",
+      "balance_xp": 2948,
+      "balance_tp": 1310
+    },
+    {
+      "timestamp": "2026-02-22T07:12:29.114545+00:00",
+      "type": "tp",
+      "amount": 20,
+      "reason": "task_completion: 125 XP (base=50, tier=2, mult=2.5) | quality_bonus: +62 XP | low_risk_bonus: +20 TP (risk=0.20)",
+      "balance_xp": 2948,
+      "balance_tp": 1330
+    },
+    {
+      "timestamp": "2026-02-22T07:13:03.358076+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +200 TP (security_alert)",
+      "balance_xp": 3023,
+      "balance_tp": 1330
+    },
+    {
+      "timestamp": "2026-02-22T07:13:03.358081+00:00",
+      "type": "tp",
+      "amount": 200,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +200 TP (security_alert)",
+      "balance_xp": 3023,
+      "balance_tp": 1530
+    },
+    {
+      "timestamp": "2026-02-22T07:13:33.326801+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +100 TP (deploy_failed)",
+      "balance_xp": 3098,
+      "balance_tp": 1530
+    },
+    {
+      "timestamp": "2026-02-22T07:13:33.326806+00:00",
+      "type": "tp",
+      "amount": 100,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +100 TP (deploy_failed)",
+      "balance_xp": 3098,
+      "balance_tp": 1630
+    },
+    {
+      "timestamp": "2026-02-22T07:14:02.616272+00:00",
+      "type": "xp",
+      "amount": 187,
+      "reason": "task_completion: 125 XP (base=50, tier=2, mult=2.5) | quality_bonus: +62 XP | low_risk_bonus: +20 TP (risk=0.20)",
+      "balance_xp": 3285,
+      "balance_tp": 1630
+    },
+    {
+      "timestamp": "2026-02-22T07:14:02.616276+00:00",
+      "type": "tp",
+      "amount": 20,
+      "reason": "task_completion: 125 XP (base=50, tier=2, mult=2.5) | quality_bonus: +62 XP | low_risk_bonus: +20 TP (risk=0.20)",
+      "balance_xp": 3285,
+      "balance_tp": 1650
+    },
+    {
+      "timestamp": "2026-02-22T10:59:26.374754+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5)",
+      "balance_xp": 3360,
+      "balance_tp": 1650
+    },
+    {
+      "timestamp": "2026-02-22T10:59:55.748908+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +200 TP (security_alert)",
+      "balance_xp": 3435,
+      "balance_tp": 1650
+    },
+    {
+      "timestamp": "2026-02-22T10:59:55.748913+00:00",
+      "type": "tp",
+      "amount": 200,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +200 TP (security_alert)",
+      "balance_xp": 3435,
+      "balance_tp": 1850
+    },
+    {
+      "timestamp": "2026-02-22T11:00:31.381000+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +100 TP (deploy_failed)",
+      "balance_xp": 3510,
+      "balance_tp": 1850
+    },
+    {
+      "timestamp": "2026-02-22T11:00:31.381005+00:00",
+      "type": "tp",
+      "amount": 100,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +100 TP (deploy_failed)",
+      "balance_xp": 3510,
+      "balance_tp": 1950
+    },
+    {
+      "timestamp": "2026-02-22T11:01:05.806929+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5)",
+      "balance_xp": 3585,
+      "balance_tp": 1950
+    },
+    {
+      "timestamp": "2026-02-22T17:15:06.189600+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5)",
+      "balance_xp": 3660,
+      "balance_tp": 1950
+    },
+    {
+      "timestamp": "2026-02-22T17:15:43.419462+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +200 TP (security_alert)",
+      "balance_xp": 3735,
+      "balance_tp": 1950
+    },
+    {
+      "timestamp": "2026-02-22T17:15:43.419467+00:00",
+      "type": "tp",
+      "amount": 200,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +200 TP (security_alert)",
+      "balance_xp": 3735,
+      "balance_tp": 2150
+    },
+    {
+      "timestamp": "2026-02-22T17:16:17.968707+00:00",
+      "type": "xp",
+      "amount": 187,
+      "reason": "task_completion: 125 XP (base=50, tier=2, mult=2.5) | quality_bonus: +62 XP | critical_event: +100 TP (deploy_failed) | low_risk_bonus: +20 TP (risk=0.20)",
+      "balance_xp": 3922,
+      "balance_tp": 2150
+    },
+    {
+      "timestamp": "2026-02-22T17:16:17.968712+00:00",
+      "type": "tp",
+      "amount": 120,
+      "reason": "task_completion: 125 XP (base=50, tier=2, mult=2.5) | quality_bonus: +62 XP | critical_event: +100 TP (deploy_failed) | low_risk_bonus: +20 TP (risk=0.20)",
+      "balance_xp": 3922,
+      "balance_tp": 2270
+    },
+    {
+      "timestamp": "2026-02-22T17:24:13.811445+00:00",
+      "type": "xp",
+      "amount": 187,
+      "reason": "task_completion: 125 XP (base=50, tier=2, mult=2.5) | quality_bonus: +62 XP | low_risk_bonus: +20 TP (risk=0.20)",
+      "balance_xp": 4109,
+      "balance_tp": 2270
+    },
+    {
+      "timestamp": "2026-02-22T17:24:13.811450+00:00",
+      "type": "tp",
+      "amount": 20,
+      "reason": "task_completion: 125 XP (base=50, tier=2, mult=2.5) | quality_bonus: +62 XP | low_risk_bonus: +20 TP (risk=0.20)",
+      "balance_xp": 4109,
+      "balance_tp": 2290
+    },
+    {
+      "timestamp": "2026-02-22T17:24:43.694240+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +200 TP (security_alert)",
+      "balance_xp": 4184,
+      "balance_tp": 2290
+    },
+    {
+      "timestamp": "2026-02-22T17:24:43.694244+00:00",
+      "type": "tp",
+      "amount": 200,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +200 TP (security_alert)",
+      "balance_xp": 4184,
+      "balance_tp": 2490
+    },
+    {
+      "timestamp": "2026-02-22T17:25:12.062181+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +100 TP (deploy_failed)",
+      "balance_xp": 4259,
+      "balance_tp": 2490
+    },
+    {
+      "timestamp": "2026-02-22T17:25:12.062186+00:00",
+      "type": "tp",
+      "amount": 100,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +100 TP (deploy_failed)",
+      "balance_xp": 4259,
+      "balance_tp": 2590
+    },
+    {
+      "timestamp": "2026-02-22T17:25:41.774260+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5)",
+      "balance_xp": 4334,
+      "balance_tp": 2590
+    },
+    {
+      "timestamp": "2026-02-27T14:42:32.527062+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5)",
+      "balance_xp": 4409,
+      "balance_tp": 2590
+    },
+    {
+      "timestamp": "2026-02-27T14:43:09.298307+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +200 TP (security_alert)",
+      "balance_xp": 4484,
+      "balance_tp": 2590
+    },
+    {
+      "timestamp": "2026-02-27T14:43:09.298312+00:00",
+      "type": "tp",
+      "amount": 200,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +200 TP (security_alert)",
+      "balance_xp": 4484,
+      "balance_tp": 2790
+    },
+    {
+      "timestamp": "2026-02-27T14:43:46.756743+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +100 TP (deploy_failed)",
+      "balance_xp": 4559,
+      "balance_tp": 2790
+    },
+    {
+      "timestamp": "2026-02-27T14:43:46.756748+00:00",
+      "type": "tp",
+      "amount": 100,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +100 TP (deploy_failed)",
+      "balance_xp": 4559,
+      "balance_tp": 2890
+    },
+    {
+      "timestamp": "2026-02-27T14:44:17.854680+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5)",
+      "balance_xp": 4634,
+      "balance_tp": 2890
+    },
+    {
+      "timestamp": "2026-02-27T14:44:24.048810+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5)",
+      "balance_xp": 4709,
+      "balance_tp": 2890
+    },
+    {
+      "timestamp": "2026-02-27T14:44:57.232519+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +200 TP (security_alert)",
+      "balance_xp": 4784,
+      "balance_tp": 2890
+    },
+    {
+      "timestamp": "2026-02-27T14:44:57.232525+00:00",
+      "type": "tp",
+      "amount": 200,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +200 TP (security_alert)",
+      "balance_xp": 4784,
+      "balance_tp": 3090
+    },
+    {
+      "timestamp": "2026-02-27T14:45:32.736355+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +100 TP (deploy_failed)",
+      "balance_xp": 4859,
+      "balance_tp": 3090
+    },
+    {
+      "timestamp": "2026-02-27T14:45:32.736361+00:00",
+      "type": "tp",
+      "amount": 100,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +100 TP (deploy_failed)",
+      "balance_xp": 4859,
+      "balance_tp": 3190
+    },
+    {
+      "timestamp": "2026-02-27T14:46:13.422025+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5)",
+      "balance_xp": 4934,
+      "balance_tp": 3190
+    },
+    {
+      "timestamp": "2026-02-27T15:14:16.466812+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5)",
+      "balance_xp": 5009,
+      "balance_tp": 3190
+    },
+    {
+      "timestamp": "2026-02-27T15:14:52.764007+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +200 TP (security_alert)",
+      "balance_xp": 5084,
+      "balance_tp": 3190
+    },
+    {
+      "timestamp": "2026-02-27T15:14:52.764012+00:00",
+      "type": "tp",
+      "amount": 200,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +200 TP (security_alert)",
+      "balance_xp": 5084,
+      "balance_tp": 3390
+    },
+    {
+      "timestamp": "2026-02-27T15:15:32.502569+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +100 TP (deploy_failed)",
+      "balance_xp": 5159,
+      "balance_tp": 3390
+    },
+    {
+      "timestamp": "2026-02-27T15:15:32.502573+00:00",
+      "type": "tp",
+      "amount": 100,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +100 TP (deploy_failed)",
+      "balance_xp": 5159,
+      "balance_tp": 3490
+    },
+    {
+      "timestamp": "2026-02-27T15:16:14.755527+00:00",
+      "type": "xp",
+      "amount": 187,
+      "reason": "task_completion: 125 XP (base=50, tier=2, mult=2.5) | quality_bonus: +62 XP | low_risk_bonus: +20 TP (risk=0.20)",
+      "balance_xp": 5346,
+      "balance_tp": 3490
+    },
+    {
+      "timestamp": "2026-02-27T15:16:14.755530+00:00",
+      "type": "tp",
+      "amount": 20,
+      "reason": "task_completion: 125 XP (base=50, tier=2, mult=2.5) | quality_bonus: +62 XP | low_risk_bonus: +20 TP (risk=0.20)",
+      "balance_xp": 5346,
+      "balance_tp": 3510
+    },
+    {
+      "timestamp": "2026-02-27T17:07:55.672524+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5)",
+      "balance_xp": 5421,
+      "balance_tp": 3510
+    },
+    {
+      "timestamp": "2026-02-27T17:08:37.041538+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +100 TP (deploy_failed)",
+      "balance_xp": 5496,
+      "balance_tp": 3510
+    },
+    {
+      "timestamp": "2026-02-27T17:08:37.041546+00:00",
+      "type": "tp",
+      "amount": 100,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +100 TP (deploy_failed)",
+      "balance_xp": 5496,
+      "balance_tp": 3610
+    },
+    {
+      "timestamp": "2026-02-27T17:09:21.835731+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +200 TP (security_alert)",
+      "balance_xp": 5571,
+      "balance_tp": 3610
+    },
+    {
+      "timestamp": "2026-02-27T17:09:21.835736+00:00",
+      "type": "tp",
+      "amount": 200,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +200 TP (security_alert)",
+      "balance_xp": 5571,
+      "balance_tp": 3810
+    },
+    {
+      "timestamp": "2026-02-28T09:13:28.255489+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5)",
+      "balance_xp": 5646,
+      "balance_tp": 3810
+    },
+    {
+      "timestamp": "2026-02-28T09:14:10.682250+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +200 TP (security_alert)",
+      "balance_xp": 5721,
+      "balance_tp": 3810
+    },
+    {
+      "timestamp": "2026-02-28T09:14:10.682256+00:00",
+      "type": "tp",
+      "amount": 200,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +200 TP (security_alert)",
+      "balance_xp": 5721,
+      "balance_tp": 4010
+    },
+    {
+      "timestamp": "2026-02-28T09:14:48.881664+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +100 TP (deploy_failed)",
+      "balance_xp": 5796,
+      "balance_tp": 4010
+    },
+    {
+      "timestamp": "2026-02-28T09:14:48.881669+00:00",
+      "type": "tp",
+      "amount": 100,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +100 TP (deploy_failed)",
+      "balance_xp": 5796,
+      "balance_tp": 4110
+    },
+    {
+      "timestamp": "2026-02-28T09:15:23.225916+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5)",
+      "balance_xp": 5871,
+      "balance_tp": 4110
+    },
+    {
+      "timestamp": "2026-02-28T09:20:40.786721+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5)",
+      "balance_xp": 5946,
+      "balance_tp": 4110
+    },
+    {
+      "timestamp": "2026-02-28T09:21:11.636176+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +100 TP (deploy_failed)",
+      "balance_xp": 6021,
+      "balance_tp": 4110
+    },
+    {
+      "timestamp": "2026-02-28T09:21:11.636181+00:00",
+      "type": "tp",
+      "amount": 100,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +100 TP (deploy_failed)",
+      "balance_xp": 6021,
+      "balance_tp": 4210
+    },
+    {
+      "timestamp": "2026-02-28T09:21:45.668723+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +200 TP (security_alert)",
+      "balance_xp": 6096,
+      "balance_tp": 4210
+    },
+    {
+      "timestamp": "2026-02-28T09:21:45.668728+00:00",
+      "type": "tp",
+      "amount": 200,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +200 TP (security_alert)",
+      "balance_xp": 6096,
+      "balance_tp": 4410
+    },
+    {
+      "timestamp": "2026-02-28T09:43:51.289097+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5)",
+      "balance_xp": 6171,
+      "balance_tp": 4410
+    },
+    {
+      "timestamp": "2026-02-28T09:44:28.577855+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +100 TP (deploy_failed)",
+      "balance_xp": 6246,
+      "balance_tp": 4410
+    },
+    {
+      "timestamp": "2026-02-28T09:44:28.577861+00:00",
+      "type": "tp",
+      "amount": 100,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +100 TP (deploy_failed)",
+      "balance_xp": 6246,
+      "balance_tp": 4510
+    },
+    {
+      "timestamp": "2026-02-28T09:45:01.505262+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +200 TP (security_alert)",
+      "balance_xp": 6321,
+      "balance_tp": 4510
+    },
+    {
+      "timestamp": "2026-02-28T09:45:01.505267+00:00",
+      "type": "tp",
+      "amount": 200,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +200 TP (security_alert)",
+      "balance_xp": 6321,
+      "balance_tp": 4710
+    },
+    {
+      "timestamp": "2026-02-28T11:34:07.467747+00:00",
+      "type": "xp",
+      "amount": 187,
+      "reason": "task_completion: 125 XP (base=50, tier=2, mult=2.5) | quality_bonus: +62 XP | low_risk_bonus: +20 TP (risk=0.20)",
+      "balance_xp": 6508,
+      "balance_tp": 4710
+    },
+    {
+      "timestamp": "2026-02-28T11:34:07.467753+00:00",
+      "type": "tp",
+      "amount": 20,
+      "reason": "task_completion: 125 XP (base=50, tier=2, mult=2.5) | quality_bonus: +62 XP | low_risk_bonus: +20 TP (risk=0.20)",
+      "balance_xp": 6508,
+      "balance_tp": 4730
+    },
+    {
+      "timestamp": "2026-03-01T11:10:44.831238+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5)",
+      "balance_xp": 6583,
+      "balance_tp": 4730
+    },
+    {
+      "timestamp": "2026-03-01T11:11:18.968848+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +200 TP (security_alert)",
+      "balance_xp": 6658,
+      "balance_tp": 4730
+    },
+    {
+      "timestamp": "2026-03-01T11:11:18.968853+00:00",
+      "type": "tp",
+      "amount": 200,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +200 TP (security_alert)",
+      "balance_xp": 6658,
+      "balance_tp": 4930
+    },
+    {
+      "timestamp": "2026-03-01T11:11:50.552456+00:00",
+      "type": "xp",
+      "amount": 187,
+      "reason": "task_completion: 125 XP (base=50, tier=2, mult=2.5) | quality_bonus: +62 XP | critical_event: +100 TP (deploy_failed) | low_risk_bonus: +20 TP (risk=0.20)",
+      "balance_xp": 6845,
+      "balance_tp": 4930
+    },
+    {
+      "timestamp": "2026-03-01T11:11:50.552463+00:00",
+      "type": "tp",
+      "amount": 120,
+      "reason": "task_completion: 125 XP (base=50, tier=2, mult=2.5) | quality_bonus: +62 XP | critical_event: +100 TP (deploy_failed) | low_risk_bonus: +20 TP (risk=0.20)",
+      "balance_xp": 6845,
+      "balance_tp": 5050
+    },
+    {
+      "timestamp": "2026-03-01T11:12:22.518998+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5)",
+      "balance_xp": 6920,
+      "balance_tp": 5050
+    },
+    {
+      "timestamp": "2026-03-01T11:22:17.411769+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5)",
+      "balance_xp": 6995,
+      "balance_tp": 5050
+    },
+    {
+      "timestamp": "2026-03-01T12:11:28.685236+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5)",
+      "balance_xp": 7070,
+      "balance_tp": 5050
+    },
+    {
+      "timestamp": "2026-03-08T16:54:21.303941+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +200 TP (security_alert)",
+      "balance_xp": 7145,
+      "balance_tp": 5050
+    },
+    {
+      "timestamp": "2026-03-08T16:54:21.303948+00:00",
+      "type": "tp",
+      "amount": 200,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +200 TP (security_alert)",
+      "balance_xp": 7145,
+      "balance_tp": 5250
+    },
+    {
+      "timestamp": "2026-03-08T16:57:30.888923+00:00",
+      "type": "xp",
+      "amount": 105,
+      "reason": "task_completion: 125 XP (base=50, tier=2, mult=2.5) | failed_fix: -20 XP | low_risk_bonus: +20 TP (risk=0.12)",
+      "balance_xp": 7250,
+      "balance_tp": 5250
+    },
+    {
+      "timestamp": "2026-03-08T16:57:30.888930+00:00",
+      "type": "tp",
+      "amount": 20,
+      "reason": "task_completion: 125 XP (base=50, tier=2, mult=2.5) | failed_fix: -20 XP | low_risk_bonus: +20 TP (risk=0.12)",
+      "balance_xp": 7250,
+      "balance_tp": 5270
+    },
+    {
+      "timestamp": "2026-03-08T16:58:03.718544+00:00",
+      "type": "xp",
+      "amount": 75,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +200 TP (security_alert)",
+      "balance_xp": 7325,
+      "balance_tp": 5270
+    },
+    {
+      "timestamp": "2026-03-08T16:58:03.718551+00:00",
+      "type": "tp",
+      "amount": 200,
+      "reason": "task_completion: 75 XP (base=30, tier=2, mult=2.5) | critical_event: +200 TP (security_alert)",
+      "balance_xp": 7325,
+      "balance_tp": 5470
+    },
+    {
+      "timestamp": "2026-03-09T22:22:14.199884+00:00",
+      "type": "xp",
+      "amount": 105,
+      "reason": "task_completion: 125 XP (base=50, tier=2, mult=2.5) | failed_fix: -20 XP | critical_event: +100 TP (deploy_failed) | low_risk_bonus: +20 TP (risk=0.22)",
+      "balance_xp": 7430,
+      "balance_tp": 5470
+    },
+    {
+      "timestamp": "2026-03-09T22:22:14.199890+00:00",
+      "type": "tp",
+      "amount": 120,
+      "reason": "task_completion: 125 XP (base=50, tier=2, mult=2.5) | failed_fix: -20 XP | critical_event: +100 TP (deploy_failed) | low_risk_bonus: +20 TP (risk=0.22)",
+      "balance_xp": 7430,
+      "balance_tp": 5590
+    },
+    {
+      "timestamp": "2026-03-09T22:22:51.814044+00:00",
+      "type": "xp",
+      "amount": 105,
+      "reason": "task_completion: 125 XP (base=50, tier=2, mult=2.5) | failed_fix: -20 XP | low_risk_bonus: +20 TP (risk=0.12)",
+      "balance_xp": 7535,
+      "balance_tp": 5590
+    },
+    {
+      "timestamp": "2026-03-09T22:22:51.814051+00:00",
+      "type": "tp",
+      "amount": 20,
+      "reason": "task_completion: 125 XP (base=50, tier=2, mult=2.5) | failed_fix: -20 XP | low_risk_bonus: +20 TP (risk=0.12)",
+      "balance_xp": 7535,
+      "balance_tp": 5610
+    }
+  ],
+  "metadata": {}
+}

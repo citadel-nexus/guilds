@@ -1,0 +1,18 @@
+{
+  "schema_version": "event_json_v1",
+  "event_id": "demo-deploy-fail-001",
+  "event_type": "deploy_failed",
+  "source": "github_actions",
+  "occurred_at": "2026-01-28T12:30:00Z",
+  "repo": "example/repo",
+  "ref": "release/v2.1",
+  "summary": "Deploy to staging failed: permission denied on deploy.sh",
+  "artifacts": {
+    "log_excerpt": "PermissionError: [Errno 13] Permission denied: './deploy.sh'",
+    "links": ["https://example.com/actions/runs/12345"],
+    "extra": {
+      "environment": "staging",
+      "step": "deploy"
+    }
+  }
+}

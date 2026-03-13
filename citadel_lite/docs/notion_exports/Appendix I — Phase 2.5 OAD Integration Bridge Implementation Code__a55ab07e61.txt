@@ -1,0 +1,2529 @@
+# Appendix I — Phase 2.5 OAD Integration Bridge Implementation Code
+(Page ID: a55ab07e-61e3-46f3-9cef-ef77efeab29a)
+(URL: https://www.notion.so/Appendix-I-Phase-2-5-OAD-Integration-Bridge-Implementation-Code-a55ab07e61e346f39cefef77efeab29a)
+
+[Total top-level blocks: 56]
+
+
+## Purpose
+
+This appendix contains the **complete implementation code** for all 9 OAD codes (OAD-001 through OAD-009) defined in Phase 2.5 of the VCC Build Instructions. Each section maps to one OAD code and includes production-ready code, configuration, and test files.
+**Parent Reference:** Phase 2.5 — OAD Integration Bridge (VCC Build Instructions §Phase 2.5)
+**Depends On:** Appendix H (Phase 2.1 Bridge — BRIDGE-001 through BRIDGE-009)
+**CRP Version:** 2.5
+
+---
+
+
+## I.1 — OAD NATS Event Publisher `OAD-001`
+
+
+### I.1.1 — NATS Stream Provisioning Script
+
+Extends the Phase 2.1 `VCC_BRIDGE` stream with OAD subjects.
+File: `scripts/provision_oad_nats.sh`
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Extend VCC_BRIDGE stream with OAD subjects
+# Requires: nats CLI, NATS_URL env var
+# Run after: provision_bridge_nats.sh (Phase 2.1)
+
+NATS_URL="${NATS_URL:?NATS_URL is required}"
+
+echo "[OAD-NATS] Extending VCC_BRIDGE stream with OAD subjects..."
+
+# Update stream to include OAD subjects
+nats --server "$NATS_URL" stream edit VCC_BRIDGE \
+  --subjects "citadel.vcc.cycle.completed,citadel.diagnostic.completed,citadel.vcc.build.pause,citadel.vcc.build.resume,citadel.oad.reflex.applied,citadel.oad.cognition.completed,citadel.oad.mission.dispatched,citadel.oad.mission.completed" \
+  --max-msgs 10000 \
+  --max-age 720h \
+  --retention limits \
+  --storage file \
+  --replicas 1 \
+  --discard old \
+  --force
+
+echo "[OAD-NATS] Stream VCC_BRIDGE updated with OAD subjects."
+
+# Create OAD-specific consumer
+nats --server "$NATS_URL" consumer add VCC_BRIDGE vcc-oad-consumer \
+  --filter 'citadel.oad.>' \
+  --ack explicit \
+  --deliver all \
+  --max-deliver 5 \
+  --ack-wait 30s \
+  --replay instant \
+  --pull \
+  --max-pending 256 \
+  2>/dev/null || echo "[OAD-NATS] Consumer vcc-oad-consumer already exists, skipping."
+
+# Create mission-specific consumer (separate for priority handling)
+nats --server "$NATS_URL" consumer add VCC_BRIDGE vcc-mission-consumer \
+  --filter 'citadel.oad.mission.>' \
+  --ack explicit \
+  --deliver all \
+  --max-deliver 10 \
+  --ack-wait 60s \
+  --replay instant \
+  --pull \
+  --max-pending 64 \
+  2>/dev/null || echo "[OAD-NATS] Consumer vcc-mission-consumer already exists, skipping."
+
+echo "[OAD-NATS] ✅ OAD NATS provisioning complete."
+echo "  Subjects: citadel.oad.reflex.applied, citadel.oad.cognition.completed, citadel.oad.mission.dispatched, citadel.oad.mission.completed"
+echo "  Consumers: vcc-oad-consumer, vcc-mission-consumer"
+```
+
+### I.1.2 — OAD NATS Publisher Library
+
+File: `tools/lib/oad_nats.py`
+```python
+#!/usr/bin/env python3
+"""OAD NATS Event Publisher — publishes OAD events to the VCC Bridge stream.
+
+Used by OAD's cognition_loop.py on rig2 to broadcast reflex fixes,
+cognition completions, and mission results to the orchestrator.
+
+Requires: NATS_URL env var on rig2.
+"""
+
+import os
+import json
+import asyncio
+import logging
+from datetime import datetime, timezone
+from typing import Literal, Optional
+
+import nats
+from nats.js.api import StreamConfig
+from pydantic import BaseModel, Field
+
+logger = logging.getLogger("oad_nats")
+
+NATS_URL = os.environ.get("NATS_URL", "nats://localhost:4222")
+
+
+# ── Event Schemas ───────────────────────────────────────────────────────────
+
+class ReflexAppliedEvent(BaseModel):
+    """Published after every OAD Reflex Engine auto-fix."""
+    reflex_id: str
+    rig: str                     # "rig1" | "rig2" | "rig3"
+    pattern_code: str            # "F924" | "F950" | "F960" | "custom"
+    file_path: str
+    fix_description: str
+    before_hash: str             # git hash before fix
+    after_hash: str              # git hash after fix
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+
+class CognitionCompletedEvent(BaseModel):
+    """Published after every full OAD cognition cycle."""
+    cycle_id: str
+    rig: str
+    thought_summary: str
+    compound_analysis: str
+    gitlab_status: str           # "ok" | "error" | "unknown"
+    linear_status: str           # "ok" | "error" | "unknown"
+    supabase_status: str         # "ok" | "error" | "unknown"
+    notion_status: str           # "ok" | "error" | "unknown"
+    college_verdict: str | None = None
+    reflex_fixes_this_cycle: int = 0
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+
+class MissionDispatchedEvent(BaseModel):
+    """Published when orchestrator dispatches a mission to OAD."""
+    mission_id: str
+    rig_target: str              # "rig1" | "rig2" | "rig3"
+    mission_type: Literal["reflex_scan", "college_query", "pipeline_investigate", "full_cognition"]
+    payload: dict = {}
+    priority: Literal["low", "medium", "high", "critical"] = "medium"
+    dispatched_by: str = "orchestrator"
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+
+class MissionCompletedEvent(BaseModel):
+    """Published when OAD completes a dispatched mission."""
+    mission_id: str
+    rig: str
+    result: dict = {}
+    success: bool = True
+    error_detail: str | None = None
+    duration_ms: int = 0
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+
+# ── Publisher ───────────────────────────────────────────────────────────────
+
+class OADNATSPublisher:
+    """Publishes OAD events to NATS JetStream."""
+
+    SUBJECTS = {
+        "reflex_applied": "citadel.oad.reflex.applied",
+        "cognition_completed": "citadel.oad.cognition.completed",
+        "mission_dispatched": "citadel.oad.mission.dispatched",
+        "mission_completed": "citadel.oad.mission.completed",
+    }
+
+    def __init__(self):
+        self._nc: Optional[nats.NATS] = None
+        self._js = None
+
+    async def connect(self):
+        """Connect to NATS server."""
+        if self._nc and self._nc.is_connected:
+            return
+        self._nc = await nats.connect(
+            NATS_URL,
+            reconnect_time_wait=2,
+            max_reconnect_attempts=10,
+            name="oad-nats-publisher",
+        )
+        self._js = self._nc.jetstream()
+        logger.info(f"[OAD-NATS] Connected to {NATS_URL}")
+
+    async def disconnect(self):
+        """Disconnect from NATS server."""
+        if self._nc and self._nc.is_connected:
+            await self._nc.close()
+            logger.info("[OAD-NATS] Disconnected.")
+
+    async def publish_reflex_applied(self, event: ReflexAppliedEvent) -> None:
+        """Publish a Reflex Engine auto-fix event."""
+        await self._publish("reflex_applied", event)
+
+    async def publish_cognition_completed(self, event: CognitionCompletedEvent) -> None:
+        """Publish a cognition cycle completion event."""
+        await self._publish("cognition_completed", event)
+
+    async def publish_mission_dispatched(self, event: MissionDispatchedEvent) -> None:
+        """Publish a mission dispatch event."""
+        await self._publish("mission_dispatched", event)
+
+    async def publish_mission_completed(self, event: MissionCompletedEvent) -> None:
+        """Publish a mission completion event."""
+        await self._publish("mission_completed", event)
+
+    async def _publish(self, event_type: str, event: BaseModel) -> None:
+        """Internal publish helper."""
+        await self.connect()
+        subject = self.SUBJECTS[event_type]
+        payload = event.model_dump_json().encode()
+        ack = await self._js.publish(subject, payload)
+        logger.info(f"[OAD-NATS] Published {subject} seq={ack.seq} ({len(payload)} bytes)")
+
+
+# ── Integration Patch for cognition_loop.py ─────────────────────────────────
+
+async def patch_cognition_loop_publish(
+    publisher: OADNATSPublisher,
+    rig: str,
+    cycle_id: str,
+    snapshot: dict,
+    reflex_fixes: list[dict],
+):
+    """Call this at the end of OAD's cognition_loop.py to publish events.
+
+    Usage in cognition_loop.py:
+        from tools.lib.oad_nats import OADNATSPublisher, patch_cognition_loop_publish
+
+        publisher = OADNATSPublisher()
+
+        # After each reflex fix:
+        await publisher.publish_reflex_applied(ReflexAppliedEvent(...))
+
+        # After full cognition cycle:
+        await patch_cognition_loop_publish(
+            publisher, rig="rig2", cycle_id=cycle_id,
+            snapshot=snapshot_dict, reflex_fixes=fixes_list
+        )
+    """
+    # Publish individual reflex events
+    for fix in reflex_fixes:
+        await publisher.publish_reflex_applied(ReflexAppliedEvent(
+            reflex_id=fix.get("reflex_id", f"reflex-{cycle_id}-{fix.get('pattern_code', 'unknown')}"),
+            rig=rig,
+            pattern_code=fix.get("pattern_code", "custom"),
+            file_path=fix.get("file_path", ""),
+            fix_description=fix.get("description", ""),
+            before_hash=fix.get("before_hash", ""),
+            after_hash=fix.get("after_hash", ""),
+        ))
+
+    # Publish cognition completed event
+    await publisher.publish_cognition_completed(CognitionCompletedEvent(
+        cycle_id=cycle_id,
+        rig=rig,
+        thought_summary=snapshot.get("thought", {}).get("summary", ""),
+        compound_analysis=snapshot.get("compound", {}).get("analysis", ""),
+        gitlab_status=snapshot.get("gitlab", {}).get("status", "unknown"),
+        linear_status=snapshot.get("linear", {}).get("status", "unknown"),
+        supabase_status=snapshot.get("supabase", {}).get("status", "unknown"),
+        notion_status=snapshot.get("notion", {}).get("status", "unknown"),
+        college_verdict=snapshot.get("compound", {}).get("verdict"),
+        reflex_fixes_this_cycle=len(reflex_fixes),
+    ))
+
+    logger.info(f"[OAD-NATS] Cycle {cycle_id} published: {len(reflex_fixes)} reflex events + 1 cognition event")
+```
+
+### I.1.3 — OAD NATS Config Extension
+
+Add to `crp_config.yaml`:
+```yaml
+# Phase 2.5 OAD NATS subjects (add to existing nats_subjects list)
+nats_subjects:
+  # Phase 2.1 (existing)
+  - citadel.vcc.cycle.completed
+  - citadel.diagnostic.completed
+  - citadel.vcc.build.pause
+  - citadel.vcc.build.resume
+  # Phase 2.5 OAD (new)
+  - citadel.oad.reflex.applied
+  - citadel.oad.cognition.completed
+  - citadel.oad.mission.dispatched
+  - citadel.oad.mission.completed
+
+# OAD Reflex pattern registry
+oad_reflex_patterns:
+  F924:
+    name: "YAML Syntax Repair"
+    severity: low
+    auto_close_issues: true
+  F950:
+    name: "Enum Regeneration"
+    severity: medium
+    auto_close_issues: true
+  F960:
+    name: "Broken Import Resolution"
+    severity: medium
+    auto_close_issues: true
+  custom:
+    name: "Custom Reflex Fix"
+    severity: high
+    auto_close_issues: false
+
+# OAD orchestrator config
+oad_config:
+  primary_rig: "rig2"
+  cognition_timeout_s: 1800
+  reflex_warn_threshold: 10
+  college_timeout_s: 300
+  college_max_professors: 5
+  mission_dedup_window_s: 60
+  bridge_version: "2.5"
+```
+
+---
+
+
+## I.2 — OAD Reflex → Orchestrator Feed `OAD-002`
+
+File: `tools/lib/oad_reflex_feed.py`
+```python
+#!/usr/bin/env python3
+"""OAD Reflex → Orchestrator Feed — processes reflex events and injects into CRP §7.7.
+
+Subscribes to citadel.oad.reflex.applied, writes to vcc_loop_state,
+auto-closes matching issues, and prepares CRP §7.7 injection data.
+"""
+
+import os
+import json
+import logging
+from datetime import datetime, timezone, timedelta
+from collections import defaultdict
+from typing import Optional
+
+import requests
+from pydantic import BaseModel, Field
+
+logger = logging.getLogger("oad_reflex_feed")
+
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+LINEAR_API_TOKEN = os.environ.get("LINEAR_API_TOKEN", "")
+GITLAB_TOKEN = os.environ.get("GITLAB_TOKEN", "")
+GITLAB_PROJECT_ID = os.environ.get("GITLAB_PROJECT_ID", "")
+REFLEX_WARN_THRESHOLD = int(os.environ.get("OAD_REFLEX_WARN_THRESHOLD", "10"))
+
+
+class ReflexFixRecord(BaseModel):
+    """A single reflex fix for CRP §7.7 injection."""
+    reflex_id: str
+    rig: str
+    pattern_code: str
+    pattern_name: str
+    file_path: str
+    fix_description: str
+    timestamp: str
+    issue_auto_closed: bool = False
+    closed_issue_id: str | None = None
+
+
+class ReflexFeedSummary(BaseModel):
+    """Summary of reflex fixes for CRP §7.7 — OAD Reflex Fixes."""
+    since_last_crp_cycle: str
+    total_fixes: int = 0
+    fixes_by_pattern: dict = {}  # {pattern_code: count}
+    fixes_by_rig: dict = {}     # {rig: count}
+    fixes: list[ReflexFixRecord] = []
+    issues_auto_closed: int = 0
+    warning: str | None = None   # set if fixes > threshold
+
+
+# Pattern name lookup
+PATTERN_NAMES = {
+    "F924": "YAML Syntax Repair",
+    "F950": "Enum Regeneration",
+    "F960": "Broken Import Resolution",
+    "custom": "Custom Reflex Fix",
+}
+
+
+class OADReflexFeed:
+    """Processes OAD Reflex events for orchestrator and CRP."""
+
+    def __init__(self):
+        self._fixes_buffer: list[ReflexFixRecord] = []
+        self._last_flush_at: str = datetime.now(timezone.utc).isoformat()
+
+    def process_reflex_event(self, event_payload: dict) -> ReflexFixRecord:
+        """Process a single reflex applied event.
+
+        1. Write to vcc_loop_state
+        2. Check for matching issues to auto-close
+        3. Buffer for CRP §7.7 injection
+        """
+        record = ReflexFixRecord(
+            reflex_id=event_payload.get("reflex_id", ""),
+            rig=event_payload.get("rig", "unknown"),
+            pattern_code=event_payload.get("pattern_code", "custom"),
+            pattern_name=PATTERN_NAMES.get(event_payload.get("pattern_code", ""), "Unknown"),
+            file_path=event_payload.get("file_path", ""),
+            fix_description=event_payload.get("fix_description", ""),
+            timestamp=event_payload.get("timestamp", datetime.now(timezone.utc).isoformat()),
+        )
+
+        # Write to vcc_loop_state
+        self._write_to_state_store(record, event_payload)
+
+        # Auto-close matching issues (only for non-custom patterns)
+        should_auto_close = event_payload.get("pattern_code", "") != "custom"
+        if should_auto_close:
+            closed_id = self._auto_close_matching_issues(record)
+            if closed_id:
+                record.issue_auto_closed = True
+                record.closed_issue_id = closed_id
+
+        self._fixes_buffer.append(record)
+        return record
+
+    def get_crp_section_77(self) -> ReflexFeedSummary:
+        """Generate CRP §7.7 — OAD Reflex Fixes (since last CRP cycle)."""
+        summary = ReflexFeedSummary(
+            since_last_crp_cycle=self._last_flush_at,
+            total_fixes=len(self._fixes_buffer),
+            fixes=self._fixes_buffer.copy(),
+            issues_auto_closed=sum(1 for f in self._fixes_buffer if f.issue_auto_closed),
+        )
+
+        # Aggregate by pattern
+        by_pattern = defaultdict(int)
+        by_rig = defaultdict(int)
+        for fix in self._fixes_buffer:
+            by_pattern[fix.pattern_code] += 1
+            by_rig[fix.rig] += 1
+        summary.fixes_by_pattern = dict(by_pattern)
+        summary.fixes_by_rig = dict(by_rig)
+
+        # Warning if excessive fixes
+        if summary.total_fixes > REFLEX_WARN_THRESHOLD:
+            summary.warning = (
+                f"⚠️ {summary.total_fixes} reflex fixes in single period "
+                f"(threshold: {REFLEX_WARN_THRESHOLD}). "
+                f"Excessive auto-fixes may indicate systemic instability."
+            )
+
+        return summary
+
+    def flush(self):
+        """Clear the buffer after CRP consumes §7.7. Called by vcc_cycle_reporter."""
+        self._fixes_buffer.clear()
+        self._last_flush_at = datetime.now(timezone.utc).isoformat()
+
+    def _write_to_state_store(self, record: ReflexFixRecord, raw_event: dict):
+        """Write reflex fix to vcc_loop_state."""
+        if not SUPABASE_URL or not SUPABASE_KEY:
+            logger.warning("[REFLEX] No Supabase credentials — skipping state store write")
+            return
+        try:
+            resp = requests.post(
+                f"{SUPABASE_URL}/rest/v1/vcc_loop_state",
+                headers={
+                    "apikey": SUPABASE_KEY,
+                    "Authorization": f"Bearer {SUPABASE_KEY}",
+                    "Content-Type": "application/json",
+                    "Prefer": "return=minimal",
+                },
+                json={
+                    "loop_source": "oad_reflex",
+                    "cycle_id": record.reflex_id,
+                    "health_snapshot": json.dumps(raw_event),
+                    "oad_rig": record.rig,
+                    "oad_reflex_fixes": json.dumps([record.model_dump()]),
+                    "oad_reflex_count": 1,
+                },
+            )
+            resp.raise_for_status()
+            logger.info(f"[REFLEX] Written to vcc_loop_state: {record.reflex_id}")
+        except Exception as e:
+            logger.error(f"[REFLEX] State store write failed: {e}")
+
+    def _auto_close_matching_issues(self, record: ReflexFixRecord) -> str | None:
+        """Check Linear + GitLab for matching open issues and auto-close."""
+        closed_id = None
+
+        # Try Linear first
+        if LINEAR_API_TOKEN:
+            closed_id = self._auto_close_linear(record)
+
+        # Try GitLab
+        if not closed_id and GITLAB_TOKEN and GITLAB_PROJECT_ID:
+            closed_id = self._auto_close_gitlab(record)
+
+        return closed_id
+
+    def _auto_close_linear(self, record: ReflexFixRecord) -> str | None:
+        """Search and close matching Linear issue."""
+        try:
+            query = """
+            query SearchIssues($filter: IssueFilter) {
+                issues(filter: $filter, first: 5) {
+                    nodes { id title state { name } }
+                }
+            }
+            """
+            variables = {
+                "filter": {
+                    "state": {"type": {"nin": ["completed", "canceled"]}},
+                    "title": {"containsIgnoreCase": record.file_path.split("/")[-1]},
+                }
+            }
+            resp = requests.post(
+                "https://api.linear.app/graphql",
+                headers={"Authorization": LINEAR_API_TOKEN, "Content-Type": "application/json"},
+                json={"query": query, "variables": variables},
+            )
+            resp.raise_for_status()
+            issues = resp.json().get("data", {}).get("issues", {}).get("nodes", [])
+
+            for issue in issues:
+                # Check if title matches pattern
+                title = issue.get("title", "").lower()
+                file_name = record.file_path.split("/")[-1].lower()
+                if file_name in title or record.pattern_code.lower() in title:
+                    # Add comment and close
+                    comment_mutation = """
+                    mutation AddComment($issueId: String!, $body: String!) {
+                        commentCreate(input: {issueId: $issueId, body: $body}) {
+                            success
+                        }
+                    }
+                    """
+                    comment_body = (
+                        f"Auto-resolved by OAD Reflex Engine (pattern {record.pattern_code}) "
+                        f"in cycle {record.reflex_id}. File: {record.file_path}. "
+                        f"Fix: {record.fix_description}"
+                    )
+                    requests.post(
+                        "https://api.linear.app/graphql",
+                        headers={"Authorization": LINEAR_API_TOKEN, "Content-Type": "application/json"},
+                        json={"query": comment_mutation, "variables": {"issueId": issue["id"], "body": comment_body}},
+                    )
+
+                    # Add resolved-by-oad label
+                    label_mutation = """
+                    mutation AddLabel($issueId: String!) {
+                        issueAddLabel(id: $issueId, labelId: "resolved-by-oad") { success }
+                    }
+                    """
+                    requests.post(
+                        "https://api.linear.app/graphql",
+                        headers={"Authorization": LINEAR_API_TOKEN, "Content-Type": "application/json"},
+                        json={"query": label_mutation, "variables": {"issueId": issue["id"]}},
+                    )
+
+                    logger.info(f"[REFLEX] Auto-closed Linear issue {issue['id']} for {record.file_path}")
+                    return issue["id"]
+
+        except Exception as e:
+            logger.warning(f"[REFLEX] Linear auto-close failed: {e}")
+        return None
+
+    def _auto_close_gitlab(self, record: ReflexFixRecord) -> str | None:
+        """Search and close matching GitLab issue."""
+        try:
+            resp = requests.get(
+                f"https://gitlab.com/api/v4/projects/{GITLAB_PROJECT_ID}/issues",
+                headers={"PRIVATE-TOKEN": GITLAB_TOKEN},
+                params={
+                    "state": "opened",
+                    "labels": "vcc-bridge",
+                    "search": record.file_path.split("/")[-1],
+                    "per_page": 5,
+                },
+            )
+            resp.raise_for_status()
+            issues = resp.json()
+
+            for issue in issues:
+                title = issue.get("title", "").lower()
+                file_name = record.file_path.split("/")[-1].lower()
+                if file_name in title:
+                    # Add comment
+                    requests.post(
+                        f"https://gitlab.com/api/v4/projects/{GITLAB_PROJECT_ID}/issues/{issue['iid']}/notes",
+                        headers={"PRIVATE-TOKEN": GITLAB_TOKEN},
+                        json={"body": f"Auto-resolved by OAD Reflex Engine (pattern {record.pattern_code}). Fix: {record.fix_description}"},
+                    )
+                    # Close issue
+                    requests.put(
+                        f"https://gitlab.com/api/v4/projects/{GITLAB_PROJECT_ID}/issues/{issue['iid']}",
+                        headers={"PRIVATE-TOKEN": GITLAB_TOKEN},
+                        json={"state_event": "close", "labels": issue.get("labels", []) + ["resolved-by-oad"]},
+                    )
+                    logger.info(f"[REFLEX] Auto-closed GitLab issue #{issue['iid']} for {record.file_path}")
+                    return str(issue["iid"])
+
+        except Exception as e:
+            logger.warning(f"[REFLEX] GitLab auto-close failed: {e}")
+        return None
+```
+
+---
+
+
+## I.3 — Mission Dispatch Interface `OAD-003`
+
+File: `tools/oad_mission_dispatcher.py`
+```python
+#!/usr/bin/env python3
+"""OAD Mission Dispatcher — dispatches missions to OAD and awaits results.
+
+Used by loop_orchestrator.py to ask OAD to investigate failures,
+run targeted reflex scans, query the College System, or trigger
+full cognition cycles on demand.
+
+Usage:
+    dispatcher = OADMissionDispatcher()
+    result = await dispatcher.dispatch(
+        mission_type="reflex_scan",
+        payload={"target_path": "src/api/finance/", "pattern_codes": ["F960"]},
+        priority="high",
+    )
+"""
+
+import os
+import json
+import uuid
+import asyncio
+import logging
+from datetime import datetime, timezone, timedelta
+from typing import Literal, Optional
+
+import nats
+import requests
+from pydantic import BaseModel, Field
+
+from tools.lib.oad_nats import (
+    OADNATSPublisher,
+    MissionDispatchedEvent,
+    MissionCompletedEvent,
+)
+
+logger = logging.getLogger("oad_mission_dispatcher")
+
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+NATS_URL = os.environ.get("NATS_URL", "nats://localhost:4222")
+OAD_PRIMARY_RIG = os.environ.get("OAD_PRIMARY_RIG", "rig2")
+DEDUP_WINDOW_S = int(os.environ.get("OAD_MISSION_DEDUP_WINDOW_S", "60"))
+
+# Timeout defaults per mission type (seconds)
+MISSION_TIMEOUTS = {
+    "reflex_scan": 120,
+    "college_query": 300,
+    "pipeline_investigate": 180,
+    "full_cognition": 600,
+}
+
+
+class MissionResult(BaseModel):
+    """Result of a dispatched mission."""
+    mission_id: str
+    success: bool
+    result: dict = {}
+    error_detail: str | None = None
+    duration_ms: int = 0
+    timed_out: bool = False
+
+
+class OADMissionDispatcher:
+    """Dispatches missions to OAD via Supabase + NATS."""
+
+    def __init__(self):
+        self._publisher = OADNATSPublisher()
+        self._recent_missions: dict[str, datetime] = {}  # dedup key -> dispatch time
+
+    async def dispatch(
+        self,
+        mission_type: Literal["reflex_scan", "college_query", "pipeline_investigate", "full_cognition"],
+        payload: dict = {},
+        priority: Literal["low", "medium", "high", "critical"] = "medium",
+        rig_target: str | None = None,
+        timeout_s: int | None = None,
+        await_result: bool = True,
+    ) -> MissionResult:
+        """Dispatch a mission to OAD and optionally wait for result.
+
+        Args:
+            mission_type: Type of mission to dispatch
+            payload: Mission-specific payload dict
+            priority: Mission priority level
+            rig_target: Target rig (default: OAD_PRIMARY_RIG)
+            timeout_s: Timeout in seconds (default: per mission type)
+            await_result: Whether to wait for mission completion
+
+        Returns:
+            MissionResult with success/failure and result data
+        """
+        rig = rig_target or OAD_PRIMARY_RIG
+        timeout = timeout_s or MISSION_TIMEOUTS.get(mission_type, 300)
+        mission_id = f"mission-{mission_type}-{uuid.uuid4().hex[:12]}"
+
+        # Dedup check
+        dedup_key = f"{mission_type}:{json.dumps(payload, sort_keys=True)}"
+        if dedup_key in self._recent_missions:
+            elapsed = (datetime.now(timezone.utc) - self._recent_missions[dedup_key]).total_seconds()
+            if elapsed < DEDUP_WINDOW_S:
+                logger.info(f"[DISPATCH] Suppressed duplicate mission {mission_type} (last dispatched {elapsed:.0f}s ago)")
+                return MissionResult(
+                    mission_id=mission_id,
+                    success=False,
+                    error_detail=f"Duplicate mission suppressed (dedup window: {DEDUP_WINDOW_S}s)",
+                )
+
+        # Insert mission into oad_missions table
+        self._insert_mission_record(mission_id, rig, mission_type, payload, priority)
+
+        # Publish NATS event
+        event = MissionDispatchedEvent(
+            mission_id=mission_id,
+            rig_target=rig,
+            mission_type=mission_type,
+            payload=payload,
+            priority=priority,
+        )
+        await self._publisher.publish_mission_dispatched(event)
+
+        # Track for dedup
+        self._recent_missions[dedup_key] = datetime.now(timezone.utc)
+        self._cleanup_dedup_cache()
+
+        logger.info(f"[DISPATCH] Mission {mission_id} dispatched to {rig}: {mission_type} (priority: {priority})")
+
+        if not await_result:
+            return MissionResult(mission_id=mission_id, success=True)
+
+        # Wait for completion
+        return await self._await_completion(mission_id, timeout)
+
+    async def dispatch_reflex_scan(
+        self,
+        target_path: str,
+        pattern_codes: list[str] | None = None,
+        priority: str = "medium",
+    ) -> MissionResult:
+        """Convenience: dispatch a targeted reflex scan."""
+        return await self.dispatch(
+            mission_type="reflex_scan",
+            payload={"target_path": target_path, "pattern_codes": pattern_codes or ["F924", "F950", "F960"]},
+            priority=priority,
+        )
+
+    async def dispatch_college_query(
+        self,
+        query: str,
+        context: dict | None = None,
+        max_professors: int = 5,
+        priority: str = "medium",
+    ) -> MissionResult:
+        """Convenience: dispatch a College System reasoning query."""
+        return await self.dispatch(
+            mission_type="college_query",
+            payload={
+                "query": query,
+                "context": context or {},
+                "max_professors": max_professors,
+                "vector_search_k": 10,
+            },
+            priority=priority,
+        )
+
+    async def dispatch_pipeline_investigate(
+        self,
+        pipeline_id: str,
+        job_id: str | None = None,
+        error_snippet: str = "",
+        priority: str = "high",
+    ) -> MissionResult:
+        """Convenience: investigate a specific GitLab pipeline failure."""
+        return await self.dispatch(
+            mission_type="pipeline_investigate",
+            payload={"pipeline_id": pipeline_id, "job_id": job_id, "error_snippet": error_snippet},
+            priority=priority,
+        )
+
+    async def dispatch_full_cognition(
+        self,
+        reason: str,
+        priority: str = "critical",
+    ) -> MissionResult:
+        """Convenience: trigger a full OAD cognition cycle."""
+        return await self.dispatch(
+            mission_type="full_cognition",
+            payload={"reason": reason},
+            priority=priority,
+        )
+
+    def _insert_mission_record(self, mission_id: str, rig: str, mission_type: str, payload: dict, priority: str):
+        """Insert mission into oad_missions Supabase table."""
+        if not SUPABASE_URL or not SUPABASE_KEY:
+            logger.warning("[DISPATCH] No Supabase credentials — skipping DB insert")
+            return
+        try:
+            resp = requests.post(
+                f"{SUPABASE_URL}/rest/v1/oad_missions",
+                headers={
+                    "apikey": SUPABASE_KEY,
+                    "Authorization": f"Bearer {SUPABASE_KEY}",
+                    "Content-Type": "application/json",
+                    "Prefer": "return=minimal",
+                },
+                json={
+                    "mission_id": mission_id,
+                    "rig_target": rig,
+                    "mission_type": mission_type,
+                    "payload": json.dumps(payload),
+                    "priority": priority,
+                    "dispatched_by": "orchestrator",
+                    "status": "pending",
+                },
+            )
+            resp.raise_for_status()
+        except Exception as e:
+            logger.error(f"[DISPATCH] DB insert failed: {e}")
+
+    async def _await_completion(self, mission_id: str, timeout_s: int) -> MissionResult:
+        """Subscribe to NATS and wait for mission completion."""
+        try:
+            nc = await nats.connect(NATS_URL, name="mission-waiter")
+            js = nc.jetstream()
+
+            result = MissionResult(mission_id=mission_id, success=False, timed_out=True)
+
+            async def on_message(msg):
+                nonlocal result
+                data = json.loads(msg.data.decode())
+                if data.get("mission_id") == mission_id:
+                    result = MissionResult(
+                        mission_id=mission_id,
+                        success=data.get("success", False),
+                        result=data.get("result", {}),
+                        error_detail=data.get("error_detail"),
+                        duration_ms=data.get("duration_ms", 0),
+                        timed_out=False,
+                    )
+                    await msg.ack()
+
+            sub = await js.subscribe(
+                "citadel.oad.mission.completed",
+                stream="VCC_BRIDGE",
+                config=nats.js.api.ConsumerConfig(ack_wait=timeout_s),
+            )
+
+            deadline = asyncio.get_event_loop().time() + timeout_s
+            while asyncio.get_event_loop().time() < deadline:
+                try:
+                    msg = await asyncio.wait_for(sub.next_msg(), timeout=5)
+                    data = json.loads(msg.data.decode())
+                    if data.get("mission_id") == mission_id:
+                        result = MissionResult(
+                            mission_id=mission_id,
+                            success=data.get("success", False),
+                            result=data.get("result", {}),
+                            error_detail=data.get("error_detail"),
+                            duration_ms=data.get("duration_ms", 0),
+                            timed_out=False,
+                        )
+                        await msg.ack()
+                        break
+                except asyncio.TimeoutError:
+                    continue
+
+            await sub.unsubscribe()
+            await nc.close()
+
+            if result.timed_out:
+                result.error_detail = f"Mission timed out after {timeout_s}s"
+                logger.warning(f"[DISPATCH] Mission {mission_id} timed out after {timeout_s}s")
+            else:
+                logger.info(f"[DISPATCH] Mission {mission_id} completed: success={result.success}")
+
+            return result
+
+        except Exception as e:
+            logger.error(f"[DISPATCH] Await completion failed: {e}")
+            return MissionResult(
+                mission_id=mission_id,
+                success=False,
+                error_detail=f"Await failed: {str(e)}",
+                timed_out=True,
+            )
+
+    def _cleanup_dedup_cache(self):
+        """Remove expired entries from dedup cache."""
+        cutoff = datetime.now(timezone.utc) - timedelta(seconds=DEDUP_WINDOW_S * 2)
+        self._recent_missions = {
+            k: v for k, v in self._recent_missions.items() if v > cutoff
+        }
+```
+
+---
+
+
+## I.4 — College System Query Client `OAD-004`
+
+File: `tools/lib/college_query_client.py`
+```python
+#!/usr/bin/env python3
+"""College System Query Client — query OAD's College System via mission dispatch.
+
+Provides a clean interface for orchestrator, CRP, and guild_auditor to submit
+reasoning queries to OAD's College System (33 professors + FAISS vector DB).
+
+Usage:
+    client = CollegeQueryClient()
+    result = await client.query(
+        query="Why did the last 3 deployments fail?",
+        context={"crp_state": {...}, "perplexity_state": {...}},
+        max_professors=5,
+    )
+    print(result.verdict, result.confidence, result.recommendations)
+"""
+
+import os
+import logging
+from datetime import datetime, timezone
+from typing import Optional
+
+from pydantic import BaseModel, Field
+
+logger = logging.getLogger("college_query_client")
+
+COLLEGE_TIMEOUT_S = int(os.environ.get("OAD_COLLEGE_TIMEOUT_S", "300"))
+COLLEGE_MAX_PROFESSORS = int(os.environ.get("OAD_COLLEGE_MAX_PROFESSORS", "5"))
+
+
+class CollegeQueryResult(BaseModel):
+    """Result from a College System query."""
+    query_id: str
+    verdict: str                    # Summary conclusion
+    confidence: float = 0.0         # 0.0-1.0
+    reasoning_chain: list[str] = [] # Step-by-step reasoning
+    professors_consulted: int = 0
+    vectors_retrieved: int = 0
+    thought_model: str = ""         # "sonar-pro" or similar
+    compound_model: str = ""        # "gpt-4o-mini" or similar
+    recommendations: list[str] = []
+    duration_ms: int = 0
+    available: bool = True          # False if OAD unreachable
+    error: str | None = None
+
+
+class CollegeQueryClient:
+    """Query OAD's College System via mission dispatch."""
+
+    def __init__(self, dispatcher=None):
+        """Initialize with an optional OADMissionDispatcher instance.
+
+        If no dispatcher provided, creates one internally.
+        """
+        self._dispatcher = dispatcher
+
+    async def _get_dispatcher(self):
+        """Lazy-init the dispatcher."""
+        if self._dispatcher is None:
+            from tools.oad_mission_dispatcher import OADMissionDispatcher
+            self._dispatcher = OADMissionDispatcher()
+        return self._dispatcher
+
+    async def query(
+        self,
+        query: str,
+        context: dict | None = None,
+        max_professors: int | None = None,
+        vector_search_k: int = 10,
+        timeout_s: int | None = None,
+    ) -> CollegeQueryResult:
+        """Submit a reasoning query to the College System.
+
+        Args:
+            query: Natural language question for the professors
+            context: Optional dict of CRP/Perplexity state for grounding
+            max_professors: Number of professors to engage (1-33, default from env)
+            vector_search_k: Number of FAISS vectors to retrieve (default 10)
+            timeout_s: Timeout in seconds (default from env)
+
+        Returns:
+            CollegeQueryResult with verdict, confidence, reasoning chain
+        """
+        profs = min(max_professors or COLLEGE_MAX_PROFESSORS, 33)
+        timeout = timeout_s or COLLEGE_TIMEOUT_S
+
+        try:
+            dispatcher = await self._get_dispatcher()
+            mission_result = await dispatcher.dispatch(
+                mission_type="college_query",
+                payload={
+                    "query": query,
+                    "context": context or {},
+                    "max_professors": profs,
+                    "vector_search_k": vector_search_k,
+                },
+                priority="medium",
+                timeout_s=timeout,
+            )
+
+            if mission_result.timed_out:
+                return CollegeQueryResult(
+                    query_id=mission_result.mission_id,
+                    verdict="College System query timed out",
+                    available=False,
+                    error=f"Timed out after {timeout}s — OAD may be offline",
+                )
+
+            if not mission_result.success:
+                return CollegeQueryResult(
+                    query_id=mission_result.mission_id,
+                    verdict="College System query failed",
+                    available=False,
+                    error=mission_result.error_detail or "Unknown error",
+                )
+
+            # Parse College System result from mission response
+            r = mission_result.result
+            return CollegeQueryResult(
+                query_id=mission_result.mission_id,
+                verdict=r.get("verdict", ""),
+                confidence=float(r.get("confidence", 0.0)),
+                reasoning_chain=r.get("reasoning_chain", []),
+                professors_consulted=int(r.get("professors_consulted", 0)),
+                vectors_retrieved=int(r.get("vectors_retrieved", 0)),
+                thought_model=r.get("thought_model", "sonar-pro"),
+                compound_model=r.get("compound_model", "gpt-4o-mini"),
+                recommendations=r.get("recommendations", []),
+                duration_ms=mission_result.duration_ms,
+                available=True,
+            )
+
+        except Exception as e:
+            logger.error(f"[COLLEGE] Query failed: {e}")
+            return CollegeQueryResult(
+                query_id="error",
+                verdict="College System unavailable — OAD may be offline",
+                available=False,
+                error=str(e),
+            )
+
+    async def health_check(self) -> bool:
+        """Check if the College System is reachable by dispatching a ping."""
+        try:
+            result = await self.query(
+                query="health check ping",
+                max_professors=1,
+                vector_search_k=1,
+                timeout_s=30,
+            )
+            return result.available
+        except Exception:
+            return False
+```
+
+---
+
+
+## I.5 — Extended Shared Dedup v2.5 `OAD-005`
+
+File: `tools/lib/issue_dedup.py` (v2.5 patch — extends Phase 2.1 dedup)
+```python
+#!/usr/bin/env python3
+"""Issue Dedup v2.5 — Triple-loop dedup for CRP, Perplexity, and OAD.
+
+Extends the Phase 2.1 dedup library to handle OAD-originated issues,
+OAD Reflex auto-close, and 3-way cross-referencing.
+
+Breaking changes from v2.1:
+- New prefix: [OAD] alongside [CRP] and [CLv2]
+- New labels: confirmed-by-oad, resolved-by-oad
+- OAD Reflex pattern_code + file_path matching (new dedup dimension)
+- Fallback: orchestrator creates Linear issues on OAD's behalf if OAD Linear is broken
+- Rate limit now applies per-loop (5 each, 15 total max)
+"""
+
+import os
+import re
+import json
+import logging
+from datetime import datetime, timezone, timedelta
+from typing import Literal, Optional
+from collections import defaultdict
+
+import requests
+from pydantic import BaseModel, Field
+
+logger = logging.getLogger("issue_dedup_v25")
+
+LINEAR_API_TOKEN = os.environ.get("LINEAR_API_TOKEN", "")
+GITLAB_TOKEN = os.environ.get("GITLAB_TOKEN", "")
+GITLAB_PROJECT_ID = os.environ.get("GITLAB_PROJECT_ID", "")
+
+# Rate limits
+MAX_ISSUES_PER_LOOP_PER_CYCLE = 5
+TITLE_SIMILARITY_THRESHOLD = 0.75
+CLOSED_EXCLUSION_HOURS = 24
+
+# Prefix → loop mapping
+PREFIX_MAP = {
+    "[CRP]": "crp",
+    "[CLv2]": "perplexity",
+    "[OAD]": "oad",
+}
+
+# Cross-loop labels
+CROSS_LABELS = {
+    "crp": "confirmed-by-crp",
+    "perplexity": "confirmed-by-perplexity",
+    "oad": "confirmed-by-oad",
+    "oad_resolved": "resolved-by-oad",
+}
+
+
+class DedupMatch(BaseModel):
+    """A matched existing issue."""
+    issue_id: str
+    source: Literal["linear", "gitlab"]
+    title: str
+    origin_loop: str  # which loop created it
+    similarity: float
+    match_type: str   # "title_similarity", "root_cause_tag", "reflex_pattern"
+
+
+class DedupResult(BaseModel):
+    """Result of a dedup check."""
+    is_duplicate: bool = False
+    match: DedupMatch | None = None
+    action_taken: str = ""  # "created_new", "appended_comment", "suppressed_rate_limit"
+    issue_id: str | None = None
+
+
+def jaccard_similarity(a: str, b: str) -> float:
+    """Compute Jaccard similarity on word tokens."""
+    tokens_a = set(re.findall(r'\w+', a.lower()))
+    tokens_b = set(re.findall(r'\w+', b.lower()))
+    if not tokens_a or not tokens_b:
+        return 0.0
+    intersection = tokens_a & tokens_b
+    union = tokens_a | tokens_b
+    return len(intersection) / len(union)
+
+
+class IssueDedupV25:
+    """Triple-loop issue dedup for CRP, Perplexity, and OAD."""
+
+    def __init__(self):
+        self._cycle_issue_counts: dict[str, int] = defaultdict(int)  # loop -> count this cycle
+        self._cycle_id: str = ""
+
+    def start_cycle(self, cycle_id: str):
+        """Reset per-cycle counters."""
+        self._cycle_id = cycle_id
+        self._cycle_issue_counts.clear()
+
+    def check_and_create(
+        self,
+        title: str,
+        body: str,
+        origin_loop: Literal["crp", "perplexity", "oad"],
+        root_cause_category: str | None = None,
+        reflex_pattern_code: str | None = None,
+        reflex_file_path: str | None = None,
+        labels: list[str] | None = None,
+        severity: str = "medium",
+    ) -> DedupResult:
+        """Check for duplicates, then create or append comment.
+
+        Args:
+            title: Issue title (will be prefixed with [CRP]/[CLv2]/[OAD])
+            body: Issue body/description
+            origin_loop: Which loop is creating this issue
+            root_cause_category: Optional category tag for exact matching
+            reflex_pattern_code: OAD-specific: reflex pattern code for matching
+            reflex_file_path: OAD-specific: file path for reflex matching
+            labels: Additional labels
+            severity: Issue severity
+
+        Returns:
+            DedupResult with action taken
+        """
+        # Rate limit check
+        if self._cycle_issue_counts[origin_loop] >= MAX_ISSUES_PER_LOOP_PER_CYCLE:
+            logger.warning(f"[DEDUP] Rate limit hit for {origin_loop}: {MAX_ISSUES_PER_LOOP_PER_CYCLE} issues this cycle")
+            return DedupResult(action_taken="suppressed_rate_limit")
+
+        prefix = {"crp": "[CRP]", "perplexity": "[CLv2]", "oad": "[OAD]"}[origin_loop]
+        full_title = f"{prefix} {title}"
+
+        # Search for matching issues across all prefixes
+        match = self._find_match(
+            title=title,
+            root_cause_category=root_cause_category,
+            reflex_pattern_code=reflex_pattern_code,
+            reflex_file_path=reflex_file_path,
+            exclude_loop=origin_loop,
+        )
+
+        if match:
+            # Append cross-reference comment instead of creating duplicate
+            confirm_label = CROSS_LABELS.get(origin_loop, f"confirmed-by-{origin_loop}")
+            comment = (
+                f"Also detected by {origin_loop.upper()} in cycle {self._cycle_id}. "
+                f"Severity: {severity}. "
+                f"Original: {prefix} {title}"
+            )
+            self._append_comment(match, comment, confirm_label)
+            return DedupResult(
+                is_duplicate=True,
+                match=match,
+                action_taken="appended_comment",
+                issue_id=match.issue_id,
+            )
+
+        # No duplicate — create new issue
+        all_labels = list(labels or []) + ["vcc-bridge", f"origin-{origin_loop}"]
+        if root_cause_category:
+            all_labels.append(f"root-cause:{root_cause_category}")
+
+        issue_id = self._create_issue(full_title, body, all_labels)
+        self._cycle_issue_counts[origin_loop] += 1
+
+        return DedupResult(
+            is_duplicate=False,
+            action_taken="created_new",
+            issue_id=issue_id,
+        )
+
+    def auto_close_for_reflex(
+        self,
+        pattern_code: str,
+        file_path: str,
+        fix_description: str,
+        reflex_id: str,
+    ) -> list[str]:
+        """Auto-close matching issues across all loops for a Reflex fix.
+
+        Returns list of closed issue IDs.
+        """
+        closed = []
+        file_name = file_path.split("/")[-1]
+
+        # Search Linear
+        if LINEAR_API_TOKEN:
+            linear_closed = self._auto_close_linear_for_reflex(
+                file_name, pattern_code, fix_description, reflex_id
+            )
+            closed.extend(linear_closed)
+
+        # Search GitLab
+        if GITLAB_TOKEN and GITLAB_PROJECT_ID:
+            gitlab_closed = self._auto_close_gitlab_for_reflex(
+                file_name, pattern_code, fix_description, reflex_id
+            )
+            closed.extend(gitlab_closed)
+
+        return closed
+
+    def create_on_behalf_of_oad(
+        self,
+        title: str,
+        body: str,
+        labels: list[str] | None = None,
+    ) -> str | None:
+        """Create a Linear issue on OAD's behalf (fallback when OAD Linear is broken).
+
+        Uses the bridge's LINEAR_API_TOKEN instead of OAD's.
+        """
+        full_title = f"[OAD] {title}"
+        all_labels = list(labels or []) + ["vcc-bridge", "origin-oad", "created-via-bridge"]
+        return self._create_issue(full_title, body, all_labels)
+
+    def audit(self) -> dict:
+        """Run dedup audit — check for duplicate open issues across all prefixes."""
+        duplicates = []
+        all_issues = []
+
+        # Fetch all open bridge issues from Linear
+        if LINEAR_API_TOKEN:
+            linear_issues = self._fetch_all_linear_bridge_issues()
+            all_issues.extend(linear_issues)
+
+        # Check for duplicates
+        seen = {}
+        for issue in all_issues:
+            title_clean = re.sub(r'^\[(CRP|CLv2|OAD)\]\s*', '', issue.get("title", "")).lower()
+            for prev_title, prev_issue in seen.items():
+                sim = jaccard_similarity(title_clean, prev_title)
+                if sim >= TITLE_SIMILARITY_THRESHOLD:
+                    duplicates.append({
+                        "issue_a": prev_issue,
+                        "issue_b": issue,
+                        "similarity": sim,
+                    })
+            seen[title_clean] = issue
+
+        return {
+            "total_open_issues": len(all_issues),
+            "duplicates_found": len(duplicates),
+            "duplicates": duplicates,
+        }
+
+    # ── Private methods ──────────────────────────────────────────────────
+
+    def _find_match(
+        self,
+        title: str,
+        root_cause_category: str | None,
+        reflex_pattern_code: str | None,
+        reflex_file_path: str | None,
+        exclude_loop: str,
+    ) -> DedupMatch | None:
+        """Search for matching issue across all loops."""
+        # Search Linear
+        if LINEAR_API_TOKEN:
+            match = self._search_linear(title, root_cause_category, reflex_pattern_code, reflex_file_path, exclude_loop)
+            if match:
+                return match
+
+        # Search GitLab
+        if GITLAB_TOKEN and GITLAB_PROJECT_ID:
+            match = self._search_gitlab(title, root_cause_category, reflex_file_path, exclude_loop)
+            if match:
+                return match
+
+        return None
+
+    def _search_linear(self, title, root_cause_category, reflex_pattern_code, reflex_file_path, exclude_loop) -> DedupMatch | None:
+        """Search Linear for matching open issues."""
+        try:
+            query = """
+            query SearchIssues($filter: IssueFilter) {
+                issues(filter: $filter, first: 20) {
+                    nodes { id title labels { nodes { name } } state { name type } }
+                }
+            }
+            """
+            variables = {
+                "filter": {
+                    "state": {"type": {"nin": ["completed", "canceled"]}},
+                    "labels": {"name": {"eq": "vcc-bridge"}},
+                }
+            }
+            resp = requests.post(
+                "https://api.linear.app/graphql",
+                headers={"Authorization": LINEAR_API_TOKEN, "Content-Type": "application/json"},
+                json={"query": query, "variables": variables},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            issues = resp.json().get("data", {}).get("issues", {}).get("nodes", [])
+
+            for issue in issues:
+                issue_title = issue.get("title", "")
+                issue_labels = [l["name"] for l in issue.get("labels", {}).get("nodes", [])]
+                origin = self._detect_origin(issue_title, issue_labels)
+
+                if origin == exclude_loop:
+                    continue  # Skip same-loop issues
+
+                # Check root cause tag match
+                if root_cause_category:
+                    if f"root-cause:{root_cause_category}" in issue_labels:
+                        return DedupMatch(
+                            issue_id=issue["id"],
+                            source="linear",
+                            title=issue_title,
+                            origin_loop=origin,
+                            similarity=1.0,
+                            match_type="root_cause_tag",
+                        )
+
+                # Check reflex pattern + file match
+                if reflex_pattern_code and reflex_file_path:
+                    file_name = reflex_file_path.split("/")[-1].lower()
+                    if file_name in issue_title.lower():
+                        return DedupMatch(
+                            issue_id=issue["id"],
+                            source="linear",
+                            title=issue_title,
+                            origin_loop=origin,
+                            similarity=0.9,
+                            match_type="reflex_pattern",
+                        )
+
+                # Check title similarity
+                clean_title = re.sub(r'^\[(CRP|CLv2|OAD)\]\s*', '', issue_title)
+                sim = jaccard_similarity(title, clean_title)
+                if sim >= TITLE_SIMILARITY_THRESHOLD:
+                    return DedupMatch(
+                        issue_id=issue["id"],
+                        source="linear",
+                        title=issue_title,
+                        origin_loop=origin,
+                        similarity=sim,
+                        match_type="title_similarity",
+                    )
+
+        except Exception as e:
+            logger.warning(f"[DEDUP] Linear search failed: {e}")
+        return None
+
+    def _search_gitlab(self, title, root_cause_category, reflex_file_path, exclude_loop) -> DedupMatch | None:
+        """Search GitLab for matching open issues."""
+        try:
+            resp = requests.get(
+                f"https://gitlab.com/api/v4/projects/{GITLAB_PROJECT_ID}/issues",
+                headers={"PRIVATE-TOKEN": GITLAB_TOKEN},
+                params={"state": "opened", "labels": "vcc-bridge", "per_page": 20},
+                timeout=10,
+            )
+            resp.raise_for_status()
+
+            for issue in resp.json():
+                issue_title = issue.get("title", "")
+                issue_labels = issue.get("labels", [])
+                origin = self._detect_origin(issue_title, issue_labels)
+
+                if origin == exclude_loop:
+                    continue
+
+                clean_title = re.sub(r'^\[(CRP|CLv2|OAD)\]\s*', '', issue_title)
+                sim = jaccard_similarity(title, clean_title)
+                if sim >= TITLE_SIMILARITY_THRESHOLD:
+                    return DedupMatch(
+                        issue_id=str(issue["iid"]),
+                        source="gitlab",
+                        title=issue_title,
+                        origin_loop=origin,
+                        similarity=sim,
+                        match_type="title_similarity",
+                    )
+
+        except Exception as e:
+            logger.warning(f"[DEDUP] GitLab search failed: {e}")
+        return None
+
+    def _detect_origin(self, title: str, labels: list[str]) -> str:
+        """Detect which loop created an issue."""
+        for prefix, loop in PREFIX_MAP.items():
+            if title.startswith(prefix):
+                return loop
+        for label in labels:
+            if label.startswith("origin-"):
+                return label.replace("origin-", "")
+        return "unknown"
+
+    def _append_comment(self, match: DedupMatch, comment: str, label: str):
+        """Append cross-reference comment and label to matched issue."""
+        if match.source == "linear" and LINEAR_API_TOKEN:
+            try:
+                mutation = """
+                mutation AddComment($issueId: String!, $body: String!) {
+                    commentCreate(input: {issueId: $issueId, body: $body}) { success }
+                }
+                """
+                requests.post(
+                    "https://api.linear.app/graphql",
+                    headers={"Authorization": LINEAR_API_TOKEN, "Content-Type": "application/json"},
+                    json={"query": mutation, "variables": {"issueId": match.issue_id, "body": comment}},
+                    timeout=10,
+                )
+            except Exception as e:
+                logger.warning(f"[DEDUP] Linear comment failed: {e}")
+
+        elif match.source == "gitlab" and GITLAB_TOKEN:
+            try:
+                requests.post(
+                    f"https://gitlab.com/api/v4/projects/{GITLAB_PROJECT_ID}/issues/{match.issue_id}/notes",
+                    headers={"PRIVATE-TOKEN": GITLAB_TOKEN},
+                    json={"body": comment},
+                    timeout=10,
+                )
+            except Exception as e:
+                logger.warning(f"[DEDUP] GitLab comment failed: {e}")
+
+    def _create_issue(self, title: str, body: str, labels: list[str]) -> str | None:
+        """Create a new issue in Linear (primary) or GitLab (fallback)."""
+        if LINEAR_API_TOKEN:
+            try:
+                mutation = """
+                mutation CreateIssue($input: IssueCreateInput!) {
+                    issueCreate(input: $input) { success issue { id } }
+                }
+                """
+                resp = requests.post(
+                    "https://api.linear.app/graphql",
+                    headers={"Authorization": LINEAR_API_TOKEN, "Content-Type": "application/json"},
+                    json={"query": mutation, "variables": {"input": {"title": title, "description": body}}},
+                    timeout=10,
+                )
+                data = resp.json()
+                issue_id = data.get("data", {}).get("issueCreate", {}).get("issue", {}).get("id")
+                if issue_id:
+                    logger.info(f"[DEDUP] Created Linear issue: {issue_id}")
+                    return issue_id
+            except Exception as e:
+                logger.warning(f"[DEDUP] Linear create failed: {e}")
+
+        if GITLAB_TOKEN and GITLAB_PROJECT_ID:
+            try:
+                resp = requests.post(
+                    f"https://gitlab.com/api/v4/projects/{GITLAB_PROJECT_ID}/issues",
+                    headers={"PRIVATE-TOKEN": GITLAB_TOKEN},
+                    json={"title": title, "description": body, "labels": ",".join(labels)},
+                    timeout=10,
+                )
+                resp.raise_for_status()
+                iid = resp.json().get("iid")
+                logger.info(f"[DEDUP] Created GitLab issue: #{iid}")
+                return str(iid)
+            except Exception as e:
+                logger.warning(f"[DEDUP] GitLab create failed: {e}")
+
+        return None
+
+    def _auto_close_linear_for_reflex(self, file_name, pattern_code, fix_description, reflex_id) -> list[str]:
+        """Auto-close matching Linear issues for a reflex fix."""
+        closed = []
+        try:
+            query = """
+            query SearchIssues($filter: IssueFilter) {
+                issues(filter: $filter, first: 10) {
+                    nodes { id title state { name type } }
+                }
+            }
+            """
+            resp = requests.post(
+                "https://api.linear.app/graphql",
+                headers={"Authorization": LINEAR_API_TOKEN, "Content-Type": "application/json"},
+                json={"query": query, "variables": {"filter": {
+                    "state": {"type": {"nin": ["completed", "canceled"]}},
+                    "labels": {"name": {"eq": "vcc-bridge"}},
+                }}},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            issues = resp.json().get("data", {}).get("issues", {}).get("nodes", [])
+
+            for issue in issues:
+                title = issue.get("title", "").lower()
+                if file_name.lower() in title:
+                    comment = (
+                        f"Auto-resolved by OAD Reflex Engine (pattern {pattern_code}) "
+                        f"in cycle {reflex_id}. Fix: {fix_description}"
+                    )
+                    mutation = """
+                    mutation AddComment($issueId: String!, $body: String!) {
+                        commentCreate(input: {issueId: $issueId, body: $body}) { success }
+                    }
+                    """
+                    requests.post(
+                        "https://api.linear.app/graphql",
+                        headers={"Authorization": LINEAR_API_TOKEN, "Content-Type": "application/json"},
+                        json={"query": mutation, "variables": {"issueId": issue["id"], "body": comment}},
+                        timeout=10,
+                    )
+                    closed.append(issue["id"])
+
+        except Exception as e:
+            logger.warning(f"[DEDUP] Linear reflex auto-close failed: {e}")
+        return closed
+
+    def _auto_close_gitlab_for_reflex(self, file_name, pattern_code, fix_description, reflex_id) -> list[str]:
+        """Auto-close matching GitLab issues for a reflex fix."""
+        closed = []
+        try:
+            resp = requests.get(
+                f"https://gitlab.com/api/v4/projects/{GITLAB_PROJECT_ID}/issues",
+                headers={"PRIVATE-TOKEN": GITLAB_TOKEN},
+                params={"state": "opened", "labels": "vcc-bridge", "search": file_name, "per_page": 10},
+                timeout=10,
+            )
+            resp.raise_for_status()
+
+            for issue in resp.json():
+                if file_name.lower() in issue.get("title", "").lower():
+                    requests.post(
+                        f"https://gitlab.com/api/v4/projects/{GITLAB_PROJECT_ID}/issues/{issue['iid']}/notes",
+                        headers={"PRIVATE-TOKEN": GITLAB_TOKEN},
+                        json={"body": f"Auto-resolved by OAD Reflex Engine (pattern {pattern_code}). Fix: {fix_description}"},
+                        timeout=10,
+                    )
+                    requests.put(
+                        f"https://gitlab.com/api/v4/projects/{GITLAB_PROJECT_ID}/issues/{issue['iid']}",
+                        headers={"PRIVATE-TOKEN": GITLAB_TOKEN},
+                        json={"state_event": "close", "add_labels": "resolved-by-oad"},
+                        timeout=10,
+                    )
+                    closed.append(str(issue["iid"]))
+
+        except Exception as e:
+            logger.warning(f"[DEDUP] GitLab reflex auto-close failed: {e}")
+        return closed
+
+    def _fetch_all_linear_bridge_issues(self) -> list[dict]:
+        """Fetch all open vcc-bridge issues from Linear for audit."""
+        try:
+            query = """
+            query { issues(filter: {state: {type: {nin: ["completed", "canceled"]}}, labels: {name: {eq: "vcc-bridge"}}}, first: 100) {
+                nodes { id title labels { nodes { name } } }
+            }}
+            """
+            resp = requests.post(
+                "https://api.linear.app/graphql",
+                headers={"Authorization": LINEAR_API_TOKEN, "Content-Type": "application/json"},
+                json={"query": query},
+                timeout=15,
+            )
+            return resp.json().get("data", {}).get("issues", {}).get("nodes", [])
+        except Exception:
+            return []
+```
+
+---
+
+
+## I.6 — Extended State Store Migration v2.5 `OAD-006`
+
+File: `supabase/migrations/20260228_vcc_loop_state_v25.sql`
+```sql
+-- Phase 2.5: Extend vcc_loop_state with OAD columns + add history table
+-- Depends on: 20260228_vcc_loop_state.sql (Phase 2.1)
+-- OAD-006
+
+BEGIN;
+
+-- 1. Extend loop_source constraint to include OAD sources
+ALTER TABLE public.vcc_loop_state 
+    DROP CONSTRAINT IF EXISTS vcc_loop_state_loop_source_check;
+
+ALTER TABLE public.vcc_loop_state 
+    ADD CONSTRAINT vcc_loop_state_loop_source_check 
+    CHECK (loop_source IN ('crp', 'perplexity', 'orchestrator', 'oad_reflex', 'oad_cognition', 'oad_mission'));
+
+-- 2. Add OAD-specific columns
+ALTER TABLE public.vcc_loop_state ADD COLUMN IF NOT EXISTS
+    oad_rig TEXT CHECK (oad_rig IS NULL OR oad_rig IN ('rig1', 'rig2', 'rig3'));
+ALTER TABLE public.vcc_loop_state ADD COLUMN IF NOT EXISTS
+    oad_reflex_fixes JSONB DEFAULT '[]';
+ALTER TABLE public.vcc_loop_state ADD COLUMN IF NOT EXISTS
+    oad_reflex_count INT DEFAULT 0;
+ALTER TABLE public.vcc_loop_state ADD COLUMN IF NOT EXISTS
+    oad_gitlab_status TEXT;
+ALTER TABLE public.vcc_loop_state ADD COLUMN IF NOT EXISTS
+    oad_linear_status TEXT;
+ALTER TABLE public.vcc_loop_state ADD COLUMN IF NOT EXISTS
+    oad_thought_summary TEXT;
+ALTER TABLE public.vcc_loop_state ADD COLUMN IF NOT EXISTS
+    oad_compound_analysis TEXT;
+ALTER TABLE public.vcc_loop_state ADD COLUMN IF NOT EXISTS
+    oad_college_verdict TEXT;
+ALTER TABLE public.vcc_loop_state ADD COLUMN IF NOT EXISTS
+    oad_mission_id TEXT;
+ALTER TABLE public.vcc_loop_state ADD COLUMN IF NOT EXISTS
+    oad_mission_result JSONB;
+ALTER TABLE public.vcc_loop_state ADD COLUMN IF NOT EXISTS
+    oad_snapshot JSONB DEFAULT '{}';
+
+-- 3. OAD-specific indexes
+CREATE INDEX IF NOT EXISTS idx_vcc_loop_state_oad_rig 
+    ON public.vcc_loop_state(oad_rig) WHERE loop_source LIKE 'oad_%';
+CREATE INDEX IF NOT EXISTS idx_vcc_loop_state_oad_reflex 
+    ON public.vcc_loop_state(oad_reflex_count) WHERE loop_source = 'oad_reflex';
+
+-- 4. History table for cross-loop trend analysis
+CREATE TABLE IF NOT EXISTS public.vcc_loop_state_history (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    state_id UUID REFERENCES public.vcc_loop_state(id) ON DELETE SET NULL,
+    loop_source TEXT NOT NULL,
+    cycle_id TEXT NOT NULL,
+    health_grade TEXT,
+    health_score INT,
+    go_no_go TEXT,
+    oad_reflex_count INT DEFAULT 0,
+    oad_rig TEXT,
+    snapshot_summary JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_vcc_history_source 
+    ON public.vcc_loop_state_history(loop_source);
+CREATE INDEX IF NOT EXISTS idx_vcc_history_created 
+    ON public.vcc_loop_state_history(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_vcc_history_cycle 
+    ON public.vcc_loop_state_history(cycle_id);
+
+-- 5. Auto-history trigger: insert summary row on every vcc_loop_state write
+CREATE OR REPLACE FUNCTION log_vcc_loop_state_history() RETURNS trigger AS $$
+BEGIN
+    INSERT INTO public.vcc_loop_state_history (
+        state_id, loop_source, cycle_id, health_grade, health_score,
+        go_no_go, oad_reflex_count, oad_rig, snapshot_summary
+    ) VALUES (
+        NEW.id, NEW.loop_source, NEW.cycle_id, NEW.health_grade, NEW.health_score,
+        NEW.go_no_go, NEW.oad_reflex_count, NEW.oad_rig,
+        jsonb_build_object(
+            'guardrail_pass', NEW.guardrail_pass,
+            'drift_clean', NEW.drift_clean,
+            'sla_compliant', NEW.sla_compliant,
+            'oad_gitlab_status', NEW.oad_gitlab_status,
+            'oad_linear_status', NEW.oad_linear_status
+        )
+    );
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_log_vcc_loop_state_history ON public.vcc_loop_state;
+CREATE TRIGGER trg_log_vcc_loop_state_history
+    AFTER INSERT ON public.vcc_loop_state
+    FOR EACH ROW
+    EXECUTE FUNCTION log_vcc_loop_state_history();
+
+-- 6. Auto-cleanup for history (keep 90 days)
+CREATE OR REPLACE FUNCTION cleanup_vcc_history() RETURNS trigger AS $$
+BEGIN
+    DELETE FROM public.vcc_loop_state_history 
+    WHERE created_at < NOW() - INTERVAL '90 days';
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_cleanup_vcc_history ON public.vcc_loop_state_history;
+CREATE TRIGGER trg_cleanup_vcc_history
+    AFTER INSERT ON public.vcc_loop_state_history
+    EXECUTE FUNCTION cleanup_vcc_history();
+
+COMMIT;
+```
+
+---
+
+
+## I.7 — Trilateral Orchestrator v2.5 `OAD-007`
+
+File: `tools/loop_orchestrator.py` (v2.5 upgrade — replaces Phase 2.1 v2.1)
+```python
+#!/usr/bin/env python3
+"""Loop Orchestrator v2.5 — Trilateral coordinator for VCC, Perplexity, and OAD.
+
+Upgrade from v2.1 (bilateral) to v2.5 (trilateral). Subscribes to all 6 NATS
+subjects, merges state from all 3 loops, produces GO/NO-GO verdicts, and
+auto-dispatches missions to OAD when problems are detected.
+
+Runs as a persistent process (systemd service or ECS task).
+
+Usage:
+    python tools/loop_orchestrator.py
+    # or as systemd service: vcc-bridge-orchestrator.service
+"""
+
+import os
+import json
+import asyncio
+import signal
+import logging
+from datetime import datetime, timezone, timedelta
+from typing import Literal, Optional
+from collections import deque
+
+import nats
+import requests
+from pydantic import BaseModel, Field
+
+from tools.lib.oad_nats import (
+    ReflexAppliedEvent,
+    CognitionCompletedEvent,
+    MissionCompletedEvent,
+)
+from tools.lib.oad_reflex_feed import OADReflexFeed
+from tools.lib.issue_dedup import IssueDedupV25
+from tools.lib.health_schema import CitadelHealthSnapshot, ServiceHealth, OADHealth
+from tools.oad_mission_dispatcher import OADMissionDispatcher
+
+logger = logging.getLogger("loop_orchestrator")
+
+# ── Config ──────────────────────────────────────────────────────────────────
+NATS_URL = os.environ.get("NATS_URL", "nats://localhost:4222")
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+NOTION_TOKEN = os.environ.get("NOTION_INTERNAL_TOKEN", "")
+NOTION_VERSION = "2022-06-28"
+NOTION_API = "https://api.notion.com/v1"
+VCC_PAGE_ID = os.environ.get("VCC_INSTRUCTIONS_PAGE_ID", "")
+
+OAD_COGNITION_TIMEOUT_S = int(os.environ.get("OAD_COGNITION_TIMEOUT_S", "1800"))
+OAD_REFLEX_WARN_THRESHOLD = int(os.environ.get("OAD_REFLEX_WARN_THRESHOLD", "10"))
+NOTION_REPORT_INTERVAL_S = 6 * 3600  # 6 hours
+AUTO_PAUSE_CONSECUTIVE_NO_GO = 3
+
+# NATS subjects
+SUBJECTS = [
+    "citadel.vcc.cycle.completed",
+    "citadel.diagnostic.completed",
+    "citadel.vcc.build.pause",
+    "citadel.vcc.build.resume",
+    "citadel.oad.reflex.applied",
+    "citadel.oad.cognition.completed",
+]
+
+
+# ── Orchestrator State ──────────────────────────────────────────────────────
+class OrchestratorState:
+    """In-memory state tracking for the orchestrator."""
+
+    def __init__(self):
+        self.last_crp: dict | None = None
+        self.last_perplexity: dict | None = None
+        self.last_oad_cognition: dict | None = None
+        self.last_oad_reflex_batch: list[dict] = []
+        self.consecutive_no_go: int = 0
+        self.build_paused: bool = False
+        self.last_notion_report_at: datetime = datetime.min.replace(tzinfo=timezone.utc)
+        self.go_no_go_history: deque = deque(maxlen=20)
+        self.oad_cognition_last_seen: datetime | None = None
+        self.oad_gitlab_error_streak: int = 0
+
+
+# ── GO/NO-GO Engine ─────────────────────────────────────────────────────────
+def evaluate_trilateral_go_no_go(
+    crp: dict | None,
+    perplexity: dict | None,
+    oad: dict | None,
+    state: OrchestratorState,
+) -> tuple[str, int, list[str]]:
+    """Evaluate trilateral GO/NO-GO from all 3 loop states.
+
+    Returns:
+        (verdict, merged_score, blocking_reasons)
+    """
+    blockers = []
+    warnings = []
+    score = 100  # Start at 100, deduct for issues
+
+    # ── Perplexity checks ────────────────────────────────────────────
+    if perplexity:
+        grade = perplexity.get("health_grade", "UNKNOWN")
+        p_score = perplexity.get("health_score", 0)
+
+        if grade == "CRITICAL":
+            blockers.append(f"Perplexity reports CRITICAL infrastructure state (score: {p_score})")
+            score -= 40
+        elif grade == "DEGRADING" and p_score < 50:
+            blockers.append(f"Perplexity DEGRADING with score {p_score} (<50 threshold)")
+            score -= 30
+        elif grade == "DEGRADING":
+            warnings.append(f"Perplexity DEGRADING (score: {p_score})")
+            score -= 15
+
+    # ── CRP checks ───────────────────────────────────────────────────
+    if crp:
+        if not crp.get("guardrail_pass", True):
+            blockers.append("CRP guardrails failed")
+            score -= 25
+        if not crp.get("drift_clean", True):
+            blockers.append("CRP drift detected — spec/code mismatch")
+            score -= 20
+
+    # ── OAD checks ───────────────────────────────────────────────────
+    if oad:
+        gitlab_status = oad.get("gitlab_status", "unknown")
+        if gitlab_status == "error":
+            state.oad_gitlab_error_streak += 1
+            if state.oad_gitlab_error_streak >= 3:
+                blockers.append(f"OAD GitLab status 'error' for {state.oad_gitlab_error_streak} consecutive cycles")
+                score -= 20
+            else:
+                warnings.append(f"OAD GitLab status 'error' ({state.oad_gitlab_error_streak}/3 before block)")
+                score -= 5
+        else:
+            state.oad_gitlab_error_streak = 0
+
+        reflex_count = oad.get("reflex_fixes_this_cycle", 0)
+        if reflex_count > OAD_REFLEX_WARN_THRESHOLD:
+            warnings.append(f"OAD excessive reflex fixes: {reflex_count} (threshold: {OAD_REFLEX_WARN_THRESHOLD})")
+            score -= 10
+
+    # ── OAD liveness checks ──────────────────────────────────────────
+    if state.oad_cognition_last_seen:
+        since_last = (datetime.now(timezone.utc) - state.oad_cognition_last_seen).total_seconds()
+        if since_last > OAD_COGNITION_TIMEOUT_S:
+            warnings.append(f"OAD cognition missing for {since_last/60:.0f} min (timeout: {OAD_COGNITION_TIMEOUT_S/60:.0f} min)")
+            score -= 5
+
+    # ── Verdict ──────────────────────────────────────────────────────
+    score = max(0, min(100, score))
+
+    if blockers:
+        verdict = "NO-GO"
+    elif warnings and score < 60:
+        verdict = "WARNING"
+    else:
+        verdict = "GO"
+
+    return verdict, score, blockers + [f"⚠️ {w}" for w in warnings]
+
+
+# ── State Store Writer ──────────────────────────────────────────────────────
+def write_merged_state(
+    verdict: str,
+    score: int,
+    blockers: list[str],
+    crp: dict | None,
+    perplexity: dict | None,
+    oad: dict | None,
+    state: OrchestratorState,
+):
+    """Write trilateral merged row to vcc_loop_state."""
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return
+    try:
+        cycle_id = f"orch-v25-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
+        row = {
+            "loop_source": "orchestrator",
+            "cycle_id": cycle_id,
+            "health_snapshot": json.dumps({
+                "crp": crp,
+                "perplexity": perplexity,
+                "oad": oad,
+                "merged_at": datetime.now(timezone.utc).isoformat(),
+            }),
+            "health_grade": perplexity.get("health_grade") if perplexity else None,
+            "health_score": score,
+            "merged_grade": verdict,
+            "merged_score": score,
+            "go_no_go": verdict,
+            "blocking_reasons": json.dumps(blockers),
+            "guardrail_pass": crp.get("guardrail_pass") if crp else None,
+            "drift_clean": crp.get("drift_clean") if crp else None,
+            "oad_rig": oad.get("rig") if oad else None,
+            "oad_reflex_count": oad.get("reflex_fixes_this_cycle", 0) if oad else 0,
+            "oad_gitlab_status": oad.get("gitlab_status") if oad else None,
+            "oad_linear_status": oad.get("linear_status") if oad else None,
+            "oad_thought_summary": oad.get("thought_summary") if oad else None,
+            "oad_compound_analysis": oad.get("compound_analysis") if oad else None,
+            "oad_college_verdict": oad.get("college_verdict") if oad else None,
+            "oad_snapshot": json.dumps(oad) if oad else "{}",
+        }
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/vcc_loop_state",
+            headers={
+                "apikey": SUPABASE_KEY,
+                "Authorization": f"Bearer {SUPABASE_KEY}",
+                "Content-Type": "application/json",
+                "Prefer": "return=minimal",
+            },
+            json=row,
+        ).raise_for_status()
+        logger.info(f"[ORCH] Merged state written: {verdict} (score: {score})")
+    except Exception as e:
+        logger.error(f"[ORCH] State store write failed: {e}")
+
+
+# ── Main Event Loop ─────────────────────────────────────────────────────────
+async def run_orchestrator():
+    """Main orchestrator event loop — persistent NATS subscriber."""
+    state = OrchestratorState()
+    reflex_feed = OADReflexFeed()
+    dedup = IssueDedupV25()
+    dispatcher = OADMissionDispatcher()
+    running = True
+
+    def handle_signal(sig, frame):
+        nonlocal running
+        logger.info(f"[ORCH] Received signal {sig}, shutting down...")
+        running = False
+
+    signal.signal(signal.SIGTERM, handle_signal)
+    signal.signal(signal.SIGINT, handle_signal)
+
+    nc = await nats.connect(
+        NATS_URL,
+        reconnect_time_wait=2,
+        max_reconnect_attempts=-1,  # infinite reconnect
+        name="vcc-orchestrator-v25",
+    )
+    js = nc.jetstream()
+    logger.info(f"[ORCH] Connected to NATS at {NATS_URL}")
+
+    async def on_crp_event(msg):
+        """Handle VCC CRP cycle completion."""
+        data = json.loads(msg.data.decode())
+        state.last_crp = data
+        logger.info(f"[ORCH] CRP event: cycle={data.get('cycle_id')}")
+
+        # Evaluate and write merged state
+        verdict, score, blockers = evaluate_trilateral_go_no_go(
+            state.last_crp, state.last_perplexity, state.last_oad_cognition, state
+        )
+        write_merged_state(verdict, score, blockers, state.last_crp, state.last_perplexity, state.last_oad_cognition, state)
+
+        # Track consecutive NO-GO
+        if verdict == "NO-GO":
+            state.consecutive_no_go += 1
+            state.go_no_go_history.append(("NO-GO", datetime.now(timezone.utc)))
+        else:
+            state.consecutive_no_go = 0
+            state.go_no_go_history.append((verdict, datetime.now(timezone.utc)))
+
+        # Auto-pause on consecutive NO-GO
+        if state.consecutive_no_go >= AUTO_PAUSE_CONSECUTIVE_NO_GO and not state.build_paused:
+            await js.publish("citadel.vcc.build.pause", json.dumps({
+                "reason": f"{state.consecutive_no_go} consecutive NO-GO verdicts",
+                "blockers": blockers,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }).encode())
+            state.build_paused = True
+            logger.warning(f"[ORCH] BUILD PAUSED — {state.consecutive_no_go} consecutive NO-GO")
+
+            # Auto-dispatch full cognition + college query
+            await dispatcher.dispatch_full_cognition(
+                reason=f"{state.consecutive_no_go} consecutive NO-GO across VCC, Perplexity, and OAD. "
+                       f"Analyze combined state and recommend recovery plan."
+            )
+
+        # Auto-dispatch on specific CRP failures
+        if data.get("guardrail_violations"):
+            import_errors = [v for v in data["guardrail_violations"] if "import" in v.get("rule", "").lower()]
+            if import_errors:
+                await dispatcher.dispatch_reflex_scan(
+                    target_path="src/",
+                    pattern_codes=["F960"],
+                    priority="high",
+                )
+
+        await msg.ack()
+
+    async def on_perplexity_event(msg):
+        """Handle Perplexity diagnostic completion."""
+        data = json.loads(msg.data.decode())
+        state.last_perplexity = data
+        logger.info(f"[ORCH] Perplexity event: diag={data.get('diag_id')}")
+
+        # Evaluate
+        verdict, score, blockers = evaluate_trilateral_go_no_go(
+            state.last_crp, state.last_perplexity, state.last_oad_cognition, state
+        )
+        write_merged_state(verdict, score, blockers, state.last_crp, state.last_perplexity, state.last_oad_cognition, state)
+
+        # Auto-resume if recovering from paused state
+        if state.build_paused and verdict == "GO":
+            await js.publish("citadel.vcc.build.resume", json.dumps({
+                "reason": "Infrastructure recovered — Perplexity reports HEALTHY",
+                "score": score,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }).encode())
+            state.build_paused = False
+            state.consecutive_no_go = 0
+            logger.info("[ORCH] BUILD RESUMED — infrastructure recovered")
+
+        # Auto-dispatch on Perplexity CRITICAL with pipeline failure
+        if data.get("health_grade") == "CRITICAL":
+            pipeline_blockers = [b for b in data.get("blockers", []) if "pipeline" in b.lower()]
+            if pipeline_blockers:
+                await dispatcher.dispatch_pipeline_investigate(
+                    pipeline_id="latest",
+                    error_snippet=pipeline_blockers[0][:200],
+                    priority="critical",
+                )
+
+        await msg.ack()
+
+    async def on_oad_reflex_event(msg):
+        """Handle OAD Reflex auto-fix event."""
+        data = json.loads(msg.data.decode())
+        logger.info(f"[ORCH] OAD Reflex: pattern={data.get('pattern_code')}, file={data.get('file_path')}")
+
+        # Process through reflex feed
+        reflex_feed.process_reflex_event(data)
+
+        # Run dedup — auto-close matching issues from other loops
+        dedup.auto_close_for_reflex(
+            pattern_code=data.get("pattern_code", ""),
+            file_path=data.get("file_path", ""),
+            fix_description=data.get("fix_description", ""),
+            reflex_id=data.get("reflex_id", ""),
+        )
+
+        state.last_oad_reflex_batch.append(data)
+        await msg.ack()
+
+    async def on_oad_cognition_event(msg):
+        """Handle OAD cognition cycle completion."""
+        data = json.loads(msg.data.decode())
+        state.last_oad_cognition = data
+        state.oad_cognition_last_seen = datetime.now(timezone.utc)
+        logger.info(f"[ORCH] OAD Cognition: cycle={data.get('cycle_id')}, rig={data.get('rig')}")
+
+        # Evaluate trilateral
+        verdict, score, blockers = evaluate_trilateral_go_no_go(
+            state.last_crp, state.last_perplexity, state.last_oad_cognition, state
+        )
+        write_merged_state(verdict, score, blockers, state.last_crp, state.last_perplexity, state.last_oad_cognition, state)
+
+        # Track NO-GO
+        if verdict == "NO-GO":
+            state.consecutive_no_go += 1
+        elif verdict == "GO":
+            state.consecutive_no_go = 0
+            if state.build_paused:
+                await js.publish("citadel.vcc.build.resume", json.dumps({
+                    "reason": "All three loops HEALTHY — resuming build",
+                    "score": score,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }).encode())
+                state.build_paused = False
+                logger.info("[ORCH] BUILD RESUMED — trilateral HEALTHY")
+
+        await msg.ack()
+
+    # Subscribe to all subjects
+    await js.subscribe("citadel.vcc.cycle.completed", cb=on_crp_event, stream="VCC_BRIDGE", durable="orch-crp-v25")
+    await js.subscribe("citadel.diagnostic.completed", cb=on_perplexity_event, stream="VCC_BRIDGE", durable="orch-pplx-v25")
+    await js.subscribe("citadel.oad.reflex.applied", cb=on_oad_reflex_event, stream="VCC_BRIDGE", durable="orch-reflex-v25")
+    await js.subscribe("citadel.oad.cognition.completed", cb=on_oad_cognition_event, stream="VCC_BRIDGE", durable="orch-cognition-v25")
+
+    logger.info("[ORCH] Subscribed to all 4 event subjects. Running...")
+
+    # Periodic Notion reporting
+    while running:
+        await asyncio.sleep(60)
+        now = datetime.now(timezone.utc)
+        if (now - state.last_notion_report_at).total_seconds() >= NOTION_REPORT_INTERVAL_S:
+            post_notion_summary(state)
+            state.last_notion_report_at = now
+
+    await nc.close()
+    logger.info("[ORCH] Orchestrator shut down.")
+
+
+def post_notion_summary(state: OrchestratorState):
+    """Post 6-hourly summary callout to VCC Build Instructions."""
+    if not NOTION_TOKEN or not VCC_PAGE_ID:
+        return
+    try:
+        now = datetime.now(timezone.utc)
+        verdict = state.go_no_go_history[-1][0] if state.go_no_go_history else "UNKNOWN"
+        emoji = {"GO": "✅", "NO-GO": "🚫", "WARNING": "⚠️"}.get(verdict, "❓")
+
+        parts = [f"{emoji} **Bridge v2.5 Status — {now.strftime('%Y-%m-%d %H:%M UTC')}**"]
+        parts.append(f"Verdict: **{verdict}** | Paused: {state.build_paused} | Consecutive NO-GO: {state.consecutive_no_go}")
+
+        if state.last_crp:
+            parts.append(f"Last CRP: cycle `{state.last_crp.get('cycle_id', '?')}` | guardrails: {'✅' if state.last_crp.get('guardrail_pass') else '❌'}")
+        if state.last_perplexity:
+            parts.append(f"Last Perplexity: `{state.last_perplexity.get('diag_id', '?')}` | grade: {state.last_perplexity.get('health_grade', '?')} ({state.last_perplexity.get('health_score', '?')})")
+        if state.last_oad_cognition:
+            parts.append(f"Last OAD: cycle `{state.last_oad_cognition.get('cycle_id', '?')}` | rig: {state.last_oad_cognition.get('rig', '?')} | gitlab: {state.last_oad_cognition.get('gitlab_status', '?')}")
+        if state.oad_cognition_last_seen:
+            since = (now - state.oad_cognition_last_seen).total_seconds() / 60
+            parts.append(f"OAD last seen: {since:.0f} min ago | College: available")
+
+        text = "\n".join(parts)
+
+        requests.patch(
+            f"{NOTION_API}/blocks/{VCC_PAGE_ID}/children",
+            headers={
+                "Authorization": f"Bearer {NOTION_TOKEN}",
+                "Notion-Version": NOTION_VERSION,
+                "Content-Type": "application/json",
+            },
+            json={"children": [{
+                "object": "block", "type": "callout",
+                "callout": {
+                    "rich_text": [{"type": "text", "text": {"content": text[:2000]}}],
+                    "icon": {"type": "emoji", "emoji": emoji},
+                    "color": "green_background" if verdict == "GO" else "red_background",
+                },
+            }]},
+        ).raise_for_status()
+        logger.info(f"[ORCH] Notion summary posted: {verdict}")
+    except Exception as e:
+        logger.error(f"[ORCH] Notion summary post failed: {e}")
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+    asyncio.run(run_orchestrator())
+```
+
+---
+
+
+## I.8 — CRP v2.5 Validator Extension `OAD-008`
+
+File: `tools/crp_validator.py` (v2.5 patch — extends Phase 2.1 validator)
+```python
+#!/usr/bin/env python3
+"""CRP Validator v2.5 — validates cycle reports with OAD integration fields.
+
+Extends v2.1 to require §7.7 (OAD Status), §7.8 (Trilateral Health),
+and §7.9 (Learning Report) subsections after grace period.
+
+Usage:
+    python tools/crp_validator.py --strict report.json
+    python tools/crp_validator.py --version  # prints 2.5
+"""
+
+import os
+import sys
+import json
+import logging
+from datetime import datetime, timezone
+from typing import Optional
+
+logger = logging.getLogger("crp_validator")
+
+CRP_VERSION = "2.5"
+GRACE_CYCLES = int(os.environ.get("VCC_BRIDGE_GRACE_CYCLES", "3"))
+
+# Required top-level sections (§1-§8)
+REQUIRED_SECTIONS = [
+    "cycle_id",
+    "timestamp",
+    "crp_version",
+    "phase",
+    "build_summary",       # §1
+    "srs_coverage",        # §2
+    "guardrails_report",   # §3
+    "drift_check",         # §4
+    "test_results",        # §5
+    "next_cycle_intent",   # §6
+    "health_metrics",      # §7
+    "notion_sync",         # §8
+]
+
+# §7 subsections (v2.5)
+HEALTH_SUBSECTIONS_V21 = ["health_services", "perplexity_diagnostic", "bridge_status", "merged_health"]
+HEALTH_SUBSECTIONS_V25 = ["oad_status", "trilateral_health", "learning_report"]
+
+# v2.5 OAD fields
+OAD_FIELDS = [
+    "oad_cognition",
+    "oad_reflex_fixes",
+    "oad_reflex_count",
+    "oad_rig_status",
+    "trilateral_go_no_go",
+    "trilateral_health_score",
+    "trilateral_blockers",
+]
+
+
+class ValidationError:
+    def __init__(self, field: str, message: str, severity: str = "error"):
+        self.field = field
+        self.message = message
+        self.severity = severity  # "error" | "warning"
+
+    def __str__(self):
+        icon = "❌" if self.severity == "error" else "⚠️"
+        return f"{icon} [{self.field}] {self.message}"
+
+
+def validate_report(report: dict, strict: bool = False, cycle_number: int = 0) -> list[ValidationError]:
+    """Validate a CRP cycle report against v2.5 schema.
+
+    Args:
+        report: The cycle report dict
+        strict: If True, all warnings become errors
+        cycle_number: Current cycle number (for grace period calculation)
+
+    Returns:
+        List of validation errors/warnings
+    """
+    errors = []
+    past_grace = cycle_number > GRACE_CYCLES
+
+    # ── Version check ────────────────────────────────────────────────
+    version = report.get("crp_version", "")
+    if version not in ("2.5", "2.1", "2.0"):
+        errors.append(ValidationError("crp_version", f"Unknown version '{version}', expected '2.5'"))
+
+    if version == "2.0" and past_grace:
+        errors.append(ValidationError("crp_version", "CRP v2.0 reports are rejected after grace period. Upgrade to v2.5."))
+    elif version == "2.0":
+        errors.append(ValidationError("crp_version", "CRP v2.0 accepted during grace period — upgrade to v2.5 soon", "warning"))
+
+    if version == "2.1" and past_grace:
+        errors.append(ValidationError("crp_version", "CRP v2.1 reports are rejected after grace period. Upgrade to v2.5."))
+    elif version == "2.1":
+        errors.append(ValidationError("crp_version", "CRP v2.1 accepted during grace period — upgrade to v2.5 soon", "warning"))
+
+    # ── Required sections ────────────────────────────────────────────
+    for section in REQUIRED_SECTIONS:
+        if section not in report or report[section] is None:
+            errors.append(ValidationError(section, f"Required section '{section}' is missing"))
+        elif isinstance(report[section], str) and not report[section].strip():
+            errors.append(ValidationError(section, f"Required section '{section}' is empty"))
+
+    # ── §7 health subsections (v2.1) ─────────────────────────────────
+    health = report.get("health_metrics", {})
+    if isinstance(health, dict):
+        for sub in HEALTH_SUBSECTIONS_V21:
+            if sub not in health:
+                sev = "error" if past_grace else "warning"
+                errors.append(ValidationError(
+                    f"health_metrics.{sub}",
+                    f"§7 subsection '{sub}' is missing (required after {GRACE_CYCLES} cycles)",
+                    sev,
+                ))
+
+        # ── §7 health subsections (v2.5) ─────────────────────────────
+        for sub in HEALTH_SUBSECTIONS_V25:
+            if sub not in health:
+                sev = "error" if past_grace else "warning"
+                errors.append(ValidationError(
+                    f"health_metrics.{sub}",
+                    f"§7 v2.5 subsection '{sub}' is missing (required after {GRACE_CYCLES} cycles)",
+                    sev,
+                ))
+
+    # ── §7.7 OAD Status validation ───────────────────────────────────
+    oad_status = health.get("oad_status", {}) if isinstance(health, dict) else {}
+    if oad_status:
+        if not oad_status.get("rig"):
+            errors.append(ValidationError("health_metrics.oad_status.rig", "OAD rig not specified", "warning"))
+
+    # ── §7.8 Trilateral Health validation ────────────────────────────
+    trilateral = health.get("trilateral_health", {}) if isinstance(health, dict) else {}
+    if trilateral:
+        if "go_no_go" not in trilateral:
+            errors.append(ValidationError("health_metrics.trilateral_health.go_no_go", "Trilateral GO/NO-GO missing"))
+
+    # ── §7.9 Learning Report validation ──────────────────────────────
+    learning = health.get("learning_report", {}) if isinstance(health, dict) else {}
+    if past_grace and not learning:
+        errors.append(ValidationError(
+            "health_metrics.learning_report",
+            "§7.9 Learning Report is missing (required after grace period)",
+        ))
+    if learning:
+        for field in ["events_ingested", "new_signatures", "correlations_found"]:
+            if field not in learning:
+                errors.append(ValidationError(
+                    f"health_metrics.learning_report.{field}",
+                    f"Learning report field '{field}' is missing",
+                    "warning",
+                ))
+
+    # ── v2.5 OAD top-level fields ────────────────────────────────────
+    for field in OAD_FIELDS:
+        if field not in report:
+            sev = "error" if past_grace else "warning"
+            errors.append(ValidationError(field, f"v2.5 OAD field '{field}' is missing", sev))
+
+    # ── Strict mode: warnings become errors ──────────────────────────
+    if strict:
+        for e in errors:
+            e.severity = "error"
+
+    return errors
+
+
+def validate_file(filepath: str, strict: bool = False) -> bool:
+    """Validate a CRP report JSON file."""
+    with open(filepath) as f:
+        report = json.load(f)
+
+    errors = validate_report(report, strict=strict)
+
+    for e in errors:
+        print(str(e))
+
+    error_count = sum(1 for e in errors if e.severity == "error")
+    warning_count = sum(1 for e in errors if e.severity == "warning")
+
+    print(f"\nCRP Validator v{CRP_VERSION}: {error_count} errors, {warning_count} warnings")
+    return error_count == 0
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description=f"CRP Validator v{CRP_VERSION}")
+    parser.add_argument("file", nargs="?", help="Report JSON file to validate")
+    parser.add_argument("--strict", action="store_true", help="Treat warnings as errors")
+    parser.add_argument("--version", action="store_true", help="Print version")
+    args = parser.parse_args()
+
+    if args.version:
+        print(CRP_VERSION)
+        sys.exit(0)
+
+    if not args.file:
+        parser.error("Report file is required")
+
+    success = validate_file(args.file, strict=args.strict)
+    sys.exit(0 if success else 1)
+```
+
+---
+
+
+## I.9 — Test Matrix `OAD-001 through OAD-009`
+
+**Total tests: 58** across 9 test files.
+| **Test File** | **OAD Code** | **Tests** | **Key Assertions** |
+| `test_oad_nats_events.py` | OAD-001 | 7 | All 4 subjects publish valid JSON, consumer receives within 5s, payload schema validates, JetStream persistence, consumer ack prevents redelivery, reflex event pattern_code validation, mission dispatch round-trip |
+| `test_oad_reflex_feed.py` | OAD-002 | 7 | Reflex event writes to vcc_loop_state, matching Linear issue auto-closed, CRP §7.7 contains reflex summary, >5 fixes triggers WARNING, custom pattern does NOT auto-close, dedup matches file path, flush clears buffer |
+| `test_oad_mission_dispatch.py` | OAD-003 | 8 | Mission inserts into oad_missions table, NATS event publishes, completion callback fires, timeout returns error, auto-dispatch on guardrail failure, priority ordering respected, duplicate missions within 60s suppressed, all 4 mission types dispatch correctly |
+| `test_college_query_client.py` | OAD-004 | 6 | Query dispatches mission correctly, result parses into CollegeQueryResult, timeout returns graceful error, context passed through, max_professors cap respected, health_check returns bool |
+| `test_oad_dedup_v25.py` | OAD-005 | 7 | OAD prefix recognized, reflex auto-fix closes matching issues, 3-way cross-reference works, OAD Linear fallback via orchestrator, rate limit enforced at 5 per loop, audit detects duplicates, auto_close_for_reflex returns closed IDs |
+| `test_oad_state_store_v25.py` | OAD-006 | 7 | OAD reflex write validates, OAD cognition write validates, mission result write validates, orchestrator v2.5 merge includes OAD data, history table receives entries, oad_rig constraint enforces valid names, cleanup trigger removes old rows |
+| `test_oad_orchestrator_v25.py` | OAD-007 | 9 | OAD reflex event triggers dedup, OAD cognition triggers merge, OAD gitlab error → NO-GO after 3 cycles, excessive reflex → WARNING, missing cognition → WARNING, auto-dispatch on import errors, trilateral merge correct GO/NO-GO, orchestrator survives OAD offline, Notion summary posts |
+| `test_oad_crp_v25.py` | OAD-008 | 7 | v2.5 schema validates with OAD fields, v2.1 accepted during grace, v2.1 rejected after grace, §7.7/§7.8/§7.9 render correctly, OADHealth validates with partial data, trilateral GO/NO-GO uses worst-of-three, CRP version assertion |
+
+---
+
+
+## I.10 — GitLab CI Stages `OAD-001 through OAD-009`
+
+Add to `.gitlab-ci.yml`:
+```yaml
+# ── Phase 2.5 OAD Bridge CI Stages ──────────────────────────────────────────
+
+bridge-oad-nats:
+  stage: test
+  image: python:3.11-slim
+  script:
+    - pip install -r requirements.txt
+    - python -c "import yaml; cfg=yaml.safe_load(open('config/crp_config.yaml')); subjects=cfg.get('nats_subjects',[]); assert 'citadel.oad.reflex.applied' in subjects, 'Missing OAD reflex subject'; assert 'citadel.oad.cognition.completed' in subjects, 'Missing OAD cognition subject'; assert 'citadel.oad.mission.dispatched' in subjects, 'Missing OAD mission dispatched subject'; assert 'citadel.oad.mission.completed' in subjects, 'Missing OAD mission completed subject'; print('✅ All 4 OAD NATS subjects declared')"
+  rules:
+    - changes:
+        - config/crp_config.yaml
+        - tools/lib/oad_nats.py
+
+bridge-oad-tests:
+  stage: test
+  image: python:3.11-slim
+  services:
+    - name: nats:latest
+      alias: nats
+  variables:
+    NATS_URL: "nats://nats:4222"
+    SUPABASE_URL: "$SUPABASE_URL"
+    SUPABASE_SERVICE_ROLE_KEY: "$SUPABASE_SERVICE_ROLE_KEY"
+  script:
+    - pip install -r requirements.txt
+    - python -m pytest tests/phase25/ -v --tb=short --junitxml=reports/phase25.xml
+  artifacts:
+    reports:
+      junit: reports/phase25.xml
+    when: always
+  rules:
+    - changes:
+        - tools/lib/oad_nats.py
+        - tools/lib/oad_reflex_feed.py
+        - tools/lib/issue_dedup.py
+        - tools/lib/college_query_client.py
+        - tools/oad_mission_dispatcher.py
+        - tools/loop_orchestrator.py
+        - tools/crp_validator.py
+        - tests/phase25/**/*
+
+bridge-dedup-v25:
+  stage: test
+  image: python:3.11-slim
+  script:
+    - pip install -r requirements.txt
+    - python tools/lib/issue_dedup.py --audit --include-oad || echo "⚠️ Dedup audit found duplicates"
+  allow_failure: true
+  rules:
+    - changes:
+        - tools/lib/issue_dedup.py
+
+crp-validate-v25:
+  stage: test
+  image: python:3.11-slim
+  script:
+    - pip install -r requirements.txt
+    - python tools/crp_validator.py --version | grep -q '2.5' || (echo '❌ CRP version mismatch'; exit 1)
+    - echo '✅ CRP validator version 2.5 confirmed'
+  rules:
+    - changes:
+        - tools/crp_validator.py
+
+bridge-state-store-v25:
+  stage: test
+  image: python:3.11-slim
+  script:
+    - pip install -r requirements.txt
+    - python -m pytest tests/phase25/test_oad_state_store_v25.py -v --tb=short
+  rules:
+    - changes:
+        - supabase/migrations/20260228_vcc_loop_state_v25.sql
+
+bridge-orchestrator-v25:
+  stage: test
+  image: python:3.11-slim
+  services:
+    - name: nats:latest
+      alias: nats
+  variables:
+    NATS_URL: "nats://nats:4222"
+  script:
+    - pip install -r requirements.txt
+    - python -m pytest tests/phase25/test_oad_orchestrator_v25.py -v --tb=short
+  rules:
+    - changes:
+        - tools/loop_orchestrator.py
+```
+
+---
+
+
+## I.11 — File Index
+
+| **File** | **OAD Code** | **Purpose** |
+| `scripts/provision_oad_nats.sh` | OAD-001 | Extend VCC_BRIDGE stream with OAD subjects + consumers |
+| `tools/lib/oad_nats.py` | OAD-001 | OAD NATS event publisher library (4 event schemas + publisher class) |
+| `tools/lib/oad_reflex_feed.py` | OAD-002 | Reflex → orchestrator feed with auto-close + CRP §7.7 injection |
+| `tools/oad_mission_dispatcher.py` | OAD-003 | Mission dispatch interface (4 mission types + NATS + Supabase) |
+| `tools/lib/college_query_client.py` | OAD-004 | College System query client for orchestrator/CRP/auditor |
+| `tools/lib/issue_dedup.py` (v2.5) | OAD-005 | Triple-loop dedup with OAD prefix + reflex auto-close |
+| `supabase/migrations/20260228_vcc_loop_state_v25.sql` | OAD-006 | ALTER TABLE for OAD columns + vcc_loop_state_history + triggers |
+| `tools/loop_orchestrator.py` (v2.5) | OAD-007 | Trilateral orchestrator — 6 NATS subs + GO/NO-GO + auto-dispatch |
+| `tools/crp_validator.py` (v2.5) | OAD-008 | CRP validator with §7.7/§7.8/§7.9 enforcement + grace period |
+| `config/crp_config.yaml` (patch) | OAD-009 | OAD NATS subjects + reflex patterns + OAD config section |

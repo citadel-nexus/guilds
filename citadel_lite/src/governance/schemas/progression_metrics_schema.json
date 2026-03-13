@@ -1,0 +1,346 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:citadel:cgrf:progression-metrics:v1",
+  "title": "Progression Metrics Schema",
+  "description": "JSON Schema for progression.yaml — validates the cross-cycle AI comparison and progression tracking file produced by ProgressionWriter. Each cycle entry captures both AI perspectives, code metrics, design choices, flaws, and intent alignment.",
+  "type": "object",
+  "required": ["_meta", "summary", "cycles"],
+  "additionalProperties": false,
+
+  "properties": {
+
+    "_meta": {
+      "type": "object",
+      "required": ["schema", "created"],
+      "additionalProperties": true,
+      "properties": {
+        "schema": {
+          "type": "string",
+          "const": "progression-metrics-v1"
+        },
+        "created": {
+          "type": "string",
+          "description": "ISO 8601 timestamp of first entry"
+        },
+        "last_updated": {
+          "type": "string",
+          "description": "ISO 8601 timestamp of most recent save"
+        },
+        "run_id": {
+          "type": "string",
+          "description": "Identifier for this orchestrator run (YYYYMMDD_HHMMSS)"
+        },
+        "blueprint": {
+          "type": "string",
+          "description": "Blueprint file being executed"
+        }
+      }
+    },
+
+    "summary": {
+      "type": "object",
+      "required": ["total_cycles", "goals_completed", "known_flaws", "design_decisions"],
+      "additionalProperties": true,
+      "properties": {
+        "total_cycles": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Cumulative cycles recorded across all runs"
+        },
+        "goals_completed": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Task names that resulted in a committed cycle"
+        },
+        "known_flaws": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/FlawEntry" },
+          "description": "Accumulated major/critical flaws — injected into THINK to prevent repetition"
+        },
+        "design_decisions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/DesignDecision" },
+          "description": "Accumulated design choices — injected into THINK to ensure consistency"
+        },
+        "accumulated_difficulty_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10,
+          "description": "Rolling average complexity score across all cycles"
+        },
+        "avg_intent_alignment": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Rolling average intent alignment (0.0=no alignment, 1.0=perfect)"
+        },
+        "alignment_trend": {
+          "type": "array",
+          "items": { "type": "number", "minimum": 0, "maximum": 1 },
+          "description": "Last 10 intent_alignment values (most recent last)"
+        }
+      }
+    },
+
+    "cycles": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/CycleEntry" },
+      "description": "One entry per orchestrator cycle"
+    }
+  },
+
+  "$defs": {
+
+    "OutcomeEnum": {
+      "type": "string",
+      "enum": ["committed", "blocked_audit", "blocked_test", "no_files", "skipped"],
+      "description": "committed=git commit succeeded; blocked_audit=Claude rejected; blocked_test=tests failed; no_files=BUILD empty; skipped=dry-run"
+    },
+
+    "AlignmentEnum": {
+      "type": "string",
+      "enum": ["aligned", "partial", "diverged", "unknown"],
+      "description": "How well the primary GPT-4o approach aligns with Claude's perspective"
+    },
+
+    "DifficultyEnum": {
+      "type": "string",
+      "enum": ["trivial", "simple", "moderate", "complex", "expert", "unknown"]
+    },
+
+    "MaintainabilityEnum": {
+      "type": "string",
+      "enum": ["good", "acceptable", "poor"]
+    },
+
+    "SeverityEnum": {
+      "type": "string",
+      "enum": ["minor", "major", "critical"]
+    },
+
+    "VerdictEnum": {
+      "type": "string",
+      "enum": ["approved", "needs_revision", "rejected"]
+    },
+
+    "FlawEntry": {
+      "type": "object",
+      "required": ["severity", "description"],
+      "additionalProperties": true,
+      "properties": {
+        "severity": { "$ref": "#/$defs/SeverityEnum" },
+        "description": {
+          "type": "string",
+          "minLength": 5,
+          "description": "Clear description of the flaw"
+        },
+        "location": {
+          "type": "string",
+          "description": "Filename or function name where flaw was found"
+        },
+        "cycle": {
+          "type": "integer",
+          "description": "Cycle number when flaw was first identified"
+        },
+        "task": {
+          "type": "string",
+          "description": "Task that introduced this flaw"
+        }
+      }
+    },
+
+    "DesignDecision": {
+      "type": "object",
+      "required": ["choice"],
+      "additionalProperties": true,
+      "properties": {
+        "choice": {
+          "type": "string",
+          "description": "The specific design decision made"
+        },
+        "rationale": {
+          "type": "string",
+          "description": "Why this decision was made (inferred from code or explicit)"
+        },
+        "alternatives": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Alternatives that were considered but not chosen"
+        },
+        "cycle": {
+          "type": "integer",
+          "description": "Cycle when this decision was made"
+        },
+        "task": {
+          "type": "string",
+          "description": "Task context for this decision"
+        }
+      }
+    },
+
+    "PerspectiveComparison": {
+      "type": "object",
+      "required": ["alignment"],
+      "additionalProperties": true,
+      "properties": {
+        "primary_approach": {
+          "type": "string",
+          "description": "What approach GPT-4o took (inferred from code)"
+        },
+        "claude_perspective": {
+          "type": "string",
+          "description": "How Claude would have approached this, or confirms alignment"
+        },
+        "alignment": { "$ref": "#/$defs/AlignmentEnum" },
+        "divergence_notes": {
+          "type": "string",
+          "description": "Key differences when alignment is partial/diverged"
+        }
+      }
+    },
+
+    "CodeMetrics": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "difficulty": { "$ref": "#/$defs/DifficultyEnum" },
+        "complexity_score": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "description": "1=trivial script, 10=distributed systems kernel"
+        },
+        "design_pattern": {
+          "type": "string",
+          "description": "Primary design pattern identified: dataclass, factory, strategy, observer, adapter, none, etc."
+        },
+        "maintainability": { "$ref": "#/$defs/MaintainabilityEnum" }
+      }
+    },
+
+    "AuditLayerEntry": {
+      "type": "object",
+      "required": ["verdict"],
+      "additionalProperties": true,
+      "properties": {
+        "verdict": { "$ref": "#/$defs/VerdictEnum" },
+        "risk_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "rationale": { "type": "string" },
+        "claude_perspective": { "type": "string" },
+        "alignment": { "$ref": "#/$defs/AlignmentEnum" },
+        "divergence_notes": { "type": "string" },
+        "issues_count": { "type": "integer", "minimum": 0 },
+        "srs_refs_failed": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+
+    "PrimaryLayerEntry": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "backend": {
+          "type": "string",
+          "description": "LLM backend used: azure, openai, bedrock, fallback"
+        },
+        "approach": {
+          "type": "string",
+          "description": "Primary AI's inferred approach from code analysis"
+        },
+        "reasoning": {
+          "type": "string",
+          "description": "THINK reasoning for selecting this task"
+        },
+        "hint": {
+          "type": "string",
+          "description": "Implementation hint from THINK output"
+        }
+      }
+    },
+
+    "DiffSummary": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "lines_added": { "type": "integer", "minimum": 0 },
+        "lines_removed": { "type": "integer", "minimum": 0 },
+        "files_written": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "assessment_alignment": {
+          "type": "string",
+          "description": "aligned|diverged from assessment_vs_outcome diff metric"
+        }
+      }
+    },
+
+    "TestResult": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "passed": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "errors": { "type": "integer", "minimum": 0 }
+      }
+    },
+
+    "CycleEntry": {
+      "type": "object",
+      "required": ["cycle", "ts", "task", "caps_grade", "outcome"],
+      "additionalProperties": true,
+      "properties": {
+        "cycle": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Cycle number"
+        },
+        "ts": {
+          "type": "string",
+          "description": "ISO 8601 timestamp when cycle was recorded"
+        },
+        "task": {
+          "type": "string",
+          "description": "Task selected by THINK (priority_task)"
+        },
+        "caps_grade": {
+          "type": "string",
+          "enum": ["S", "A", "B", "C", "D"],
+          "description": "CAPS grade assigned to this task"
+        },
+        "outcome": { "$ref": "#/$defs/OutcomeEnum" },
+        "primary_layer": { "$ref": "#/$defs/PrimaryLayerEntry" },
+        "audit_layer": { "$ref": "#/$defs/AuditLayerEntry" },
+        "code_metrics": { "$ref": "#/$defs/CodeMetrics" },
+        "design_choices": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/DesignDecision" }
+        },
+        "flaws": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/FlawEntry" }
+        },
+        "intent_alignment": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Claude's assessment: how well this code serves blueprint goals"
+        },
+        "diff_summary": { "$ref": "#/$defs/DiffSummary" },
+        "test_result": { "$ref": "#/$defs/TestResult" },
+        "implementation_score": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Blueprint completion percentage at time of this cycle"
+        }
+      }
+    }
+  }
+}

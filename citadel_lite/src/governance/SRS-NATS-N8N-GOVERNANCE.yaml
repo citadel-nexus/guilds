@@ -1,0 +1,1600 @@
+# SRS-NATS-N8N-GOVERNANCE.yaml
+# NATS JetStream Event Bus & n8n Workflow Governance
+# Software Requirements Specification
+# ===========================================================
+# CGRF v2.0 | Status: Draft | Created: 2026-02-06
+#
+# This artifact provides assessor-traceable SRS codes for the
+# NATS JetStream event bus operations, n8n workflow governance,
+# dead-letter queue management, orchestrator lifecycle,
+# authority/governance gates, and contract/CI validation.
+# ===========================================================
+
+_document_schema: CGRF-v2.0
+_module: nats_n8n_governance
+_purpose: SRS traceability for NATS JetStream event bus and n8n workflow governance
+_owner: CNWB
+_compliance: CGRF v2.0
+_status: Draft
+
+srs_family: NATS_N8N_GOVERNANCE
+version: "1.0.0"
+description: "SRS codes for NATS JetStream event bus operations, n8n workflow governance, and runtime binding"
+
+# =============================================================================
+# F-SERIES: EVENT BUS & WORKFLOW EVENTS (F800-F879)
+# =============================================================================
+
+f_events:
+
+  # ---------------------------------------------------------------------------
+  # Stream & Infrastructure Events (F800-F809)
+  # ---------------------------------------------------------------------------
+
+  - name: NATS_STREAM_CREATED
+    srs_code: F800
+    default_severity: INFO
+    value_metric: 2
+    description: >
+      A new NATS JetStream stream has been successfully created.
+      Captures stream name, subject filter, retention policy, and replica count.
+
+  - name: NATS_STREAM_UPDATED
+    srs_code: F801
+    default_severity: INFO
+    value_metric: 2
+    description: >
+      An existing NATS JetStream stream configuration has been modified.
+      Records the previous and new configuration diff for audit trail.
+
+  - name: NATS_STREAM_DELETED
+    srs_code: F802
+    default_severity: WARNING
+    value_metric: 3
+    description: >
+      A NATS JetStream stream has been deleted. This is a destructive operation
+      and must be preceded by a backup snapshot (A806) in production environments.
+
+  - name: NATS_STREAM_LIMIT_REACHED
+    srs_code: F803
+    default_severity: WARNING
+    value_metric: 3
+    description: >
+      A stream has reached its configured message count, byte size, or age limit.
+      May trigger automatic purge depending on retention policy (limits vs interest vs workqueue).
+
+  - name: NATS_STREAM_STALE
+    srs_code: F804
+    default_severity: WARNING
+    value_metric: 3
+    description: >
+      No new messages have been published to a stream beyond the configured
+      staleness threshold. May indicate a dead producer or misconfigured subject.
+
+  - name: NATS_CONNECTION_LOST
+    srs_code: F805
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      Connection to the NATS server or cluster has been lost. Triggers automatic
+      reconnection attempts and suspends publish/consume operations until restored.
+
+  - name: NATS_CONNECTION_RESTORED
+    srs_code: F806
+    default_severity: INFO
+    value_metric: 2
+    description: >
+      Connection to the NATS server or cluster has been re-established after
+      a prior disconnection. Resumes pending publish/consume operations.
+
+  - name: NATS_CLUSTER_HEALTH_DEGRADED
+    srs_code: F807
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      The NATS cluster health has degraded below acceptable thresholds.
+      One or more nodes may be unreachable or experiencing high latency.
+
+  - name: NATS_JETSTREAM_DISABLED
+    srs_code: F808
+    default_severity: CRITICAL
+    value_metric: 5
+    description: >
+      JetStream has been disabled or is unavailable on the connected NATS server.
+      All stream and consumer operations will fail until JetStream is re-enabled.
+
+  - name: NATS_STORAGE_THRESHOLD_EXCEEDED
+    srs_code: F809
+    default_severity: WARNING
+    value_metric: 3
+    description: >
+      NATS JetStream storage usage has exceeded the configured warning threshold.
+      Requires immediate attention to prevent message rejection due to storage exhaustion.
+
+  # ---------------------------------------------------------------------------
+  # Message & Schema Events (F810-F819)
+  # ---------------------------------------------------------------------------
+
+  - name: EVENT_PUBLISHED
+    srs_code: F810
+    default_severity: DEBUG
+    value_metric: 1
+    description: >
+      An event has been successfully published to a NATS JetStream stream.
+      Includes subject, sequence number, and deduplication ID for traceability.
+
+  - name: EVENT_CONSUMED
+    srs_code: F811
+    default_severity: DEBUG
+    value_metric: 1
+    description: >
+      An event has been successfully consumed and acknowledged by a consumer.
+      Records consumer name, stream sequence, and processing duration.
+
+  - name: EVENT_SCHEMA_VALIDATION_FAILED
+    srs_code: F812
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      An event payload failed schema validation against the registered JSON Schema
+      or Avro schema in the contract registry. The message is rejected before processing.
+
+  - name: EVENT_ENVELOPE_MALFORMED
+    srs_code: F813
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      The event envelope is missing required fields (event_type, timestamp,
+      tenant_id, trace_id, schema_version). The message cannot be processed.
+
+  - name: EVENT_DUPLICATE_DETECTED
+    srs_code: F814
+    default_severity: WARNING
+    value_metric: 2
+    description: >
+      A duplicate event has been detected via the idempotency key or NATS
+      deduplication window. The duplicate is discarded without processing.
+
+  - name: EVENT_TENANT_MISMATCH
+    srs_code: F815
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      The tenant_id in the event envelope does not match the expected tenant
+      for the stream or consumer. Indicates a potential tenant isolation violation.
+
+  - name: EVENT_TRACE_MISSING
+    srs_code: F816
+    default_severity: WARNING
+    value_metric: 3
+    description: >
+      An event is missing the required trace_id or correlation_id header,
+      breaking distributed tracing continuity across the event bus.
+
+  - name: EVENT_SCHEMA_REGISTERED
+    srs_code: F817
+    default_severity: INFO
+    value_metric: 2
+    description: >
+      A new event schema version has been registered in the contract registry.
+      Includes schema name, version, and compatibility check result.
+
+  - name: EVENT_SCHEMA_BREAKING_CHANGE
+    srs_code: F818
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      A proposed schema change has been detected as backward-incompatible.
+      The change is blocked until a migration plan is provided and approved.
+
+  - name: EVENT_PAYLOAD_OVERSIZED
+    srs_code: F819
+    default_severity: WARNING
+    value_metric: 3
+    description: >
+      An event payload exceeds the configured maximum size threshold.
+      Large payloads should use object store references instead of inline data.
+
+  # ---------------------------------------------------------------------------
+  # Consumer & Processing Events (F820-F829)
+  # ---------------------------------------------------------------------------
+
+  - name: CONSUMER_CREATED
+    srs_code: F820
+    default_severity: INFO
+    value_metric: 2
+    description: >
+      A new NATS JetStream consumer has been created on a stream.
+      Records consumer name, delivery policy, ack policy, and filter subjects.
+
+  - name: CONSUMER_DELETED
+    srs_code: F821
+    default_severity: WARNING
+    value_metric: 3
+    description: >
+      A NATS JetStream consumer has been deleted. Any unacknowledged messages
+      will be lost from the consumer's perspective.
+
+  - name: CONSUMER_LAG_HIGH
+    srs_code: F822
+    default_severity: WARNING
+    value_metric: 3
+    description: >
+      Consumer lag (pending message count) has exceeded the configured threshold.
+      Indicates the consumer is unable to keep up with the publish rate.
+
+  - name: CONSUMER_STALLED
+    srs_code: F823
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      A consumer has stopped making progress for an extended period despite
+      having pending messages. May indicate a deadlock or resource exhaustion.
+
+  - name: CONSUMER_REDELIVERY_EXCEEDED
+    srs_code: F824
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      A message has exceeded the maximum redelivery count configured on the consumer.
+      The message is routed to the dead-letter queue for manual inspection.
+
+  - name: CONSUMER_ACK_TIMEOUT
+    srs_code: F825
+    default_severity: WARNING
+    value_metric: 3
+    description: >
+      A consumer failed to acknowledge a message within the configured ack_wait
+      period. The message will be redelivered to an available consumer instance.
+
+  - name: CONSUMER_PROCESSING_ERROR
+    srs_code: F826
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      An unhandled error occurred during message processing in a consumer handler.
+      The message is NAK'd for redelivery or routed to DLQ depending on policy.
+
+  - name: CONSUMER_BACKPRESSURE_ACTIVE
+    srs_code: F827
+    default_severity: WARNING
+    value_metric: 3
+    description: >
+      Backpressure has been activated on a consumer due to downstream service
+      saturation. New message delivery is throttled until pressure is relieved.
+
+  - name: CONSUMER_CIRCUIT_BREAKER_OPEN
+    srs_code: F828
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      The circuit breaker for a consumer's downstream dependency has tripped open
+      after exceeding the failure threshold. Message processing is halted.
+
+  - name: CONSUMER_CIRCUIT_BREAKER_CLOSED
+    srs_code: F829
+    default_severity: INFO
+    value_metric: 2
+    description: >
+      The circuit breaker for a consumer's downstream dependency has closed
+      after successful health checks. Normal message processing resumes.
+
+  # ---------------------------------------------------------------------------
+  # DLQ Events (F830-F839)
+  # ---------------------------------------------------------------------------
+
+  - name: DLQ_MESSAGE_ROUTED
+    srs_code: F830
+    default_severity: WARNING
+    value_metric: 3
+    description: >
+      A message has been routed to the dead-letter queue after exhausting
+      all retry attempts or encountering a non-retryable error.
+
+  - name: DLQ_REPLAY_INITIATED
+    srs_code: F831
+    default_severity: INFO
+    value_metric: 2
+    description: >
+      A DLQ replay operation has been initiated, re-publishing selected
+      messages from the DLQ back to their original stream for reprocessing.
+
+  - name: DLQ_REPLAY_COMPLETED
+    srs_code: F832
+    default_severity: INFO
+    value_metric: 2
+    description: >
+      A DLQ replay operation has completed successfully. Records the count
+      of messages replayed and any that failed during replay.
+
+  - name: DLQ_REPLAY_FAILED
+    srs_code: F833
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      A DLQ replay operation has failed. Messages remain in the DLQ and
+      the failure reason is logged for investigation.
+
+  - name: DLQ_POISON_MESSAGE_DETECTED
+    srs_code: F834
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      A poison message has been detected in the DLQ -- a message that
+      consistently causes consumer failures regardless of retry attempts.
+
+  - name: DLQ_THRESHOLD_EXCEEDED
+    srs_code: F835
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      The number of messages in the DLQ has exceeded the configured alert
+      threshold within the monitoring period. Indicates a systemic processing issue.
+
+  - name: DLQ_MESSAGE_DROPPED
+    srs_code: F836
+    default_severity: WARNING
+    value_metric: 3
+    description: >
+      A DLQ message has been permanently dropped after exceeding the maximum
+      retry count and being marked for disposal by an operator or policy.
+
+  - name: DLQ_MANUAL_REVIEW_REQUIRED
+    srs_code: F837
+    default_severity: WARNING
+    value_metric: 3
+    description: >
+      A DLQ message has been flagged for manual review. Automated processing
+      has been unable to resolve the issue and human intervention is required.
+
+  - name: DLQ_RETENTION_EXPIRING
+    srs_code: F838
+    default_severity: INFO
+    value_metric: 2
+    description: >
+      Messages in the DLQ are approaching their retention expiry. Unreviewed
+      messages will be permanently lost when the retention period elapses.
+
+  - name: DLQ_CLEARED
+    srs_code: F839
+    default_severity: INFO
+    value_metric: 2
+    description: >
+      The dead-letter queue has been explicitly cleared by an operator action.
+      All messages in the DLQ have been purged or archived before clearing.
+
+  # ---------------------------------------------------------------------------
+  # n8n Workflow Events (F840-F849)
+  # ---------------------------------------------------------------------------
+
+  - name: N8N_WORKFLOW_EXECUTED
+    srs_code: F840
+    default_severity: INFO
+    value_metric: 2
+    description: >
+      An n8n workflow execution has completed successfully. Records workflow ID,
+      execution ID, duration, node count, and trigger source.
+
+  - name: N8N_WORKFLOW_FAILED
+    srs_code: F841
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      An n8n workflow execution has failed. Records the failing node, error message,
+      execution context, and whether the failure is retryable.
+
+  - name: N8N_WORKFLOW_TIMEOUT
+    srs_code: F842
+    default_severity: WARNING
+    value_metric: 3
+    description: >
+      An n8n workflow execution has exceeded its configured timeout limit.
+      The execution is terminated and partial results are discarded or rolled back.
+
+  - name: N8N_UNAUTHORIZED_SIDE_EFFECT
+    srs_code: F843
+    default_severity: CRITICAL
+    value_metric: 5
+    description: >
+      An n8n workflow has attempted a direct database write, external API call,
+      or filesystem operation that is not authorized by the workflow governance policy.
+
+  - name: N8N_WORKFLOW_DEPLOYED
+    srs_code: F844
+    default_severity: INFO
+    value_metric: 2
+    description: >
+      A new or updated n8n workflow has been deployed to the runtime environment.
+      Records the deployer identity, workflow version, and deployment target.
+
+  - name: N8N_WORKFLOW_MODIFIED
+    srs_code: F845
+    default_severity: WARNING
+    value_metric: 3
+    description: >
+      An n8n workflow definition has been modified outside of the approved
+      deployment pipeline. Triggers a governance review and audit log entry.
+
+  - name: N8N_SECRET_ACCESS_VIOLATION
+    srs_code: F846
+    default_severity: CRITICAL
+    value_metric: 5
+    description: >
+      An n8n workflow has attempted to access, exfiltrate, or log a secret
+      or credential that is not in its authorized scope.
+
+  - name: N8N_WEBHOOK_RECEIVED
+    srs_code: F847
+    default_severity: DEBUG
+    value_metric: 1
+    description: >
+      An n8n webhook trigger has received an incoming HTTP request. Records
+      source IP, path, method, and whether the request passed validation.
+
+  - name: N8N_IDEMPOTENCY_VIOLATION
+    srs_code: F848
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      An n8n workflow has produced duplicate side effects for the same trigger
+      event, violating the idempotency contract. Indicates missing dedup logic.
+
+  - name: N8N_ENVIRONMENT_CROSSOVER
+    srs_code: F849
+    default_severity: CRITICAL
+    value_metric: 5
+    description: >
+      An n8n workflow in a staging or development environment has been detected
+      communicating with production services, databases, or APIs.
+
+  # ---------------------------------------------------------------------------
+  # Orchestrator Events (F850-F859)
+  # ---------------------------------------------------------------------------
+
+  - name: ORCHESTRATOR_STARTED
+    srs_code: F850
+    default_severity: INFO
+    value_metric: 2
+    description: >
+      The event bus orchestrator has started and is ready to route events
+      between streams, consumers, and external systems.
+
+  - name: ORCHESTRATOR_HEALTH_CHECK_FAILED
+    srs_code: F851
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      The orchestrator health check has failed. One or more critical dependencies
+      (NATS, n8n, state store) are unreachable or unhealthy.
+
+  - name: ORCHESTRATOR_POLICY_GATE_DENIED
+    srs_code: F852
+    default_severity: WARNING
+    value_metric: 3
+    description: >
+      A policy gate in the orchestrator has denied an event routing or processing
+      request based on governance rules, rate limits, or authority checks.
+
+  - name: ORCHESTRATOR_ROUTING_ERROR
+    srs_code: F853
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      The orchestrator encountered an error while routing an event to its
+      target stream or consumer. The event is held for retry or DLQ routing.
+
+  - name: ORCHESTRATOR_STATE_INCONSISTENCY
+    srs_code: F854
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      The orchestrator has detected an inconsistency between its internal state
+      and the NATS server state. Triggers a state reconciliation procedure.
+
+  - name: ORCHESTRATOR_DEDUP_HIT
+    srs_code: F855
+    default_severity: DEBUG
+    value_metric: 1
+    description: >
+      The orchestrator's deduplication cache has detected and suppressed a
+      duplicate event before it reaches the target stream.
+
+  - name: ORCHESTRATOR_LEADER_ELECTED
+    srs_code: F856
+    default_severity: INFO
+    value_metric: 2
+    description: >
+      A new orchestrator leader has been elected in a multi-instance deployment.
+      The elected instance assumes responsibility for singleton operations.
+
+  - name: ORCHESTRATOR_LEADER_LOST
+    srs_code: F857
+    default_severity: WARNING
+    value_metric: 3
+    description: >
+      The current orchestrator leader has lost its leadership lease. A new
+      election will be triggered and singleton operations are suspended.
+
+  - name: ORCHESTRATOR_CONFIG_RELOADED
+    srs_code: F858
+    default_severity: INFO
+    value_metric: 2
+    description: >
+      The orchestrator has successfully reloaded its routing configuration
+      and policy gates from the configuration source without restart.
+
+  - name: ORCHESTRATOR_SHUTDOWN_GRACEFUL
+    srs_code: F859
+    default_severity: INFO
+    value_metric: 2
+    description: >
+      The orchestrator has initiated a graceful shutdown, draining in-flight
+      messages and releasing leadership before terminating.
+
+  # ---------------------------------------------------------------------------
+  # Authority & Governance Events (F860-F869)
+  # ---------------------------------------------------------------------------
+
+  - name: AUTHORITY_GATE_APPROVED
+    srs_code: F860
+    default_severity: DEBUG
+    value_metric: 1
+    description: >
+      An authority gate check has approved a request. The requesting principal
+      has the required capabilities (CAPS) for the requested operation.
+
+  - name: AUTHORITY_GATE_DENIED
+    srs_code: F861
+    default_severity: WARNING
+    value_metric: 3
+    description: >
+      An authority gate check has denied a request. The requesting principal
+      lacks the required capabilities or the operation is restricted.
+
+  - name: AUTHORITY_GATE_ESCALATED
+    srs_code: F862
+    default_severity: WARNING
+    value_metric: 3
+    description: >
+      An authority gate check has escalated a request for higher-level approval.
+      The operation requires additional authorization beyond the current context.
+
+  - name: CAPS_CONTEXT_MISSING
+    srs_code: F863
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      An operation was attempted without the required CAPS (Capability-Authority
+      Principal Scope) context. The request is rejected as unauthenticated.
+
+  - name: CAPS_CONTEXT_INVALID
+    srs_code: F864
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      The CAPS context provided with a request is malformed, expired, or has
+      an invalid signature. The request is rejected as unauthorized.
+
+  - name: GOVERNANCE_RULE_VIOLATED
+    srs_code: F865
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      A governance rule has been violated during event processing or workflow
+      execution. The violation is logged and the operation is blocked or flagged.
+
+  - name: GOVERNANCE_RULE_UPDATED
+    srs_code: F866
+    default_severity: INFO
+    value_metric: 2
+    description: >
+      A governance rule has been created, modified, or deactivated. Records
+      the rule identifier, previous state, and new state for audit trail.
+
+  - name: TENANT_ISOLATION_BREACH
+    srs_code: F867
+    default_severity: CRITICAL
+    value_metric: 5
+    description: >
+      A tenant isolation boundary has been breached. Data or operations from
+      one tenant have crossed into another tenant's scope. Immediate investigation required.
+
+  - name: AUDIT_TRAIL_GAP_DETECTED
+    srs_code: F868
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      A gap has been detected in the audit trail sequence. One or more audit
+      events are missing, indicating potential data loss or tampering.
+
+  - name: AUDIT_HASH_CHAIN_BROKEN
+    srs_code: F869
+    default_severity: CRITICAL
+    value_metric: 5
+    description: >
+      The SHA-256 hash chain in the audit ledger has been broken. A record's
+      previous_hash does not match the preceding record's hash, indicating tampering.
+
+  # ---------------------------------------------------------------------------
+  # Contract & CI Events (F870-F879)
+  # ---------------------------------------------------------------------------
+
+  - name: CONTRACT_VALIDATION_PASSED
+    srs_code: F870
+    default_severity: DEBUG
+    value_metric: 1
+    description: >
+      An event contract validation has passed. The event payload conforms to
+      the registered schema and all required envelope fields are present.
+
+  - name: CONTRACT_VALIDATION_FAILED
+    srs_code: F871
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      An event contract validation has failed. The event payload does not
+      conform to the registered schema or is missing required envelope fields.
+
+  - name: CONTRACT_BREAKING_CHANGE_BLOCKED
+    srs_code: F872
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      A proposed schema change has been blocked by the contract registry because
+      it introduces a backward-incompatible change without a migration plan.
+
+  - name: CONTRACT_REGISTRY_SYNCED
+    srs_code: F873
+    default_severity: INFO
+    value_metric: 2
+    description: >
+      The contract registry has been synchronized across all environments.
+      All schema versions and compatibility rules are consistent.
+
+  - name: CONTRACT_GOLDEN_REPLAY_PASSED
+    srs_code: F874
+    default_severity: INFO
+    value_metric: 2
+    description: >
+      A golden replay test has passed. A recorded sequence of events was
+      replayed through the pipeline and produced the expected outputs.
+
+  - name: CONTRACT_GOLDEN_REPLAY_FAILED
+    srs_code: F875
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      A golden replay test has failed. The replayed event sequence produced
+      outputs that differ from the expected baseline, indicating a regression.
+
+  - name: CI_GATE_PASSED
+    srs_code: F876
+    default_severity: INFO
+    value_metric: 2
+    description: >
+      A CI pipeline governance gate has passed. All contract validations,
+      schema compatibility checks, and golden replay tests succeeded.
+
+  - name: CI_GATE_FAILED
+    srs_code: F877
+    default_severity: ERROR
+    value_metric: 4
+    description: >
+      A CI pipeline governance gate has failed. One or more contract validations,
+      schema compatibility checks, or golden replay tests did not pass.
+
+  - name: SCHEMA_MIGRATION_REQUIRED
+    srs_code: F878
+    default_severity: WARNING
+    value_metric: 3
+    description: >
+      A schema version change requires a migration. Existing consumers must
+      be updated to handle both old and new schema versions during transition.
+
+  - name: SCHEMA_MIGRATION_COMPLETED
+    srs_code: F879
+    default_severity: INFO
+    value_metric: 2
+    description: >
+      A schema migration has been completed. All consumers have been updated
+      and the old schema version has been marked as deprecated.
+
+# =============================================================================
+# A-SERIES: EVENT BUS ACTIONS (A800-A879)
+# =============================================================================
+
+a_actions:
+
+  # ---------------------------------------------------------------------------
+  # Stream Management Actions (A800-A809)
+  # ---------------------------------------------------------------------------
+
+  - name: ACTION_CREATE_STREAM
+    srs_code: A800
+    default_severity: INFO
+    description: >
+      Create a new NATS JetStream stream with the specified configuration
+      including subjects, retention policy, storage type, and replica count.
+
+  - name: ACTION_UPDATE_STREAM
+    srs_code: A801
+    default_severity: INFO
+    description: >
+      Update an existing NATS JetStream stream configuration. Only mutable
+      fields (max_msgs, max_bytes, max_age, etc.) can be modified.
+
+  - name: ACTION_DELETE_STREAM
+    srs_code: A802
+    default_severity: WARNING
+    description: >
+      Delete a NATS JetStream stream and all its consumers. This is a
+      destructive operation that requires explicit confirmation and prior backup.
+
+  - name: ACTION_PURGE_STREAM
+    srs_code: A803
+    default_severity: WARNING
+    description: >
+      Purge all messages from a NATS JetStream stream while preserving
+      the stream configuration and consumer bindings.
+
+  - name: ACTION_SCALE_STREAM_REPLICAS
+    srs_code: A804
+    default_severity: INFO
+    description: >
+      Scale the replica count of a NATS JetStream stream up or down
+      to adjust durability and availability characteristics.
+
+  - name: ACTION_ROTATE_STREAM_ENCRYPTION
+    srs_code: A805
+    default_severity: INFO
+    description: >
+      Rotate the encryption key used for at-rest encryption of stream data.
+      Requires re-encryption of existing messages during a maintenance window.
+
+  - name: ACTION_BACKUP_STREAM_SNAPSHOT
+    srs_code: A806
+    default_severity: INFO
+    description: >
+      Create a point-in-time snapshot backup of a NATS JetStream stream
+      including all messages and consumer state for disaster recovery.
+
+  - name: ACTION_RESTORE_STREAM_SNAPSHOT
+    srs_code: A807
+    default_severity: WARNING
+    description: >
+      Restore a NATS JetStream stream from a previously created snapshot
+      backup. Existing stream data will be replaced with the snapshot data.
+
+  - name: ACTION_MIGRATE_STREAM
+    srs_code: A808
+    default_severity: WARNING
+    description: >
+      Migrate a NATS JetStream stream between clusters or storage backends.
+      Ensures zero message loss during the migration window.
+
+  - name: ACTION_SEED_STREAMS
+    srs_code: A809
+    default_severity: INFO
+    description: >
+      Bootstrap all required NATS JetStream streams from the stream
+      definition manifest. Used during initial deployment or environment setup.
+
+  # ---------------------------------------------------------------------------
+  # Message & Consumer Actions (A810-A819)
+  # ---------------------------------------------------------------------------
+
+  - name: ACTION_PUBLISH_EVENT
+    srs_code: A810
+    default_severity: DEBUG
+    description: >
+      Publish an event to a NATS JetStream stream with envelope validation,
+      schema check, and deduplication ID assignment.
+
+  - name: ACTION_NAK_MESSAGE
+    srs_code: A811
+    default_severity: WARNING
+    description: >
+      Send a negative acknowledgment (NAK) for a message, requesting redelivery
+      after an optional delay. Used when processing fails transiently.
+
+  - name: ACTION_TERM_MESSAGE
+    srs_code: A812
+    default_severity: WARNING
+    description: >
+      Terminate delivery of a message, preventing any further redelivery attempts.
+      The message is routed to the DLQ for inspection.
+
+  - name: ACTION_CREATE_CONSUMER
+    srs_code: A813
+    default_severity: INFO
+    description: >
+      Create a new NATS JetStream consumer on a stream with specified delivery
+      policy, ack policy, filter subjects, and max delivery count.
+
+  - name: ACTION_DELETE_CONSUMER
+    srs_code: A814
+    default_severity: WARNING
+    description: >
+      Delete a NATS JetStream consumer. Any unacknowledged messages in the
+      consumer's pending set will be lost from the consumer's perspective.
+
+  - name: ACTION_PAUSE_CONSUMER
+    srs_code: A815
+    default_severity: INFO
+    description: >
+      Pause message delivery to a consumer without deleting it. Messages
+      continue to accumulate in the stream and will be delivered on resume.
+
+  - name: ACTION_RESUME_CONSUMER
+    srs_code: A816
+    default_severity: INFO
+    description: >
+      Resume message delivery to a previously paused consumer. Delivery
+      resumes from where it was paused unless the sequence is reset.
+
+  - name: ACTION_RESET_CONSUMER_SEQUENCE
+    srs_code: A817
+    default_severity: WARNING
+    description: >
+      Reset a consumer's delivery sequence to a specific stream sequence number
+      or timestamp. Messages before the reset point will not be redelivered.
+
+  - name: ACTION_OPEN_CIRCUIT_BREAKER
+    srs_code: A818
+    default_severity: WARNING
+    description: >
+      Manually open the circuit breaker for a consumer's downstream dependency,
+      halting message processing until the dependency is verified healthy.
+
+  - name: ACTION_CLOSE_CIRCUIT_BREAKER
+    srs_code: A819
+    default_severity: INFO
+    description: >
+      Manually close the circuit breaker for a consumer's downstream dependency,
+      resuming normal message processing after verification.
+
+  # ---------------------------------------------------------------------------
+  # DLQ Actions (A820-A829)
+  # ---------------------------------------------------------------------------
+
+  - name: ACTION_ROUTE_TO_DLQ
+    srs_code: A820
+    default_severity: WARNING
+    description: >
+      Route a failed message to the dead-letter queue with full context
+      including original subject, failure reason, retry count, and timestamp.
+
+  - name: ACTION_REPLAY_FROM_DLQ
+    srs_code: A821
+    default_severity: INFO
+    description: >
+      Replay selected messages from the DLQ back to their original stream
+      for reprocessing. Supports filtering by time range, error type, or subject.
+
+  - name: ACTION_REPLAY_FROM_SEQUENCE
+    srs_code: A822
+    default_severity: INFO
+    description: >
+      Replay messages from a specific stream sequence number. Used to
+      reprocess a range of messages after a consumer bug fix.
+
+  - name: ACTION_REPLAY_FROM_TIME
+    srs_code: A823
+    default_severity: INFO
+    description: >
+      Replay messages from a specific timestamp. Used to reprocess messages
+      that arrived during a known failure window.
+
+  - name: ACTION_DROP_DLQ_MESSAGE
+    srs_code: A824
+    default_severity: WARNING
+    description: >
+      Permanently drop a message from the DLQ after operator review.
+      The message is archived before deletion for audit compliance.
+
+  - name: ACTION_QUARANTINE_DLQ_MESSAGE
+    srs_code: A825
+    default_severity: INFO
+    description: >
+      Move a DLQ message to a quarantine stream for extended analysis.
+      Quarantined messages are excluded from automatic DLQ processing.
+
+  - name: ACTION_CLEAR_DLQ
+    srs_code: A826
+    default_severity: WARNING
+    description: >
+      Clear all messages from the dead-letter queue. Requires operator
+      confirmation and creates an archive snapshot before purging.
+
+  - name: ACTION_EXPORT_DLQ_REPORT
+    srs_code: A827
+    default_severity: INFO
+    description: >
+      Export a report of all DLQ messages including failure reasons,
+      retry counts, original subjects, and timestamps for analysis.
+
+  - name: ACTION_ESCALATE_DLQ_ALERT
+    srs_code: A828
+    default_severity: WARNING
+    description: >
+      Escalate a DLQ alert to the operations team via configured notification
+      channels (Slack, PagerDuty, email) when thresholds are exceeded.
+
+  - name: ACTION_AUTO_RETRY_DLQ
+    srs_code: A829
+    default_severity: INFO
+    description: >
+      Initiate an automatic retry of eligible DLQ messages based on retry
+      policy rules. Only messages with retryable error codes are selected.
+
+  # ---------------------------------------------------------------------------
+  # n8n Governance Actions (A830-A839)
+  # ---------------------------------------------------------------------------
+
+  - name: ACTION_DEPLOY_WORKFLOW
+    srs_code: A830
+    default_severity: INFO
+    description: >
+      Deploy an n8n workflow to the runtime environment through the approved
+      deployment pipeline with governance validation and version tagging.
+
+  - name: ACTION_DISABLE_WORKFLOW
+    srs_code: A831
+    default_severity: WARNING
+    description: >
+      Disable an n8n workflow, preventing it from being triggered or executed.
+      In-flight executions are allowed to complete before full deactivation.
+
+  - name: ACTION_ROLLBACK_WORKFLOW
+    srs_code: A832
+    default_severity: WARNING
+    description: >
+      Rollback an n8n workflow to a previous version. The current version is
+      archived and the specified previous version is activated.
+
+  - name: ACTION_AUDIT_WORKFLOW_RUN
+    srs_code: A833
+    default_severity: INFO
+    description: >
+      Audit a specific n8n workflow execution, recording all node inputs,
+      outputs, side effects, and duration for compliance review.
+
+  - name: ACTION_ROTATE_N8N_SECRETS
+    srs_code: A834
+    default_severity: INFO
+    description: >
+      Rotate the secrets and credentials used by n8n workflows. Updates
+      credential stores and restarts affected workflows gracefully.
+
+  - name: ACTION_RESTRICT_N8N_PERMISSIONS
+    srs_code: A835
+    default_severity: WARNING
+    description: >
+      Restrict the permissions and accessible nodes for an n8n workflow
+      based on governance policy or security incident response.
+
+  - name: ACTION_EXPORT_WORKFLOW_TO_GIT
+    srs_code: A836
+    default_severity: INFO
+    description: >
+      Export an n8n workflow definition to the Git repository for version
+      control, code review, and CI/CD pipeline integration.
+
+  - name: ACTION_IMPORT_WORKFLOW_FROM_GIT
+    srs_code: A837
+    default_severity: INFO
+    description: >
+      Import an n8n workflow definition from the Git repository. The imported
+      workflow undergoes governance validation before activation.
+
+  - name: ACTION_VALIDATE_WORKFLOW_GOVERNANCE
+    srs_code: A838
+    default_severity: INFO
+    description: >
+      Validate an n8n workflow against all governance rules including node
+      allowlists, side-effect policies, secret access, and environment isolation.
+
+  - name: ACTION_ISOLATE_N8N_ENVIRONMENT
+    srs_code: A839
+    default_severity: WARNING
+    description: >
+      Isolate an n8n environment by cutting network access to production
+      services. Used during security incidents or environment crossover detection.
+
+  # ---------------------------------------------------------------------------
+  # Orchestrator Actions (A840-A849)
+  # ---------------------------------------------------------------------------
+
+  - name: ACTION_START_ORCHESTRATOR
+    srs_code: A840
+    default_severity: INFO
+    description: >
+      Start the event bus orchestrator, initializing connections to NATS,
+      loading routing configuration, and beginning event processing.
+
+  - name: ACTION_STOP_ORCHESTRATOR
+    srs_code: A841
+    default_severity: WARNING
+    description: >
+      Stop the event bus orchestrator with a graceful shutdown, draining
+      in-flight messages and persisting state before termination.
+
+  - name: ACTION_RELOAD_ROUTING_CONFIG
+    srs_code: A842
+    default_severity: INFO
+    description: >
+      Hot-reload the orchestrator routing configuration without restart.
+      Validates the new configuration before applying it to live routing.
+
+  - name: ACTION_FLUSH_DEDUP_CACHE
+    srs_code: A843
+    default_severity: INFO
+    description: >
+      Flush the orchestrator's deduplication cache, clearing all tracked
+      message IDs. Use with caution as duplicates may temporarily pass through.
+
+  - name: ACTION_FORCE_LEADER_ELECTION
+    srs_code: A844
+    default_severity: WARNING
+    description: >
+      Force a new leader election in a multi-instance orchestrator deployment.
+      The current leader releases its lease and all instances compete for leadership.
+
+  - name: ACTION_UPDATE_POLICY_GATES
+    srs_code: A845
+    default_severity: INFO
+    description: >
+      Update the policy gate rules in the orchestrator. Changes take effect
+      immediately and apply to all subsequent event routing decisions.
+
+  - name: ACTION_SYNC_STATE_STORE
+    srs_code: A846
+    default_severity: INFO
+    description: >
+      Synchronize the orchestrator's internal state store with the NATS
+      server state, resolving any detected inconsistencies.
+
+  - name: ACTION_DRAIN_ORCHESTRATOR
+    srs_code: A847
+    default_severity: WARNING
+    description: >
+      Drain the orchestrator by stopping new event intake while allowing
+      in-flight messages to complete processing. Used before maintenance.
+
+  - name: ACTION_ENABLE_DEBUG_TRACING
+    srs_code: A848
+    default_severity: DEBUG
+    description: >
+      Enable verbose debug tracing on the orchestrator for troubleshooting.
+      Logs all event routing decisions, policy gate evaluations, and state changes.
+
+  - name: ACTION_DISABLE_DEBUG_TRACING
+    srs_code: A849
+    default_severity: DEBUG
+    description: >
+      Disable verbose debug tracing on the orchestrator, returning to
+      normal logging levels to reduce log volume and performance overhead.
+
+  # ---------------------------------------------------------------------------
+  # Governance & Contract Actions (A850-A859)
+  # ---------------------------------------------------------------------------
+
+  - name: ACTION_REGISTER_SCHEMA
+    srs_code: A850
+    default_severity: INFO
+    description: >
+      Register a new event schema version in the contract registry with
+      backward compatibility validation against existing versions.
+
+  - name: ACTION_DEPRECATE_SCHEMA
+    srs_code: A851
+    default_severity: WARNING
+    description: >
+      Deprecate an event schema version, marking it for removal after the
+      configured deprecation period. Consumers are notified of the deprecation.
+
+  - name: ACTION_VALIDATE_CONTRACT
+    srs_code: A852
+    default_severity: INFO
+    description: >
+      Validate an event against its registered contract, checking schema
+      conformance, required envelope fields, and compatibility constraints.
+
+  - name: ACTION_RUN_GOLDEN_REPLAY
+    srs_code: A853
+    default_severity: INFO
+    description: >
+      Execute a golden replay test by replaying a recorded event sequence
+      through the pipeline and comparing outputs against the expected baseline.
+
+  - name: ACTION_ENFORCE_ENVELOPE_FIELDS
+    srs_code: A854
+    default_severity: INFO
+    description: >
+      Enforce the presence and validity of required envelope fields
+      (event_type, timestamp, tenant_id, trace_id, schema_version) on all events.
+
+  - name: ACTION_UPDATE_AUTHORITY_RULES
+    srs_code: A855
+    default_severity: WARNING
+    description: >
+      Update the authority rules that govern which principals can perform
+      which operations on streams, consumers, and events.
+
+  - name: ACTION_AUDIT_HASH_CHAIN
+    srs_code: A856
+    default_severity: INFO
+    description: >
+      Audit the integrity of the hash chain in the audit ledger by verifying
+      that each record's previous_hash correctly references its predecessor.
+
+  - name: ACTION_REPAIR_HASH_CHAIN
+    srs_code: A857
+    default_severity: WARNING
+    description: >
+      Repair a broken hash chain in the audit ledger by inserting bridge
+      records that reconnect the chain while preserving the gap evidence.
+
+  - name: ACTION_SYNC_EVENT_REGISTRY
+    srs_code: A858
+    default_severity: INFO
+    description: >
+      Synchronize the event type registry across all environments, ensuring
+      consistent event type definitions, schemas, and routing rules.
+
+  - name: ACTION_GENERATE_CONTRACT_REPORT
+    srs_code: A859
+    default_severity: INFO
+    description: >
+      Generate a comprehensive contract compliance report covering all
+      registered schemas, validation statistics, and compatibility status.
+
+# =============================================================================
+# R-SERIES: EVENT BUS REACTIONS (R600-R679)
+# =============================================================================
+
+r_reactions:
+
+  # ---------------------------------------------------------------------------
+  # Stream State Reactions (R600-R609)
+  # ---------------------------------------------------------------------------
+
+  - name: REACTION_STREAM_CREATED
+    srs_code: R600
+    default_severity: INFO
+    description: >
+      Confirms that a NATS JetStream stream has been successfully created.
+      The stream is now accepting publishes on its configured subjects.
+
+  - name: REACTION_STREAM_UPDATED
+    srs_code: R601
+    default_severity: INFO
+    description: >
+      Confirms that a NATS JetStream stream configuration has been
+      successfully updated. New configuration is effective immediately.
+
+  - name: REACTION_STREAM_DELETED
+    srs_code: R602
+    default_severity: WARNING
+    description: >
+      Confirms that a NATS JetStream stream has been deleted along with
+      all associated consumers. A backup snapshot was archived prior to deletion.
+
+  - name: REACTION_STREAM_PURGED
+    srs_code: R603
+    default_severity: INFO
+    description: >
+      Confirms that all messages in a NATS JetStream stream have been purged.
+      Consumer bindings and stream configuration remain intact.
+
+  - name: REACTION_STREAM_SCALED
+    srs_code: R604
+    default_severity: INFO
+    description: >
+      Confirms that the replica count of a NATS JetStream stream has been
+      successfully scaled to the requested count.
+
+  - name: REACTION_STREAM_ENCRYPTION_ROTATED
+    srs_code: R605
+    default_severity: INFO
+    description: >
+      Confirms that the encryption key for a NATS JetStream stream has been
+      rotated and all existing messages have been re-encrypted.
+
+  - name: REACTION_STREAM_BACKUP_COMPLETED
+    srs_code: R606
+    default_severity: INFO
+    description: >
+      Confirms that a point-in-time snapshot backup of a NATS JetStream
+      stream has been completed and stored in the backup location.
+
+  - name: REACTION_STREAM_RESTORED
+    srs_code: R607
+    default_severity: INFO
+    description: >
+      Confirms that a NATS JetStream stream has been successfully restored
+      from a snapshot backup. All messages and consumer state are recovered.
+
+  - name: REACTION_STREAM_MIGRATED
+    srs_code: R608
+    default_severity: INFO
+    description: >
+      Confirms that a NATS JetStream stream has been successfully migrated
+      to the target cluster or storage backend with zero message loss.
+
+  - name: REACTION_STREAMS_SEEDED
+    srs_code: R609
+    default_severity: INFO
+    description: >
+      Confirms that all required NATS JetStream streams have been bootstrapped
+      from the stream definition manifest during environment setup.
+
+  # ---------------------------------------------------------------------------
+  # Consumer & Processing Reactions (R610-R619)
+  # ---------------------------------------------------------------------------
+
+  - name: REACTION_CONSUMER_CREATED
+    srs_code: R610
+    default_severity: INFO
+    description: >
+      Confirms that a NATS JetStream consumer has been successfully created
+      and is ready to receive messages from the bound stream.
+
+  - name: REACTION_CONSUMER_DELETED
+    srs_code: R611
+    default_severity: WARNING
+    description: >
+      Confirms that a NATS JetStream consumer has been deleted. Any pending
+      unacknowledged messages are no longer tracked by this consumer.
+
+  - name: REACTION_CONSUMER_PAUSED
+    srs_code: R612
+    default_severity: INFO
+    description: >
+      Confirms that message delivery to a consumer has been paused.
+      Messages continue to accumulate in the stream for later delivery.
+
+  - name: REACTION_CONSUMER_RESUMED
+    srs_code: R613
+    default_severity: INFO
+    description: >
+      Confirms that a previously paused consumer has resumed message delivery.
+      Delivery continues from the last acknowledged sequence.
+
+  - name: REACTION_CONSUMER_SEQUENCE_RESET
+    srs_code: R614
+    default_severity: WARNING
+    description: >
+      Confirms that a consumer's delivery sequence has been reset to the
+      specified stream sequence number or timestamp.
+
+  - name: REACTION_CIRCUIT_BREAKER_OPENED
+    srs_code: R615
+    default_severity: WARNING
+    description: >
+      Confirms that the circuit breaker for a consumer's downstream dependency
+      has been opened, halting message processing.
+
+  - name: REACTION_CIRCUIT_BREAKER_CLOSED
+    srs_code: R616
+    default_severity: INFO
+    description: >
+      Confirms that the circuit breaker for a consumer's downstream dependency
+      has been closed, resuming normal message processing.
+
+  - name: REACTION_BACKPRESSURE_ACTIVATED
+    srs_code: R617
+    default_severity: WARNING
+    description: >
+      Confirms that backpressure has been activated on a consumer. Message
+      delivery rate is throttled until downstream capacity recovers.
+
+  - name: REACTION_BACKPRESSURE_RELEASED
+    srs_code: R618
+    default_severity: INFO
+    description: >
+      Confirms that backpressure has been released on a consumer. Message
+      delivery has returned to normal rate.
+
+  - name: REACTION_CONSUMER_RECOVERED
+    srs_code: R619
+    default_severity: INFO
+    description: >
+      Confirms that a stalled or errored consumer has recovered and resumed
+      normal message processing after intervention or auto-recovery.
+
+  # ---------------------------------------------------------------------------
+  # DLQ Reactions (R620-R629)
+  # ---------------------------------------------------------------------------
+
+  - name: REACTION_DLQ_MESSAGE_STORED
+    srs_code: R620
+    default_severity: WARNING
+    description: >
+      Confirms that a failed message has been stored in the dead-letter queue
+      with full context for later inspection and replay.
+
+  - name: REACTION_DLQ_REPLAY_STARTED
+    srs_code: R621
+    default_severity: INFO
+    description: >
+      Confirms that a DLQ replay operation has started. Selected messages
+      are being re-published to their original streams.
+
+  - name: REACTION_DLQ_REPLAY_SUCCEEDED
+    srs_code: R622
+    default_severity: INFO
+    description: >
+      Confirms that a DLQ replay operation completed successfully. All
+      selected messages were re-published and processed without error.
+
+  - name: REACTION_DLQ_REPLAY_FAILED
+    srs_code: R623
+    default_severity: ERROR
+    description: >
+      Confirms that a DLQ replay operation has failed. The failure reason
+      is recorded and messages remain in the DLQ for retry.
+
+  - name: REACTION_DLQ_MESSAGE_DROPPED
+    srs_code: R624
+    default_severity: WARNING
+    description: >
+      Confirms that a DLQ message has been permanently dropped after
+      operator approval. An archive copy was retained for audit.
+
+  - name: REACTION_DLQ_MESSAGE_QUARANTINED
+    srs_code: R625
+    default_severity: INFO
+    description: >
+      Confirms that a DLQ message has been moved to the quarantine stream
+      for extended analysis and is excluded from automatic processing.
+
+  - name: REACTION_DLQ_CLEARED
+    srs_code: R626
+    default_severity: INFO
+    description: >
+      Confirms that the dead-letter queue has been cleared. An archive
+      snapshot was created before purging all messages.
+
+  - name: REACTION_DLQ_REPORT_GENERATED
+    srs_code: R627
+    default_severity: INFO
+    description: >
+      Confirms that a DLQ report has been generated and is available for
+      review, containing failure analysis and message statistics.
+
+  - name: REACTION_DLQ_ALERT_ESCALATED
+    srs_code: R628
+    default_severity: WARNING
+    description: >
+      Confirms that a DLQ alert has been escalated to the operations team
+      through the configured notification channels.
+
+  - name: REACTION_DLQ_AUTO_RETRIED
+    srs_code: R629
+    default_severity: INFO
+    description: >
+      Confirms that eligible DLQ messages have been automatically retried
+      based on retry policy rules. Reports success and failure counts.
+
+  # ---------------------------------------------------------------------------
+  # n8n Reactions (R630-R639)
+  # ---------------------------------------------------------------------------
+
+  - name: REACTION_WORKFLOW_DEPLOYED
+    srs_code: R630
+    default_severity: INFO
+    description: >
+      Confirms that an n8n workflow has been successfully deployed and
+      activated in the runtime environment with governance validation.
+
+  - name: REACTION_WORKFLOW_DISABLED
+    srs_code: R631
+    default_severity: WARNING
+    description: >
+      Confirms that an n8n workflow has been disabled. In-flight executions
+      were allowed to complete before full deactivation.
+
+  - name: REACTION_WORKFLOW_ROLLED_BACK
+    srs_code: R632
+    default_severity: WARNING
+    description: >
+      Confirms that an n8n workflow has been rolled back to a previous version.
+      The superseded version has been archived.
+
+  - name: REACTION_WORKFLOW_AUDIT_LOGGED
+    srs_code: R633
+    default_severity: INFO
+    description: >
+      Confirms that a workflow execution audit has been logged with full
+      node-level input/output and side-effect tracking.
+
+  - name: REACTION_N8N_SECRETS_ROTATED
+    srs_code: R634
+    default_severity: INFO
+    description: >
+      Confirms that n8n secrets and credentials have been rotated. Affected
+      workflows have been gracefully restarted with new credentials.
+
+  - name: REACTION_N8N_PERMISSIONS_RESTRICTED
+    srs_code: R635
+    default_severity: WARNING
+    description: >
+      Confirms that permissions for an n8n workflow have been restricted
+      based on governance policy or security incident response.
+
+  - name: REACTION_WORKFLOW_EXPORTED
+    srs_code: R636
+    default_severity: INFO
+    description: >
+      Confirms that an n8n workflow definition has been exported to the
+      Git repository for version control and CI/CD integration.
+
+  - name: REACTION_WORKFLOW_IMPORTED
+    srs_code: R637
+    default_severity: INFO
+    description: >
+      Confirms that an n8n workflow has been imported from the Git repository
+      and passed governance validation before activation.
+
+  - name: REACTION_WORKFLOW_GOVERNANCE_VALIDATED
+    srs_code: R638
+    default_severity: INFO
+    description: >
+      Confirms that an n8n workflow has passed all governance validation
+      checks including node allowlists, side-effect policies, and secret access.
+
+  - name: REACTION_N8N_ENVIRONMENT_ISOLATED
+    srs_code: R639
+    default_severity: WARNING
+    description: >
+      Confirms that an n8n environment has been isolated by cutting network
+      access to production services following a security incident or crossover.
+
+  # ---------------------------------------------------------------------------
+  # Orchestrator Reactions (R640-R649)
+  # ---------------------------------------------------------------------------
+
+  - name: REACTION_ORCHESTRATOR_STARTED
+    srs_code: R640
+    default_severity: INFO
+    description: >
+      Confirms that the event bus orchestrator has started, established
+      NATS connections, loaded routing configuration, and begun processing.
+
+  - name: REACTION_ORCHESTRATOR_STOPPED
+    srs_code: R641
+    default_severity: INFO
+    description: >
+      Confirms that the event bus orchestrator has completed a graceful
+      shutdown, draining all in-flight messages and persisting state.
+
+  - name: REACTION_ROUTING_CONFIG_RELOADED
+    srs_code: R642
+    default_severity: INFO
+    description: >
+      Confirms that the orchestrator routing configuration has been
+      hot-reloaded and validated. New routing rules are now active.
+
+  - name: REACTION_DEDUP_CACHE_FLUSHED
+    srs_code: R643
+    default_severity: INFO
+    description: >
+      Confirms that the orchestrator's deduplication cache has been flushed.
+      Duplicate detection will rebuild as new messages are processed.
+
+  - name: REACTION_LEADER_ELECTED
+    srs_code: R644
+    default_severity: INFO
+    description: >
+      Confirms that a new orchestrator leader has been elected and has
+      assumed responsibility for singleton operations.
+
+  - name: REACTION_POLICY_GATES_UPDATED
+    srs_code: R645
+    default_severity: INFO
+    description: >
+      Confirms that orchestrator policy gate rules have been updated and
+      are applied to all subsequent event routing decisions.
+
+  - name: REACTION_STATE_STORE_SYNCED
+    srs_code: R646
+    default_severity: INFO
+    description: >
+      Confirms that the orchestrator's internal state store has been
+      synchronized with the NATS server state, resolving inconsistencies.
+
+  - name: REACTION_ORCHESTRATOR_DRAINED
+    srs_code: R647
+    default_severity: INFO
+    description: >
+      Confirms that the orchestrator has been drained. New event intake
+      has stopped and all in-flight messages have completed processing.
+
+  - name: REACTION_DEBUG_TRACING_ENABLED
+    srs_code: R648
+    default_severity: DEBUG
+    description: >
+      Confirms that verbose debug tracing has been enabled on the orchestrator.
+      All routing decisions and state changes are being logged.
+
+  - name: REACTION_DEBUG_TRACING_DISABLED
+    srs_code: R649
+    default_severity: DEBUG
+    description: >
+      Confirms that verbose debug tracing has been disabled on the orchestrator.
+      Logging has returned to normal levels.
+
+  # ---------------------------------------------------------------------------
+  # Governance Reactions (R650-R659)
+  # ---------------------------------------------------------------------------
+
+  - name: REACTION_SCHEMA_REGISTERED
+    srs_code: R650
+    default_severity: INFO
+    description: >
+      Confirms that a new event schema version has been registered in the
+      contract registry with backward compatibility validation.
+
+  - name: REACTION_SCHEMA_DEPRECATED
+    srs_code: R651
+    default_severity: WARNING
+    description: >
+      Confirms that an event schema version has been deprecated and marked
+      for removal after the configured deprecation period.
+
+  - name: REACTION_CONTRACT_VALIDATED
+    srs_code: R652
+    default_severity: INFO
+    description: >
+      Confirms that an event has been validated against its registered contract
+      and conforms to all schema and envelope requirements.
+
+  - name: REACTION_GOLDEN_REPLAY_COMPLETED
+    srs_code: R653
+    default_severity: INFO
+    description: >
+      Confirms that a golden replay test has been executed and the results
+      have been compared against the expected baseline.
+
+  - name: REACTION_ENVELOPE_ENFORCED
+    srs_code: R654
+    default_severity: INFO
+    description: >
+      Confirms that required envelope field enforcement has been applied
+      to events, rejecting those with missing or invalid fields.
+
+  - name: REACTION_AUTHORITY_RULES_UPDATED
+    srs_code: R655
+    default_severity: INFO
+    description: >
+      Confirms that authority rules have been updated, changing which
+      principals can perform operations on streams, consumers, and events.
+
+  - name: REACTION_HASH_CHAIN_AUDITED
+    srs_code: R656
+    default_severity: INFO
+    description: >
+      Confirms that the audit ledger hash chain integrity verification
+      has been completed. Reports any gaps or broken links detected.
+
+  - name: REACTION_HASH_CHAIN_REPAIRED
+    srs_code: R657
+    default_severity: WARNING
+    description: >
+      Confirms that a broken hash chain has been repaired with bridge records.
+      The gap evidence has been preserved in the repair metadata.
+
+  - name: REACTION_EVENT_REGISTRY_SYNCED
+    srs_code: R658
+    default_severity: INFO
+    description: >
+      Confirms that the event type registry has been synchronized across
+      all environments with consistent definitions and routing rules.
+
+  - name: REACTION_CONTRACT_REPORT_GENERATED
+    srs_code: R659
+    default_severity: INFO
+    description: >
+      Confirms that a comprehensive contract compliance report has been
+      generated covering schemas, validation stats, and compatibility status.

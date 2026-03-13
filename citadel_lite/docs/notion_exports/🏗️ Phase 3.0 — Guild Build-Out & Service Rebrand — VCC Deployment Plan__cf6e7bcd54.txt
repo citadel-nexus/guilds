@@ -1,0 +1,484 @@
+# 🏗️ Phase 3.0 — Guild Build-Out & Service Rebrand — VCC Deployment Plan
+(Page ID: cf6e7bcd-546f-41c5-b7f6-b89e2351f9be)
+(URL: https://www.notion.so/Phase-3-0-Guild-Build-Out-Service-Rebrand-VCC-Deployment-Plan-cf6e7bcd546f41c5b7f6b89e2351f9be)
+
+[Total top-level blocks: 170]
+
+**Status:** Blueprint | **Date:** Feb 27, 2026
+**Owner:** mr.nobody | **Scope:** VCC deployment plan for full guild build-out derived from Service Rebrand Blueprint + Guild House architecture
+**Depends on:** Phase 2.0 — VCC CREW Agent Integration & Systems Development
+
+---
+
+
+## Objective
+
+
+[CALLOUT] 🎯 **Build, deploy, and rebrand all 8 Citadel Guilds** into production-ready services with unified NATS namespaces, Supabase schemas, Stripe metadata, URL routing, and cross-guild event flows — all orchestrated by the VCC pipeline.
+
+This phase takes the **Citadel Guilds — Service Rebrand Blueprint** and the **Guild House + Social Platform — Missing Layer Architecture** and turns them into concrete VCC build instructions across 5 deployment tracks.
+
+---
+
+
+## Guild Assessment Summary
+
+Assessment of the rebrand blueprint and guild house architecture reveals:
+
+### Rebrand Blueprint Assessment
+
+- **8 guilds defined** — Commerce, Intelligence, Research, Creator, Builder, Finance, Entertainment, Writers
+- **5 existing services need renaming** — TradeBuilder → Commerce, Intelligence Suite → Intelligence, Oracle Dossier → Research, AI Generate → Creator, Workshop → Builder
+- **2 new guilds launching** — Entertainment Guild (RPG + Marketplace) and Writers Guild (Book Maker pipeline)
+- **Finance Guild** — already correctly named, no rebrand needed
+- **Visual identity system complete** — color palette, icons, naming conventions, copy all defined
+- **5-phase implementation checklist** already scoped (Nav+Branding → Content+Copy → Code+Infra → New Guild Pages → Marketing)
+- **SEO redirect map** defined for all `/services/*` → `/guilds/*` paths
+
+### Guild House Architecture Assessment
+
+- **Health Grade: A** (score 90) — well-structured, auditing stage
+- Full-stack social layer: **18 Supabase tables** (11 new), **12 FastAPI route files**, WebSocket + NATS fan-out
+- **Feed ranking engine**, presence system, push notifications, search (pg_trgm + tsvector)
+- **14 SRS codes** (SRS-SOC-001 through SRS-SOC-014) with acceptance criteria
+- **6 REFLEX triggers** for monitoring (pipeline_stall, delivery_failure, spam_burst, ws_drop, engagement_anomaly, push_lag)
+- Admin dashboard wireframes (§8.1–8.7) cover all management screens
+- Missing: actual deployment — blueprinted but not yet on ECS/VPS
+
+---
+
+
+## Track 1 — Navigation & URL Rebrand (Week 1)
+
+
+### 1.1 Frontend Route Migration
+
+| **Task** | **File / Location** | **VCC Action** | **Est.** |
+| Rename "Services" dropdown → "Guilds" | `src/components/Navbar.tsx` | String replace + icon swap (⚔️) | 15 min |
+| Update route paths `/services/*` → `/guilds/*` | `src/App.tsx` or router config | Batch rename + add 301 redirects in nginx | 1 hr |
+| Rename 5 service pages | Individual page components | TradeBuilder→Commerce, Intelligence Suite→Intelligence, Oracle Dossier→Research, AI Generate→Creator, Workshop→Builder | 2 hrs |
+| Apply guild color system to page headers | Each guild page component | CSS variable injection per guild brand color hex | 2 hrs |
+| Update footer links + meta tags + OG | `src/components/Footer.tsx`, `index.html` | Batch string replacement | 1 hr |
+
+### 1.2 Nginx Redirect Rules
+
+```javascript
+# /etc/nginx/conf.d/guild-redirects.conf
+location = /services { return 301 /guilds; }
+location ^~ /services/tradebuilder { return 301 /guilds/commerce; }
+location ^~ /services/intelligence-suite { return 301 /guilds/intelligence; }
+location ^~ /services/oracle-dossier { return 301 /guilds/research; }
+location ^~ /services/ai-generate { return 301 /guilds/creator; }
+location ^~ /services/workshop { return 301 /guilds/builder; }
+location ^~ /services/finance-guild { return 301 /guilds/finance; }
+```
+
+### 1.3 Dropdown Hierarchy (Client Journey Order)
+
+```javascript
+Guilds ▾
+├── 🏪 Commerce Guild        ← "I need more clients"
+├── 🔍 Intelligence Guild     ← "I need market insights"
+├── 📜 Research Guild         ← "I need deep answers"
+├── 🎨 Creator Guild          ← "I need content"
+├── 💰 Finance Guild          ← "I need my books handled"
+├── 🔧 Builder Guild          ← "I need custom tools"
+├── ──────────────
+├── 🎮 Entertainment Guild    ← "I want to play / create"
+└── 📚 Writers Guild          ← "I want to publish"
+```
+
+---
+
+
+## Track 2 — NATS Namespace Migration (Week 1–2)
+
+
+### 2.1 Subject Prefix Map
+
+| **Guild** | **NATS Prefix** | **Key Subjects** | **Migration Effort** |
+| 🏪 Commerce | `citadel.commerce.*` | `.lead.captured`, `.deal.closed`, `.onboard.start`, `.review.requested` | Rename from `citadel.tradebuilder.*` |
+| 🔍 Intelligence | `citadel.intel.*` | `.signal.detected`, `.briefing.generated`, `.alert.sent` | New namespace |
+| 📜 Research | `citadel.research.*` | `.dossier.started`, `.dossier.complete`, `.entity.enriched` | Rename from `citadel.oracle.*` |
+| 🎨 Creator | `citadel.creator.*` | `.content.generated`, `.brand.trained`, `.pipeline.distributed` | New namespace |
+| 🔧 Builder | `citadel.builder.*` | `.api.called`, `.integration.deployed`, `.sdk.downloaded` | New namespace |
+| 💰 Finance | `citadel.finance.*` | `.invoice.sent`, `.payment.received`, `.quote.accepted`, `.ttp.sent` | Already correct ✅ |
+| 🎮 Entertainment | `citadel.ent.*`  • `citadel.rpg.*` | `.session.started`, `.lore.generated`, `.marketplace.sale` | New namespace |
+| 📚 Writers | `citadel.writer.*` | `.book.compiled`, `.chapter.drafted`, `.audiobook.rendered` | New namespace |
+
+### 2.2 Cross-Guild Event Flows
+
+```mermaid
+flowchart LR
+    COM["🏪 Commerce"] -->|"client onboarded"| FIN["💰 Finance"]
+    COM -->|"needs content"| CRE["🎨 Creator"]
+    INT["🔍 Intelligence"] -->|"signal detected"| RES["📜 Research"]
+    RES -->|"dossier complete"| COM
+    CRE -->|"content published"| COM
+    ENT["🎮 Entertainment"] -->|"lore compiled"| WRI["📚 Writers"]
+    WRI -->|"book published"| ENT
+    ENT -->|"marketplace sale"| FIN
+    BUI["🔧 Builder"] -->|"custom integration"| COM
+    BUI -->|"API usage"| FIN
+```
+
+### 2.3 NATS Migration Script
+
+```python
+# tools/migrate_nats_subjects.py
+SUBJECT_MAP = {
+    "citadel.tradebuilder.": "citadel.commerce.",
+    "citadel.oracle.": "citadel.research.",
+}
+
+# 1. Create new JetStream streams for each guild prefix
+# 2. Mirror old streams to new during transition
+# 3. Update all publisher/subscriber references in codebase
+# 4. Remove old streams after 7-day verification window
+```
+
+---
+
+
+## Track 3 — Supabase Schema & Stripe Metadata (Week 2)
+
+
+### 3.1 Stripe Product Metadata Update
+
+All Stripe products get a `guild` metadata key:
+```python
+# tools/update_stripe_guild_metadata.py
+GUILD_MAP = {
+    "price_tradebuilder": "commerce",
+    "price_zes_standard": "intelligence",
+    "price_zes_premium": "intelligence",
+    "price_crew_bundle": "commerce",  # CREW is Commerce Guild's voice agent
+    "price_oracle_dossier": "research",
+    "price_ai_generate": "creator",
+    "price_workshop": "builder",
+    "price_finance": "finance",
+    "price_rpg": "entertainment",
+    "price_bookmaker": "writer",
+}
+
+for price_id, guild in GUILD_MAP.items():
+    stripe.Product.modify(price_id, metadata={"guild": guild})
+```
+
+### 3.2 Supabase Table Prefix Convention
+
+| **Guild** | **Table Prefix** | **Existing Tables** | **Action** |
+| Commerce | `commerce_*` | `crew_leads`, `crew_members`, `call_transcripts` | Add views / aliases (keep originals for backward compat) |
+| Intelligence | `intel_*` | None yet | Create `intel_signals`, `intel_briefings`, `intel_sources` |
+| Research | `research_*` | None yet | Create `research_dossiers`, `research_entities` |
+| Creator | `creator_*` | None yet | Create `creator_content`, `creator_brand_voices` |
+| Builder | `builder_*` | None yet | Create `builder_integrations`, `builder_api_keys` |
+| Finance | `finance_*` | 17+ tables (customers, quotes, invoices, payments, etc.) | Already correct ✅ |
+| Entertainment | `ent_*` | `rpg_sessions`, `rpg_characters`, `rpg_worlds` | Add `ent_marketplace_*`, `ent_xp_*` |
+| Writers | `writer_*` | None yet | Create `writer_books`, `writer_chapters`, `writer_audiobooks` |
+
+### 3.3 Guild House Social Layer Tables (18 tables from blueprint)
+
+These 18 tables from the Guild House architecture need deployment:
+1. `crew_social_polls` + `crew_social_poll_votes`
+1. `crew_social_bookmarks`
+1. `crew_social_drafts`
+1. `crew_push_tokens` + `crew_push_log`
+1. `crew_social_reports` + `crew_social_appeals`
+1. `crew_social_preferences`
+1. `crew_social_hashtags` + `crew_social_content_hashtags`
+1. `crew_gdpr_requests` + `crew_dmca_notices` + `crew_dmca_counter_notices`
+1. Plus existing: `feed_posts`, `user_profiles`, `crew_social_reactions`, `crew_social_follows`
+
+---
+
+
+## Track 4 — Guild-Specific Service Build-Out (Weeks 2–4)
+
+
+### 4.1 Commerce Guild (TradeBuilder → Commerce)
+
+**Current state:** Most mature guild — CREW voice agent, lead pipeline, CRM all operational.
+- [ ] Rename all `tradebuilder` references in codebase → `commerce`
+- [ ] Update CREW agent branding to reference "Commerce Guild"
+- [ ] Migrate NATS subjects `citadel.tradebuilder.*` → `citadel.commerce.*`
+- [ ] Update Stripe products metadata with `guild: "commerce"`
+- [ ] Rebuild landing page at `/guilds/commerce` with new hero copy: _"Never miss another lead."_
+- [ ] Wire Commerce → Finance cross-guild event (new client → auto-create finance customer)
+
+### 4.2 Intelligence Guild (Intelligence Suite → Intelligence)
+
+- [ ] Create `intel_signals`, `intel_briefings`, `intel_sources` Supabase tables
+- [ ] Build FastAPI router `src/intel/router.py` with routes: `/api/intel/signals`, `/api/intel/briefings`
+- [ ] Wire FAISS semantic search for intelligence corpus
+- [ ] Create n8n alert workflow: NATS signal → client notification
+- [ ] Build landing page at `/guilds/intelligence`
+- [ ] Configure Metabase intelligence dashboards
+
+### 4.3 Research Guild (Oracle Dossier → Research)
+
+- [ ] Rename Oracle references → Research Guild
+- [ ] Create `research_dossiers`, `research_entities` tables
+- [ ] Build `/api/research/dossiers` router with College :8200 integration
+- [ ] Wire Bedrock stagger chain for deep reasoning
+- [ ] Build landing page at `/guilds/research`
+
+### 4.4 Creator Guild (AI Generate → Creator)
+
+- [ ] Create `creator_content`, `creator_brand_voices` tables
+- [ ] Build `/api/creator/generate` router with prompt factory integration
+- [ ] Wire C.R.E.W. Social Pipeline for 8-channel distribution
+- [ ] Build landing page at `/guilds/creator`
+
+### 4.5 Builder Guild (Workshop → Builder)
+
+- [ ] Create `builder_integrations`, `builder_api_keys` tables
+- [ ] Build `/api/builder/` router with SDK endpoints
+- [ ] Generate developer documentation site
+- [ ] Build landing page at `/guilds/builder`
+
+### 4.6 Finance Guild — Already Live ✅
+
+Finance Guild is the most fully specified guild with 17+ Supabase tables, full UI wireframes, Stripe/Xero/Mercury integrations, and multi-tenant contracting.
+- [ ] Deploy remaining migration `20260227_finance_guild_missing_tables.sql`
+- [ ] Build React dashboard components from UI spec
+- [ ] Wire NATS events `citadel.finance.*`
+
+### 4.7 Entertainment Guild — New Launch 🆕
+
+- [ ] Deploy RPG Session Engine on ECS (:8400)
+- [ ] Create `ent_marketplace_*` tables for creator marketplace
+- [ ] Wire LiveKit for real-time voice sessions
+- [ ] Build creator marketplace with Stripe Connect (70/30 payouts)
+- [ ] Build landing page at `/guilds/entertainment`
+- [ ] Deploy 18 Guild House social layer tables
+
+### 4.8 Writers Guild — New Launch 🆕
+
+- [ ] Deploy Book Governor v4.0 + 33-professor pipeline on College :8200
+- [ ] Create `writer_books`, `writer_chapters`, `writer_audiobooks` tables
+- [ ] Wire ElevenAuthors for multi-voice audiobook generation
+- [ ] Build landing page at `/guilds/writers`
+- [ ] Wire Entertainment → Writers lore compilation pipeline
+
+---
+
+
+## Track 5 — Marketing & GTM (Week 3–4)
+
+- [ ] Social announcement: "Services are now Guilds" brand story post
+- [ ] Update all ad creative (Google Ads, Meta Ads) to guild names
+- [ ] Update LinkedIn company description
+- [ ] Send existing clients email announcing rebrand
+- [ ] Update promo code `CITADELNEXUSPRELAUNCH` landing page copy
+- [ ] Create "How Guilds Work Together" section on main landing page
+
+---
+
+
+## Deployment Priority Matrix
+
+| **Priority** | **Track** | **Timeline** | **Parallel?** | **Blockers** |
+| 🔴 P0 | Nav + URL Rebrand (Track 1) | Week 1 | Yes | None |
+| 🔴 P0 | NATS Migration (Track 2) | Week 1–2 | Yes | None |
+| 🟠 P1 | Stripe + Supabase Schema (Track 3) | Week 2 | Yes | Track 2 for subjects |
+| 🟠 P1 | Commerce + Finance Guild Build (Track 4.1, 4.6) | Week 2 | Yes | Track 1 for URLs |
+| 🟡 P2 | Intel + Research + Creator + Builder (Track 4.2–4.5) | Weeks 2–3 | Yes (4 lanes) | Track 3 for tables |
+| 🔵 P3 | Entertainment + Writers (Track 4.7–4.8) | Weeks 3–4 | Yes | RPG engine + College :8200 |
+| ⚪ P4 | Marketing + GTM (Track 5) | Week 3–4 | Yes | Track 1 complete |
+
+---
+
+
+## 🩺 Health Checks — Phase 3.0
+
+
+[CALLOUT] 🩺 **Every guild service must expose a **`**/health**`** endpoint and register with the central health monitor before going live.** Health checks gate the deployment priority matrix — no guild advances to the next track without green health.
+
+
+### Per-Guild Health Endpoints
+
+| **Guild** | **Endpoint** | **Port** | **Checks** | **Interval** |
+| 🏪 Commerce | `/api/commerce/health` | 8422 | CREW API live, Supabase conn, NATS `citadel.commerce.*` publishing, Stripe webhook reachable | 30s |
+| 🔍 Intelligence | `/api/intel/health` | 8000 | Bedrock stagger chain connected, FAISS index loaded, NATS `citadel.intel.*` active | 60s |
+| 📜 Research | `/api/research/health` | 8200 | College :8200 professors responsive, FAISS domains indexed, dossier pipeline warm | 60s |
+| 🎨 Creator | `/api/creator/health` | 8000 | Prompt factory connected, Bedrock auth, content pipeline reachable | 60s |
+| 🔧 Builder | `/api/builder/health` | 8443 | MCP FastAPI live, SDK registry loaded, API key validator active | 30s |
+| 💰 Finance | `/api/finance/health` | 8092 | Dataroom engine live, Stripe Connect auth, Xero token valid, Mercury read | 30s |
+| 🎮 Entertainment | `/api/ent/health` | 8400 | RPG engine live, LiveKit connected, marketplace tables accessible, NATS `citadel.ent.*` active | 30s |
+| 📚 Writers | `/api/writer/health` | 8200 | Book Governor v4.0 operational, 33-professor pipeline warm, ElevenAuthors reachable | 60s |
+
+### Central Health Monitor
+
+```python
+# tools/health_monitor_phase3.py
+import httpx, asyncio
+from datadog import statsd
+import posthog
+
+GUILD_SERVICES = {
+    "commerce":      {"url": "http://localhost:8422/api/commerce/health", "critical": True},
+    "intelligence":  {"url": "http://localhost:8000/api/intel/health", "critical": False},
+    "research":      {"url": "http://localhost:8200/api/research/health", "critical": False},
+    "creator":       {"url": "http://localhost:8000/api/creator/health", "critical": False},
+    "builder":       {"url": "http://localhost:8443/api/builder/health", "critical": False},
+    "finance":       {"url": "http://localhost:8092/api/finance/health", "critical": True},
+    "entertainment": {"url": "http://localhost:8400/api/ent/health", "critical": False},
+    "writer":        {"url": "http://localhost:8200/api/writer/health", "critical": False},
+}
+
+async def check_guild(name: str, cfg: dict) -> dict:
+    try:
+        r = await httpx.AsyncClient().get(cfg["url"], timeout=10)
+        data = r.json()
+        status = data.get("status", "unknown")
+        statsd.gauge(f"citadel.guild.{name}.healthy", 1 if status == "healthy" else 0)
+        return {"guild": name, "status": status, "critical": cfg["critical"]}
+    except Exception as e:
+        statsd.gauge(f"citadel.guild.{name}.healthy", 0)
+        return {"guild": name, "status": "unhealthy", "error": str(e), "critical": cfg["critical"]}
+
+async def run_phase3_health():
+    results = await asyncio.gather(*[check_guild(n, c) for n, c in GUILD_SERVICES.items()])
+    critical_ok = all(r["status"] == "healthy" for r in results if r["critical"])
+    posthog.capture("system", "guild_health_check", {
+        "phase": "3.0",
+        "critical_healthy": critical_ok,
+        "guilds_healthy": sum(1 for r in results if r["status"] == "healthy"),
+        "guilds_total": len(results),
+    })
+    return {"phase": "3.0", "overall": "healthy" if critical_ok else "degraded", "guilds": results}
+```
+
+### Cross-Guild Event Health Matrix
+
+| **Flow** | **Health Signal** | **Failure Mode** | **Alert Threshold** |
+| Commerce → Finance | NATS ack on `citadel.commerce.client.onboarded` | Finance consumer not subscribed | 0 acks in 1 hr during business hours |
+| Intelligence → Research | NATS ack on `citadel.intel.signal.detected` | Research consumer lag > 100 | Consumer lag > 100 for 5 min |
+| Entertainment → Writers | NATS ack on `citadel.ent.lore.compiled` | Writer pipeline stall | No ack in 24h when lore fragments ≥ 10 |
+| Builder → Finance | NATS ack on `citadel.builder.api.usage` | Finance metering gap | Usage events without billing match for > 1hr |
+
+---
+
+
+## 📊 Datadog Integration — Phase 3.0
+
+
+[CALLOUT] 🐶 **Datadog monitors every guild service, NATS namespace, Supabase table, and cross-guild event flow.** Each guild gets its own service tag for APM tracing and a dedicated monitor group.
+
+
+### Datadog APM Instrumentation (Per Guild)
+
+```python
+# Each guild router adds this on startup:
+from ddtrace import tracer, patch_all
+patch_all()
+tracer.configure(
+    service=f"citadel-{guild_name}",
+    env="production",
+    version="3.0.0",
+    tags={"phase": "3.0", "guild": guild_name}
+)
+```
+
+### Datadog Monitors (Phase 3.0)
+
+| **Monitor** | **Metric / Check** | **Threshold** | **Alert** |
+| Guild Health (×8) | `http.can_connect` per guild `/health` | 2 consecutive failures | Slack `#citadel-alerts` |
+| NATS Subject Activity (×8) | `citadel.nats.{guild}.messages_per_min` | 0 messages for 15 min (business hours) | Slack `#citadel-infra` |
+| NATS Cross-Guild Lag | `citadel.nats.crossguild.consumer_lag` | > 200 pending for 5 min | Slack `#citadel-alerts` |
+| Supabase RLS Violations | `citadel.supabase.rls.violation_count` | > 0 violations | Slack `#citadel-security`  • PagerDuty |
+| Stripe Webhook Failures | `citadel.stripe.webhook.failure_rate` | > 5% for 10 min | Slack `#citadel-alerts` |
+| Guild Landing Page (×8) | Synthetic test `GET /guilds/{name}` status 200 | 2 consecutive failures | Slack `#citadel-infra` |
+| ECS Task Health | `ecs.task.running` per guild service | Desired count ≠ running count for 5 min | Slack `#citadel-infra`  • PagerDuty |
+| Migration Drift | Custom check: applied migrations vs expected | Any drift detected | Slack `#citadel-alerts` |
+
+### Datadog Custom Metrics (Phase 3.0)
+
+```python
+# tools/dd_metrics_guilds.py
+from datadog import statsd
+
+def emit_guild_event(guild: str, event_type: str, properties: dict = {}):
+    statsd.increment(f"citadel.guild.{guild}.event.{event_type}")
+    for k, v in properties.items():
+        if isinstance(v, (int, float)):
+            statsd.gauge(f"citadel.guild.{guild}.{k}", v)
+
+def emit_crossguild_flow(source: str, target: str, latency_ms: float, success: bool):
+    statsd.increment(f"citadel.crossguild.{source}_to_{target}.total")
+    statsd.histogram(f"citadel.crossguild.{source}_to_{target}.latency_ms", latency_ms)
+    if not success:
+        statsd.increment(f"citadel.crossguild.{source}_to_{target}.failed")
+
+def emit_nats_migration_progress(old_subject: str, new_subject: str, migrated_pct: float):
+    statsd.gauge(f"citadel.nats.migration.{new_subject}.pct", migrated_pct)
+```
+
+### Datadog Dashboards (Phase 3.0)
+
+1. **Guild Fleet Overview** — 8 guild health tiles (green/yellow/red), NATS throughput per namespace, ECS task counts
+1. **Cross-Guild Event Flow** — Directed graph visualization of inter-guild events, latency heatmap, failure hotspots
+1. **NATS Migration Tracker** — Old vs new subject throughput, mirror lag, verification window countdown
+1. **Stripe Guild Revenue** — Per-guild MRR, payment success rate, entitlement enforcement stats
+1. **Landing Page Performance** — Synthetic test results, page load times per guild URL, error rates
+
+---
+
+
+## 📈 PostHog Integration — Phase 3.0
+
+
+[CALLOUT] 🦔 **PostHog tracks guild-level product analytics, feature adoption, and user journey through the guild ecosystem.** Server-side events from all guild APIs + client-side events from guild landing pages.
+
+
+### PostHog Events (Phase 3.0)
+
+| **Event** | **Trigger** | **Properties** | **Use Case** |
+| `guild_page_viewed` | User visits `/guilds/{name}` | `guild`, `referrer`, `utm_source`, `user_type` (new/returning) | Guild discovery funnel |
+| `guild_service_activated` | First API call or subscription to a guild | `guild`, `tenant_id`, `activation_source`, `tier` | Activation rate per guild |
+| `guild_crossflow_triggered` | Cross-guild event fires | `source_guild`, `target_guild`, `event_type`, `latency_ms` | Cross-guild adoption, stickiness |
+| `guild_stripe_checkout` | User starts Stripe checkout for a guild product | `guild`, `product_id`, `price`, `tier` | Revenue attribution per guild |
+| `guild_stripe_payment` | Payment succeeds or fails | `guild`, `amount_cents`, `success`, `payment_method` | Conversion rate, payment health |
+| `guild_nats_migration` | Subject successfully migrated | `old_subject`, `new_subject`, `messages_migrated` | Migration progress tracking |
+| `guild_social_action` | Social layer action (post, follow, DM, reaction) | `guild`, `action_type`, `tenant_id` | Social engagement per guild |
+
+### PostHog Feature Flags (Phase 3.0)
+
+| **Flag** | **Description** | **Default** | **Rollout** |  |
+| `guild_intelligence_launch` | Enable Intelligence Guild landing page + API routes | OFF | Internal → Beta → 100% |  |
+| `guild_research_launch` | Enable Research Guild landing page + API routes | OFF | Internal → Beta → 100% |  |
+| `guild_creator_launch` | Enable Creator Guild landing page + API routes | OFF | Internal → Beta → 100% |  |
+| `guild_builder_launch` | Enable Builder Guild landing page + API routes | OFF | Internal → Beta → 100% |  |
+| `guild_entertainment_launch` | Enable Entertainment Guild (RPG + Marketplace) | OFF | Internal → Beta → 100% |  |
+| `guild_writers_launch` | Enable Writers Guild (Book Maker pipeline) | OFF | Internal → Beta → 100% |  |
+| `guild_social_layer` | Enable Guild House social features across all guilds | OFF | 10% → 50% → 100% |  |
+| `guild_crossflow_events` | Enable automated cross-guild event flows | OFF | Internal testing → 100% |  |
+
+### PostHog Dashboards (Phase 3.0)
+
+1. **Guild Adoption Funnel** — Page view → Service activated → First payment → Cross-guild usage
+1. **Guild Revenue Attribution** — MRR breakdown by guild, average revenue per tenant per guild
+1. **Cross-Guild Stickiness** — Tenants using 1 guild vs 2+ guilds, retention correlation
+1. **Social Layer Engagement** — Posts, follows, DMs per guild, engagement vs retention correlation
+1. **Feature Flag Rollout Impact** — Per-flag activation rate, error rate, revenue impact
+
+---
+
+
+## Cross-References
+
+- Phase 2.0 — VCC CREW Agent Integration & Systems Development
+- Citadel Guilds — Service Rebrand Blueprint — Feb 27, 2026
+- 🏰 Guild House + Social Platform — Missing Layer Architecture
+- 🎨 Finance Guild — UI Layout & Dashboard Spec
+- Development Guild — Full Blueprint
+- C.R.E.W. Social Engagement Pipeline — 60-Second Content Delivery Blueprint
+
+---
+
+
+[CALLOUT] ⚡ **Key insight from assessment:** The rebrand is mostly naming + copy + URL changes — no infrastructure migrations. The guild system is already how the codebase is organized internally. This phase makes the external brand match the internal architecture, then builds out the 4 guilds that exist only as blueprints.
+
+
+[CALLOUT] 🔗 **Dependency chain:** Phase 2.0 (CREW agent integration) → **Phase 3.0 (Guild build-out)** → Phase 4.0 (Guild audit) — each phase validates the previous before advancing.

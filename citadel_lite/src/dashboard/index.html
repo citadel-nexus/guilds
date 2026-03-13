@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CITADEL LITE — Agentic DevOps Pipeline</title>
+  <link rel="stylesheet" href="/dashboard/style.css" />
+</head>
+<body>
+
+  <!-- ===== Top Bar ===== -->
+  <header class="topbar">
+    <div class="topbar-brand">
+      <span class="topbar-logo">&#9670;</span>
+      <span class="topbar-name">CITADEL LITE</span>
+    </div>
+
+    <!-- Menu Bar -->
+    <nav class="menubar">
+      <div class="menu-item" data-menu="scenarios">
+        <span class="menu-label">SCENARIOS</span>
+        <div class="menu-drop" id="menuScenarios">
+          <div class="menu-drop-hdr">TEST SCENARIOS</div>
+          <div class="menu-drop-list" id="scenarioList">
+            <div class="muted">Loading...</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="menu-item" data-menu="memory">
+        <span class="menu-label">MEMORY</span>
+        <div class="menu-drop menu-drop-wide" id="menuMemory">
+          <div class="menu-drop-hdr">
+            KNOWLEDGE BASE
+            <span class="menu-drop-count" id="memKbCount">--</span>
+          </div>
+          <div class="menu-drop-toolbar">
+            <input type="text" class="mem-search" id="memSearchInput" placeholder="Search memory..." />
+            <button class="btn-cfg" id="memSearchBtn">QUERY</button>
+          </div>
+          <div class="menu-drop-body" id="memKbBody">
+            <p class="muted">Click QUERY to search the knowledge base.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="menu-item" data-menu="settings">
+        <span class="menu-label">SETTINGS</span>
+        <div class="menu-drop menu-drop-config" id="menuSettings">
+          <div class="menu-drop-hdr">
+            CONFIGURATION
+            <span class="cfg-hdr-right">
+              <span class="cfg-save-status" id="cfgSaveStatus"></span>
+              <button class="btn-cfg" id="cfgSaveBtn" type="button">SAVE</button>
+              <button class="btn-cfg btn-cfg-alt" id="cfgReloadBtn" type="button">RELOAD</button>
+            </span>
+          </div>
+          <div class="cfg-body" id="cfgBody">
+
+            <!-- Pipeline -->
+            <div class="cfg-group">
+              <div class="cfg-group-title">PIPELINE</div>
+              <div class="cfg-fields">
+                <div class="cfg-field">
+                  <label>EXECUTION MODE</label>
+                  <select id="cfg_pipeline_execution_mode">
+                    <option value="local">local</option>
+                    <option value="dry_run">dry_run</option>
+                    <option value="github">github</option>
+                    <option value="gitlab">gitlab</option>
+                  </select>
+                </div>
+                <div class="cfg-field">
+                  <label>AGENT VERSION</label>
+                  <select id="cfg_pipeline_agent_version">
+                    <option value="v1">v1</option>
+                    <option value="v2">v2</option>
+                  </select>
+                </div>
+                <div class="cfg-field">
+                  <label>SSE ENABLED</label>
+                  <select id="cfg_pipeline_sse_enabled">
+                    <option value="true">true</option>
+                    <option value="false">false</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- LLM — Azure OpenAI -->
+            <div class="cfg-group">
+              <div class="cfg-group-title">LLM &mdash; AZURE OPENAI</div>
+              <div class="cfg-fields">
+                <div class="cfg-field cfg-field-wide">
+                  <label>ENDPOINT</label>
+                  <input type="text" id="cfg_llm_azure_openai_endpoint" placeholder="https://your-resource.openai.azure.com/" />
+                </div>
+                <div class="cfg-field">
+                  <label>API KEY</label>
+                  <input type="password" id="cfg_llm_azure_openai_api_key" placeholder="API key" />
+                </div>
+                <div class="cfg-field">
+                  <label>DEPLOYMENT</label>
+                  <input type="text" id="cfg_llm_azure_openai_deployment" placeholder="gpt-4o" />
+                </div>
+              </div>
+            </div>
+
+            <!-- LLM — OpenAI Direct -->
+            <div class="cfg-group">
+              <div class="cfg-group-title">LLM &mdash; OPENAI DIRECT</div>
+              <div class="cfg-fields">
+                <div class="cfg-field">
+                  <label>API KEY</label>
+                  <input type="password" id="cfg_llm_openai_api_key" placeholder="sk-..." />
+                </div>
+                <div class="cfg-field">
+                  <label>MODEL</label>
+                  <input type="text" id="cfg_llm_openai_model" placeholder="gpt-4o" />
+                </div>
+              </div>
+            </div>
+
+            <!-- GitHub -->
+            <div class="cfg-group">
+              <div class="cfg-group-title">GITHUB</div>
+              <div class="cfg-fields">
+                <div class="cfg-field">
+                  <label>TOKEN</label>
+                  <input type="password" id="cfg_github_token" placeholder="ghp_..." />
+                </div>
+                <div class="cfg-field">
+                  <label>WEBHOOK SECRET</label>
+                  <input type="password" id="cfg_github_webhook_secret" placeholder="Secret" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Dashboard -->
+            <div class="cfg-group">
+              <div class="cfg-group-title">DASHBOARD</div>
+              <div class="cfg-fields">
+                <div class="cfg-field">
+                  <label>ENABLED</label>
+                  <select id="cfg_dashboard_enabled">
+                    <option value="true">true</option>
+                    <option value="false">false</option>
+                  </select>
+                </div>
+                <div class="cfg-field">
+                  <label>POLL INTERVAL (ms)</label>
+                  <input type="number" id="cfg_dashboard_poll_interval_ms" placeholder="2000" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Notifications — Slack -->
+            <div class="cfg-group">
+              <div class="cfg-group-title">NOTIFICATIONS &mdash; SLACK</div>
+              <div class="cfg-fields">
+                <div class="cfg-field cfg-field-wide">
+                  <label>WEBHOOK URL</label>
+                  <input type="password" id="cfg_notifications_slack_webhook_url" placeholder="https://hooks.slack.com/..." />
+                </div>
+                <div class="cfg-field">
+                  <label>CHANNEL</label>
+                  <input type="text" id="cfg_notifications_slack_channel" placeholder="#citadel-alerts" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Notifications — Teams -->
+            <div class="cfg-group">
+              <div class="cfg-group-title">NOTIFICATIONS &mdash; TEAMS</div>
+              <div class="cfg-fields">
+                <div class="cfg-field cfg-field-wide">
+                  <label>WEBHOOK URL</label>
+                  <input type="password" id="cfg_notifications_teams_webhook_url" placeholder="https://outlook.office.com/..." />
+                </div>
+              </div>
+            </div>
+
+            <!-- Notifications — Webhook -->
+            <div class="cfg-group">
+              <div class="cfg-group-title">NOTIFICATIONS &mdash; GENERIC WEBHOOK</div>
+              <div class="cfg-fields">
+                <div class="cfg-field cfg-field-wide">
+                  <label>URL</label>
+                  <input type="password" id="cfg_notifications_webhook_url" placeholder="https://..." />
+                </div>
+              </div>
+            </div>
+
+            <!-- Azure — Service Bus -->
+            <div class="cfg-group">
+              <div class="cfg-group-title">AZURE &mdash; SERVICE BUS</div>
+              <div class="cfg-fields">
+                <div class="cfg-field cfg-field-wide">
+                  <label>CONNECTION STRING</label>
+                  <input type="password" id="cfg_azure_service_bus_connection_string" placeholder="Endpoint=sb://..." />
+                </div>
+                <div class="cfg-field">
+                  <label>QUEUE NAME</label>
+                  <input type="text" id="cfg_azure_service_bus_queue_name" placeholder="citadel-events" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Azure — Cosmos DB -->
+            <div class="cfg-group">
+              <div class="cfg-group-title">AZURE &mdash; COSMOS DB</div>
+              <div class="cfg-fields">
+                <div class="cfg-field cfg-field-wide">
+                  <label>CONNECTION STRING</label>
+                  <input type="password" id="cfg_azure_cosmos_connection_string" placeholder="AccountEndpoint=..." />
+                </div>
+                <div class="cfg-field">
+                  <label>DATABASE</label>
+                  <input type="text" id="cfg_azure_cosmos_database" placeholder="citadel-lite" />
+                </div>
+                <div class="cfg-field">
+                  <label>CONTAINER</label>
+                  <input type="text" id="cfg_azure_cosmos_container" placeholder="incidents" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Azure — Foundry -->
+            <div class="cfg-group">
+              <div class="cfg-group-title">AZURE &mdash; FOUNDRY</div>
+              <div class="cfg-fields">
+                <div class="cfg-field cfg-field-wide">
+                  <label>ENDPOINT</label>
+                  <input type="text" id="cfg_azure_foundry_endpoint" placeholder="https://..." />
+                </div>
+                <div class="cfg-field">
+                  <label>API KEY</label>
+                  <input type="password" id="cfg_azure_foundry_api_key" placeholder="API key" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Azure — App Insights -->
+            <div class="cfg-group">
+              <div class="cfg-group-title">AZURE &mdash; APP INSIGHTS</div>
+              <div class="cfg-fields">
+                <div class="cfg-field cfg-field-wide">
+                  <label>CONNECTION STRING</label>
+                  <input type="password" id="cfg_azure_app_insights_connection_string" placeholder="InstrumentationKey=..." />
+                </div>
+              </div>
+            </div>
+
+            <!-- Azure — Storage -->
+            <div class="cfg-group">
+              <div class="cfg-group-title">AZURE &mdash; STORAGE</div>
+              <div class="cfg-fields">
+                <div class="cfg-field cfg-field-wide">
+                  <label>CONNECTION STRING</label>
+                  <input type="password" id="cfg_azure_storage_connection_string" placeholder="DefaultEndpointsProtocol=..." />
+                </div>
+              </div>
+            </div>
+
+            <!-- Azure — AI Search -->
+            <div class="cfg-group">
+              <div class="cfg-group-title">AZURE &mdash; AI SEARCH</div>
+              <div class="cfg-fields">
+                <div class="cfg-field cfg-field-wide">
+                  <label>ENDPOINT</label>
+                  <input type="text" id="cfg_azure_ai_search_endpoint" placeholder="https://your-search.search.windows.net" />
+                </div>
+                <div class="cfg-field">
+                  <label>API KEY</label>
+                  <input type="password" id="cfg_azure_ai_search_api_key" placeholder="API key" />
+                </div>
+                <div class="cfg-field">
+                  <label>INDEX NAME</label>
+                  <input type="text" id="cfg_azure_ai_search_index_name" placeholder="citadel-incidents" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Memory -->
+            <div class="cfg-group">
+              <div class="cfg-group-title">MEMORY</div>
+              <div class="cfg-fields">
+                <div class="cfg-field">
+                  <label>BACKEND</label>
+                  <select id="cfg_memory_backend">
+                    <option value="local">local</option>
+                    <option value="faiss">faiss</option>
+                    <option value="azure_search">azure_search</option>
+                  </select>
+                </div>
+                <div class="cfg-field">
+                  <label>FAISS ENABLED</label>
+                  <select id="cfg_memory_faiss_enabled">
+                    <option value="false">false</option>
+                    <option value="true">true</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Supabase -->
+            <div class="cfg-group">
+              <div class="cfg-group-title">SUPABASE</div>
+              <div class="cfg-fields">
+                <div class="cfg-field cfg-field-wide">
+                  <label>URL</label>
+                  <input type="text" id="cfg_supabase_url" placeholder="https://your-project.supabase.co" />
+                </div>
+                <div class="cfg-field">
+                  <label>API KEY</label>
+                  <input type="password" id="cfg_supabase_api_key" placeholder="eyJ..." />
+                </div>
+              </div>
+            </div>
+
+            <!-- Notion -->
+            <div class="cfg-group">
+              <div class="cfg-group-title">NOTION</div>
+              <div class="cfg-fields">
+                <div class="cfg-field">
+                  <label>API KEY</label>
+                  <input type="password" id="cfg_notion_api_key" placeholder="secret_..." />
+                </div>
+                <div class="cfg-field">
+                  <label>DATABASE ID</label>
+                  <input type="text" id="cfg_notion_database_id" placeholder="UUID" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Slack Bot -->
+            <div class="cfg-group">
+              <div class="cfg-group-title">SLACK BOT (ENHANCED)</div>
+              <div class="cfg-fields">
+                <div class="cfg-field cfg-field-wide">
+                  <label>BOT TOKEN</label>
+                  <input type="password" id="cfg_slack_bot_token" placeholder="xoxb-..." />
+                </div>
+                <div class="cfg-field">
+                  <label>SIGNING SECRET</label>
+                  <input type="password" id="cfg_slack_signing_secret" placeholder="Secret" />
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <div class="topbar-kpis" id="topbarKpis">
+      <div class="kpi">
+        <span class="kpi-label">STATUS</span>
+        <span class="kpi-value ok" id="kpiStatus">ONLINE</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-label">AGENTS</span>
+        <span class="kpi-value" id="kpiAgents">--</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-label">RULES</span>
+        <span class="kpi-value" id="kpiRules">--</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-label">MODE</span>
+        <span class="kpi-value" id="kpiMode">--</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-label">LLM</span>
+        <span class="kpi-value" id="kpiLlm">--</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-label">VER</span>
+        <span class="kpi-value accent" id="kpiVersion">2.1.0</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===== Pipeline Stage Bar ===== -->
+  <div class="pipeline-bar" id="pipelineBar">
+    <div class="pipeline-id" id="pipelineEventId">NO ACTIVE EVENT</div>
+    <div class="pipeline-stages" id="pipelineStages">
+      <div class="pstage" data-stage="event"><span class="pstage-dot"></span><span class="pstage-name">EVENT</span></div>
+      <div class="pstage-conn"></div>
+      <div class="pstage" data-stage="sentinel"><span class="pstage-dot"></span><span class="pstage-name">SENTINEL</span></div>
+      <div class="pstage-conn"></div>
+      <div class="pstage" data-stage="sherlock"><span class="pstage-dot"></span><span class="pstage-name">SHERLOCK</span></div>
+      <div class="pstage-conn"></div>
+      <div class="pstage" data-stage="fixer"><span class="pstage-dot"></span><span class="pstage-name">FIXER</span></div>
+      <div class="pstage-conn"></div>
+      <div class="pstage" data-stage="guardian"><span class="pstage-dot"></span><span class="pstage-name">GUARDIAN</span></div>
+      <div class="pstage-conn"></div>
+      <div class="pstage" data-stage="execution"><span class="pstage-dot"></span><span class="pstage-name">EXEC</span></div>
+    </div>
+  </div>
+
+  <!-- ===== Main Grid ===== -->
+  <main class="grid-main">
+
+    <!-- Row 1: Trigger + Governance -->
+    <section class="panel" id="panelTrigger">
+      <div class="panel-hdr"><span class="panel-hdr-dot"></span>EVENT TRIGGER</div>
+      <form id="eventForm" class="trigger-form" autocomplete="off">
+        <div class="tf-row">
+          <label>TYPE</label>
+          <select id="eventType" required>
+            <option value="ci_failure">CI Failure</option>
+            <option value="deploy_failure">Deploy Failure</option>
+            <option value="infra_alert">Infra Alert</option>
+            <option value="security_alert">Security Alert</option>
+            <option value="rollback_needed">Rollback Needed</option>
+            <option value="performance_degradation">Perf Degradation</option>
+            <option value="test_failure">Test Failure</option>
+          </select>
+        </div>
+        <div class="tf-row">
+          <label>REPO</label>
+          <input type="text" id="eventRepo" placeholder="group/project (e.g. guilds/citadel_lite_repo)" />
+        </div>
+        <div class="tf-row">
+          <label>REF</label>
+          <input type="text" id="eventRef" placeholder="Branch (e.g. main)" />
+        </div>
+        <div class="tf-row">
+          <label>SUMMARY</label>
+          <input type="text" id="eventSummary" placeholder="Incident description..." required />
+        </div>
+        <div class="tf-row">
+          <label>LOG</label>
+          <textarea id="logExcerpt" rows="3" placeholder="Log excerpt..."></textarea>
+        </div>
+        <div class="tf-actions">
+          <button type="submit" class="btn-submit" id="submitBtn">SUBMIT</button>
+          <span class="tf-status" id="formStatus"></span>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel" id="panelGovernance">
+      <div class="panel-hdr"><span class="panel-hdr-dot"></span>GOVERNANCE</div>
+      <div class="gov-grid">
+        <div class="gov-cell">
+          <div class="gov-cell-label">RISK SCORE</div>
+          <div class="risk-gauge">
+            <div class="risk-fill" id="riskGaugeFill"></div>
+            <span class="risk-val" id="riskGaugeLabel">--</span>
+          </div>
+        </div>
+        <div class="gov-cell">
+          <div class="gov-cell-label">DECISION</div>
+          <div class="gov-decision" id="govDecision">--</div>
+        </div>
+        <div class="gov-cell">
+          <div class="gov-cell-label">COMPLIANCE</div>
+          <div id="complianceStatus"><span class="cbadge pending">PENDING</span></div>
+        </div>
+        <div class="gov-cell gov-cell-wide">
+          <div class="gov-cell-label">POLICY REFS</div>
+          <ul class="policy-list" id="policyRefs"><li class="muted">No policies evaluated</li></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Row 2: Agent Outputs + Memory/Audit stack -->
+    <section class="panel panel-agents" id="panelAgents">
+      <div class="panel-hdr"><span class="panel-hdr-dot"></span>AGENT OUTPUTS</div>
+      <div class="agent-tabs" id="agentTabs">
+        <button class="atab active" data-agent="sentinel">SENTINEL</button>
+        <button class="atab" data-agent="sherlock">SHERLOCK</button>
+        <button class="atab" data-agent="fixer">FIXER</button>
+        <button class="atab" data-agent="guardian">GUARDIAN</button>
+        <button class="atab" data-agent="execution">EXECUTION</button>
+      </div>
+      <div class="agent-tab-badges" id="agentTabBadges">
+        <span class="atab-badge" id="badgeSentinel">waiting</span>
+        <span class="atab-badge" id="badgeSherlock">waiting</span>
+        <span class="atab-badge" id="badgeFixer">waiting</span>
+        <span class="atab-badge" id="badgeGuardian">waiting</span>
+        <span class="atab-badge" id="badgeExecution">waiting</span>
+      </div>
+      <div class="agent-output-area">
+        <pre class="agent-pre" id="dataSentinel">Awaiting data...</pre>
+        <pre class="agent-pre" id="dataSherlock" style="display:none">Awaiting data...</pre>
+        <pre class="agent-pre" id="dataFixer" style="display:none">Awaiting data...</pre>
+        <pre class="agent-pre" id="dataGuardian" style="display:none">Awaiting data...</pre>
+        <pre class="agent-pre" id="dataExecution" style="display:none">Awaiting data...</pre>
+      </div>
+    </section>
+
+    <div class="panel-stack">
+      <section class="panel" id="panelMemory">
+        <div class="panel-hdr"><span class="panel-hdr-dot"></span>MEMORY RECALL</div>
+        <div class="panel-scroll" id="memoryEntries">
+          <p class="muted">No recalled incidents.</p>
+        </div>
+      </section>
+
+      <section class="panel" id="panelAudit">
+        <div class="panel-hdr"><span class="panel-hdr-dot"></span>AUDIT TRAIL</div>
+        <div class="panel-scroll" id="auditChain">
+          <p class="muted">No audit entries yet.</p>
+        </div>
+      </section>
+    </div>
+
+    <!-- Row 3: Registry + Reflex Rules -->
+    <section class="panel" id="panelRegistry">
+      <div class="panel-hdr"><span class="panel-hdr-dot"></span>AGENT REGISTRY</div>
+      <div class="registry-grid" id="agentRegistry">
+        <p class="muted">Loading agents...</p>
+      </div>
+    </section>
+
+    <section class="panel" id="panelReflex">
+      <div class="panel-hdr"><span class="panel-hdr-dot"></span>REFLEX RULES</div>
+      <div class="reflex-list" id="reflexRules">
+        <p class="muted">Loading rules...</p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Overlay backdrop (clicks close menus) -->
+  <div class="overlay-backdrop" id="overlayBackdrop"></div>
+
+  <footer class="bottombar">
+    <span>CITADEL LITE v2.1.0</span>
+    <span class="bottombar-sep">|</span>
+    <span>AGENTIC DEVOPS PIPELINE</span>
+    <span class="bottombar-sep">|</span>
+    <span id="footerTime"></span>
+  </footer>
+
+  <script src="/dashboard/app.js"></script>
+</body>
+</html>

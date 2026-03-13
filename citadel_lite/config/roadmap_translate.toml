@@ -1,0 +1,98 @@
+# Roadmap Translator Configuration
+# Used by src/roadmap_translator/ pipeline
+
+[meta]
+version = "1.0.0"
+
+# ---------------------------------------------------------------------------
+# Status normalization dictionary
+# Maps raw strings (case-insensitive) to StatusEnum values
+# ---------------------------------------------------------------------------
+[status_map]
+"done"         = "done"
+"DONE"         = "done"
+"完了"          = "done"
+"完成"          = "done"
+"✅"           = "done"
+"implemented"  = "done"
+"merged"       = "done"
+"デモ確認済み"    = "done"
+"テスト追加済み"   = "done"
+"WIP"          = "in_progress"
+"進行中"        = "in_progress"
+"in_progress"  = "in_progress"
+"blocked"      = "blocked"
+"依存待ち"       = "blocked"
+"pending"      = "blocked"
+"TODO"         = "planned"
+"予定"          = "planned"
+"next"         = "planned"
+"planned"      = "planned"
+
+# ---------------------------------------------------------------------------
+# Verify-status keywords (found in description text)
+# ---------------------------------------------------------------------------
+[verify_keywords]
+verified  = ["verified", "検証済み", "VERIFIED"]
+tested    = ["テスト", "tested", "合格", "PASS", "passing", "tests passing"]
+not_tested = ["未テスト", "not_tested"]
+
+# ---------------------------------------------------------------------------
+# Phase → revenue_gate mapping
+# ---------------------------------------------------------------------------
+[phase_revenue_gate]
+0  = "core"
+1  = "core"
+2  = "core"
+3  = "core"
+4  = "core"
+5  = "core"
+6  = "core"
+7  = "core"
+8  = "core"
+9  = "core"
+10 = "core"
+11 = "core"
+12 = "core"
+13 = "core"
+14 = "core"
+15 = "core"
+16 = "core"
+17 = "core"
+18 = "core"
+19 = "core"
+20 = "core"
+21 = "core"
+22 = "core"
+23 = "core"
+24 = "core"
+25 = "zes_agent"
+26 = "core"
+27 = "tradebuilder"
+
+# ---------------------------------------------------------------------------
+# Readiness calculation table
+# (status, verify_status) → readiness score
+# ---------------------------------------------------------------------------
+[readiness]
+"done|verified"      = 1.0
+"done|tested"        = 0.9
+"done|not_tested"    = 0.8
+"done|unknown"       = 0.8
+"in_progress|verified" = 0.6
+"in_progress|tested" = 0.55
+"in_progress|unknown"= 0.5
+"blocked|unknown"    = 0.2
+"planned|unknown"    = 0.1
+"unknown|unknown"    = 0.05
+
+# ---------------------------------------------------------------------------
+# Evidence weight defaults
+# ---------------------------------------------------------------------------
+[evidence_weights]
+file_loc   = 0.8
+test_result = 0.7
+artifact   = 0.6
+abstract   = 0.4
+git_commit = 0.6
+text_claim = 0.3

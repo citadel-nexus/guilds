@@ -1,0 +1,1364 @@
+# Email System Upgrade — AI Generation, Templates, Rehydration, Signatures & Meeting Scheduler
+(Page ID: 7e1a6edf-2cdc-4a68-8506-dc25fdb19934)
+(URL: https://www.notion.so/Email-System-Upgrade-AI-Generation-Templates-Rehydration-Signatures-Meeting-Scheduler-7e1a6edf2cdc4a688506dc25fdb19934)
+
+[Total top-level blocks: 41]
+
+
+## Overview
+
+Upgrade the Citadel Nexus email system (`/admin/operations` → Email tab) with:
+1. **AI-generated email responses** (OpenAI / Bedrock)
+1. **Dropdown template selector** with live preview
+1. **Client data rehydration** from Supabase (auto-fill recipient info)
+1. **Header/footer injection** with sender identity (email, socials, phone) from auto-selected template
+1. **Schedule meeting with sender** (calendar link generation)
+
+---
+
+
+## Architecture
+
+```mermaid
+flowchart TB
+    subgraph UI["Frontend — Email Compose"]
+        TEMPLATE["Template Dropdown"]
+        AI_BTN["✨ AI Generate"]
+        TO["To: field"]
+        REHYDRATE["🔄 Rehydrate Client"]
+        EDITOR["Rich Text Editor"]
+        PREVIEW["Live Preview"]
+        SCHEDULE["📅 Schedule Meeting"]
+    end
+
+    subgraph API["Backend API — Port 8201"]
+        TMPL_API["/api/email/templates"]
+        AI_API["/api/email/ai-generate"]
+        REHY_API["/api/email/rehydrate"]
+        SEND_API["/api/email/send"]
+        SIG_API["/api/email/sender-signature"]
+        MEET_API["/api/email/schedule-meeting"]
+    end
+
+    subgraph DATA["Data Layer"]
+        SUPA["Supabase\nclients / contacts"]
+        SES["AWS SES"]
+        LLM["Bedrock / OpenAI"]
+        CAL["Google Calendar API"]
+    end
+
+    TEMPLATE --> TMPL_API
+    AI_BTN --> AI_API
+    TO --> REHY_API
+    REHYDRATE --> REHY_API
+    EDITOR --> SEND_API
+    SCHEDULE --> MEET_API
+
+    TMPL_API --> SUPA
+    AI_API --> LLM
+    REHY_API --> SUPA
+    SEND_API --> SES
+    SIG_API --> SUPA
+    MEET_API --> CAL
+```
+
+---
+
+
+## Supabase Migrations
+
+Run these before deploying the backend.
+```sql
+-- ============================================
+-- 1. Email Templates table
+-- ============================================
+CREATE TABLE IF NOT EXISTS public.email_templates (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name        TEXT NOT NULL,
+    slug        TEXT UNIQUE NOT NULL,
+    subject     TEXT NOT NULL DEFAULT '',
+    body_html   TEXT NOT NULL DEFAULT '',
+    category    TEXT NOT NULL DEFAULT 'general',
+    header_html TEXT DEFAULT '',
+    footer_html TEXT DEFAULT '',
+    variables   JSONB DEFAULT '[]'::jsonb,
+    created_at  TIMESTAMPTZ DEFAULT now(),
+    updated_at  TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_email_templates_category ON public.email_templates(category);
+CREATE INDEX idx_email_templates_slug ON public.email_templates(slug);
+
+-- ============================================
+-- 2. Sender Signatures table
+-- ============================================
+CREATE TABLE IF NOT EXISTS public.sender_signatures (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    sender_name     TEXT NOT NULL,
+    sender_email    TEXT NOT NULL,
+    phone           TEXT,
+    title           TEXT,
+    company         TEXT DEFAULT 'Citadel Nexus',
+    website         TEXT DEFAULT 'https://citadel-nexus.com',
+    linkedin        TEXT,
+    twitter         TEXT,
+    instagram       TEXT,
+    github          TEXT,
+    calendar_link   TEXT,
+    logo_url        TEXT DEFAULT 'https://citadel-nexus.com/logo.png',
+    header_html     TEXT DEFAULT '',
+    footer_html     TEXT DEFAULT '',
+    is_default      BOOLEAN DEFAULT false,
+    created_at      TIMESTAMPTZ DEFAULT now(),
+    updated_at      TIMESTAMPTZ DEFAULT now()
+);
+
+-- ============================================
+-- 3. Clients table (if not exists)
+-- ============================================
+CREATE TABLE IF NOT EXISTS public.clients (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name          TEXT NOT NULL,
+    email         TEXT UNIQUE,
+    company       TEXT,
+    phone         TEXT,
+    industry      TEXT,
+    last_contact  TIMESTAMPTZ,
+    notes         TEXT,
+    tags          JSONB DEFAULT '[]'::jsonb,
+    created_at    TIMESTAMPTZ DEFAULT now(),
+    updated_at    TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_clients_email ON public.clients(email);
+
+-- ============================================
+-- 4. Client Meetings junction
+-- ============================================
+CREATE TABLE IF NOT EXISTS public.client_meetings (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    client_id     UUID REFERENCES public.clients(id) ON DELETE CASCADE,
+    topic         TEXT,
+    meeting_date  TIMESTAMPTZ,
+    notes         TEXT,
+    status        TEXT DEFAULT 'completed',
+    created_at    TIMESTAMPTZ DEFAULT now()
+);
+
+-- ============================================
+-- 5. Meeting Proposals table
+-- ============================================
+CREATE TABLE IF NOT EXISTS public.meeting_proposals (
+    id                TEXT PRIMARY KEY,
+    recipient_name    TEXT NOT NULL,
+    recipient_email   TEXT NOT NULL,
+    topic             TEXT DEFAULT 'Follow-up call',
+    duration_minutes  INTEGER DEFAULT 30,
+    proposed_times    JSONB DEFAULT '[]'::jsonb,
+    confirmed_time    TIMESTAMPTZ,
+    status            TEXT DEFAULT 'proposed',
+    created_at        TIMESTAMPTZ DEFAULT now()
+);
+
+-- ============================================
+-- 6. Email Send Log (audit trail)
+-- ============================================
+CREATE TABLE IF NOT EXISTS public.email_send_log (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    to_email        TEXT NOT NULL,
+    subject         TEXT,
+    template_slug   TEXT,
+    signature_id    UUID,
+    ai_generated    BOOLEAN DEFAULT false,
+    status          TEXT DEFAULT 'sent',
+    ses_message_id  TEXT,
+    sent_at         TIMESTAMPTZ DEFAULT now()
+);
+
+-- ============================================
+-- 7. Seed: default templates (your 11 existing + new)
+-- ============================================
+INSERT INTO public.email_templates (slug, name, category, subject, body_html, variables) VALUES
+('general_outreach',     'General Outreach',          'outreach',  'Reaching Out from Citadel Nexus',  '<p>Hi recipient_name,</p><p>message</p><p>Best,<br/>sender_name</p>', '["recipient_name","message","sender_name"]'),
+('meeting_followup',     'Meeting Follow-Up',         'followup',  'Meeting Follow-Up',                '<p>Hi recipient_name,</p><p>Thanks for taking the time to chat today! Here''s a quick recap:</p><ul><li>Topic: topic</li><li>Next steps: next_steps</li></ul><p>Looking forward to it!</p>', '["recipient_name","topic","next_steps","sender_name"]'),
+('quote_followup',       'Quote Follow-Up',           'followup',  'Your Quote from Citadel Nexus',    '<p>Hi recipient_name,</p><p>Following up on your quote for service.</p><p>details</p>', '["recipient_name","service","details"]'),
+('welcome',              'Welcome',                   'onboard',   'Welcome to Citadel Nexus!',        '<p>Hi recipient_name,</p><p>Welcome aboard! We''re excited to have you.</p>', '["recipient_name"]'),
+('general_followup',     'General Follow-Up',         'followup',  'Following Up',                     '<p>Hi recipient_name,</p><p>Just circling back on topic.</p>', '["recipient_name","topic"]'),
+('interview_invitation', 'Interview Invitation',      'recruit',   'Interview Invitation — Citadel Nexus', '<p>Hi recipient_name,</p><p>We''d like to invite you to interview for position.</p>', '["recipient_name","position","date"]'),
+('room_registration',    'Room Registration Confirmation', 'event', 'Registration Confirmed',           '<p>Hi recipient_name,</p><p>You''re confirmed for event.</p>', '["recipient_name","event","date"]'),
+('lead_hunter',          'Lead Hunter',               'outreach',  'Opportunity for company',      '<p>Hi recipient_name,</p><p>I noticed company could benefit from service.</p>', '["recipient_name","company","service"]'),
+('finance_guild',        'Finance Guild',             'finance',   'Invoice / Payment Update',         '<p>Hi recipient_name,</p><p>finance_message</p>', '["recipient_name","finance_message"]')
+ON CONFLICT (slug) DO NOTHING;
+
+-- Seed: default sender signature
+INSERT INTO public.sender_signatures (sender_name, sender_email, phone, title, company, website, linkedin, twitter, calendar_link, is_default) VALUES
+('Citadel Nexus', 'noreply@citadel-nexus.com', NULL, 'Operations', 'Citadel Nexus', 'https://citadel-nexus.com', 'https://linkedin.com/company/citadel-nexus', 'https://x.com/citadelnexus', 'https://citadel-nexus.com/meet', true)
+ON CONFLICT DO NOTHING;
+```
+
+---
+
+
+## Backend — Python (FastAPI)
+
+File: `src/api/routes/email_routes.py`
+```python
+"""
+Email System Upgrade Routes — Citadel Nexus
+Features: AI generation, template dropdown, client rehydration,
+          sender signature injection, meeting scheduler
+"""
+import os
+import json
+import uuid
+from datetime import datetime, timedelta
+from typing import Optional, List, Dict, Any
+from fastapi import APIRouter, HTTPException, Depends, Query
+from pydantic import BaseModel
+from supabase import create_client, Client
+import httpx
+
+router = APIRouter(prefix="/api/email", tags=["email"])
+
+# ── ENV ────────────────────────────────────────────────
+SUPABASE_URL = os.environ["SUPABASE_URL"]
+SUPABASE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
+SES_REGION   = os.environ.get("SES_REGION", "us-east-1")
+SES_FROM     = os.environ.get("SES_FROM_EMAIL", "noreply@citadel-nexus.com")
+OPENAI_KEY   = os.environ.get("OPENAI_API_KEY", "")
+BEDROCK_REGION = os.environ.get("BEDROCK_REGION", "us-east-1")
+CALENDAR_LINK_BASE = os.environ.get(
+    "CALENDAR_LINK_BASE", "https://citadel-nexus.com/meet"
+)
+
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+
+# ── Pydantic Models ────────────────────────────────────
+class EmailTemplate(BaseModel):
+    id: Optional[str] = None
+    name: str
+    slug: str
+    subject: str
+    body_html: str
+    category: str = "general"
+    header_html: Optional[str] = ""
+    footer_html: Optional[str] = ""
+    variables: List[str] = []
+
+
+class SenderSignature(BaseModel):
+    id: Optional[str] = None
+    sender_name: str
+    sender_email: str
+    phone: Optional[str] = None
+    title: Optional[str] = None
+    company: str = "Citadel Nexus"
+    website: str = "https://citadel-nexus.com"
+    linkedin: Optional[str] = None
+    twitter: Optional[str] = None
+    instagram: Optional[str] = None
+    github: Optional[str] = None
+    calendar_link: Optional[str] = None
+    logo_url: str = "https://citadel-nexus.com/logo.png"
+
+
+class AIGenerateRequest(BaseModel):
+    template_slug: Optional[str] = None
+    recipient_name: str
+    recipient_email: str
+    topic: str
+    context: Optional[str] = None
+    tone: str = "professional"  # professional | friendly | formal | casual
+    intent: str = "follow_up"   # follow_up | intro | proposal | thank_you | schedule
+    max_tokens: int = 500
+
+
+class SendEmailRequest(BaseModel):
+    to: str
+    subject: str
+    body_html: str
+    sender_signature_id: Optional[str] = None
+    template_slug: Optional[str] = None
+    schedule_at: Optional[str] = None
+
+
+class ScheduleMeetingRequest(BaseModel):
+    recipient_name: str
+    recipient_email: str
+    proposed_times: List[str] = []
+    duration_minutes: int = 30
+    topic: str = "Follow-up call"
+    include_calendar_link: bool = True
+    sender_signature_id: Optional[str] = None
+
+
+# ══════════════════════════════════════════════════════════
+# 1. TEMPLATE DROPDOWN — CRUD + Listing
+# ══════════════════════════════════════════════════════════
+
+@router.get("/templates")
+async def list_templates(category: Optional[str] = None):
+    """Return all email templates, optionally filtered by category."""
+    query = supabase.table("email_templates").select("*").order("name")
+    if category:
+        query = query.eq("category", category)
+    return query.execute().data
+
+
+@router.get("/templates/{slug}")
+async def get_template(slug: str):
+    """Fetch a single template by slug."""
+    result = (
+        supabase.table("email_templates")
+        .select("*")
+        .eq("slug", slug)
+        .single()
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(404, f"Template '{slug}' not found")
+    return result.data
+
+
+@router.post("/templates")
+async def create_template(template: EmailTemplate):
+    payload = template.model_dump(exclude_none=True)
+    payload.setdefault("id", str(uuid.uuid4()))
+    return supabase.table("email_templates").insert(payload).execute().data
+
+
+@router.put("/templates/{slug}")
+async def update_template(slug: str, template: EmailTemplate):
+    payload = template.model_dump(exclude_none=True)
+    payload["updated_at"] = datetime.utcnow().isoformat()
+    return (
+        supabase.table("email_templates")
+        .update(payload)
+        .eq("slug", slug)
+        .execute()
+        .data
+    )
+
+
+# ══════════════════════════════════════════════════════════
+# 2. CLIENT / RECIPIENT DATA REHYDRATION
+# ══════════════════════════════════════════════════════════
+
+@router.get("/rehydrate")
+async def rehydrate_client(
+    email: Optional[str] = None,
+    name: Optional[str] = None,
+    phone: Optional[str] = None,
+):
+    """
+    Rehydrate client data from Supabase by email, name, or phone.
+    Returns full profile + meeting history for template variable injection.
+    """
+    if not any([email, name, phone]):
+        raise HTTPException(400, "Provide at least one of: email, name, phone")
+
+    query = supabase.table("clients").select(
+        "*, meetings:client_meetings(*)"
+    )
+    if email:
+        query = query.eq("email", email)
+    elif name:
+        query = query.ilike("name", f"%{name}%")
+    elif phone:
+        query = query.eq("phone", phone)
+
+    result = query.execute()
+    if not result.data:
+        return {"found": False, "client": None}
+
+    client = result.data[0]
+    return {"found": True, "client": client}
+
+
+@router.get("/rehydrate/search")
+async def search_clients(q: str = Query(..., min_length=2)):
+    """Fuzzy search for the To: autocomplete dropdown."""
+    return (
+        supabase.table("clients")
+        .select("id, name, email, company, phone")
+        .or_(f"name.ilike.%{q}%,email.ilike.%{q}%,company.ilike.%{q}%")
+        .limit(10)
+        .execute()
+        .data
+    )
+
+
+# ══════════════════════════════════════════════════════════
+# 3. SENDER SIGNATURE — Header/Footer Injection
+# ══════════════════════════════════════════════════════════
+
+@router.get("/sender-signatures")
+async def list_sender_signatures():
+    return supabase.table("sender_signatures").select("*").execute().data
+
+
+@router.get("/sender-signatures/{sig_id}")
+async def get_sender_signature(sig_id: str):
+    result = (
+        supabase.table("sender_signatures")
+        .select("*")
+        .eq("id", sig_id)
+        .single()
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(404, "Sender signature not found")
+    return result.data
+
+
+@router.post("/sender-signatures")
+async def upsert_sender_signature(sig: SenderSignature):
+    """Create or update a sender signature; auto-generates header/footer HTML."""
+    sig_dict = sig.model_dump(exclude_none=True)
+    sig_dict.setdefault("id", str(uuid.uuid4()))
+    sig_dict["header_html"] = _build_header(sig)
+    sig_dict["footer_html"] = _build_footer(sig)
+    return (
+        supabase.table("sender_signatures")
+        .upsert(sig_dict)
+        .execute()
+        .data
+    )
+
+
+def _build_header(sig: SenderSignature) -> str:
+    return f"""
+    <div style="background:#0ff1ce; padding:20px; text-align:center;
+                border-radius:8px 8px 0 0;">
+      <img src="{sig.logo_url}" alt="{sig.company}" style="height:40px;" />
+      <h2 style="color:#0a0a0a; margin:8px 0 0; font-family:sans-serif;">
+        {sig.company}
+      </h2>
+    </div>"""
+
+
+def _build_footer(sig: SenderSignature) -> str:
+    socials = []
+    if sig.linkedin:
+        socials.append(f'<a href="{sig.linkedin}" style="color:#0ff1ce;">LinkedIn</a>')
+    if sig.twitter:
+        socials.append(f'<a href="{sig.twitter}" style="color:#0ff1ce;">Twitter/X</a>')
+    if sig.instagram:
+        socials.append(f'<a href="{sig.instagram}" style="color:#0ff1ce;">Instagram</a>')
+    if sig.github:
+        socials.append(f'<a href="{sig.github}" style="color:#0ff1ce;">GitHub</a>')
+    socials_html = " · ".join(socials)
+
+    phone_html = (
+        f'<br/>📞 <a href="tel:{sig.phone}" style="color:#ccc;">{sig.phone}</a>'
+        if sig.phone else ""
+    )
+    cal_html = ""
+    if sig.calendar_link:
+        cal_html = f"""
+        <br/><a href="{sig.calendar_link}"
+                style="display:inline-block; margin-top:12px; padding:8px 20px;
+                       background:#0ff1ce; color:#0a0a0a; border-radius:6px;
+                       text-decoration:none; font-weight:bold;">
+            📅 Schedule a Meeting
+        </a>"""
+
+    return f"""
+    <div style="background:#1a1a2e; padding:24px; text-align:center;
+                font-family:sans-serif; border-radius:0 0 8px 8px; margin-top:20px;">
+      <p style="color:#fff; margin:0; font-weight:bold;">
+        {sig.sender_name}{(' — ' + sig.title) if sig.title else ''}
+      </p>
+      <p style="color:#aaa; margin:4px 0;">
+        ✉️ <a href="mailto:{sig.sender_email}" style="color:#0ff1ce;">{sig.sender_email}</a>
+        {phone_html}
+      </p>
+      <p style="margin:8px 0;">{socials_html}</p>
+      {cal_html}
+      <hr style="border:none; border-top:1px solid #333; margin:16px 0;" />
+      <p style="color:#666; font-size:12px;">
+        <a href="{sig.website}" style="color:#888;">{sig.website}</a><br/>
+        © {datetime.now().year} {sig.company}. All rights reserved.
+      </p>
+    </div>"""
+
+
+# ══════════════════════════════════════════════════════════
+# 4. AI-GENERATED EMAIL RESPONSES
+# ══════════════════════════════════════════════════════════
+
+@router.post("/ai-generate")
+async def ai_generate_email(req: AIGenerateRequest):
+    """
+    Generate email body via AI. Optionally seeds from a template for structure.
+    """
+    template_hint = ""
+    if req.template_slug:
+        tmpl = await get_template(req.template_slug)
+        template_hint = (
+            f"Use this template structure as a guide:\n"
+            f"Subject: {tmpl['subject']}\n"
+            f"Variables: {', '.join(tmpl.get('variables', []))}\n"
+        )
+
+    system_prompt = (
+        "You are an email copywriter for Citadel Nexus, an AI-orchestrated "
+        "development platform. "
+        f"Write a {req.tone} email for the intent: {req.intent}. "
+        "Keep it concise, genuine, and action-oriented. "
+        "Do NOT include a subject line — only the email body in HTML. "
+        "Always address the recipient by first name. "
+        f"{template_hint}"
+    )
+    user_prompt = (
+        f"Recipient: {req.recipient_name} ({req.recipient_email})\n"
+        f"Topic: {req.topic}\n"
+        f"Additional context: {req.context or 'None'}\n\n"
+        "Write the email body now."
+    )
+
+    body = await _call_llm(system_prompt, user_prompt, req.max_tokens)
+    return {
+        "generated_body": body,
+        "tone": req.tone,
+        "intent": req.intent,
+        "model_used": "openai" if OPENAI_KEY else "bedrock",
+    }
+
+
+async def _call_llm(system: str, user: str, max_tokens: int) -> str:
+    """OpenAI (preferred) or AWS Bedrock fallback."""
+    if OPENAI_KEY:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={"Authorization": f"Bearer {OPENAI_KEY}"},
+                json={
+                    "model": "gpt-4o-mini",
+                    "messages": [
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": user},
+                    ],
+                    "max_tokens": max_tokens,
+                    "temperature": 0.7,
+                },
+                timeout=30,
+            )
+            resp.raise_for_status()
+            return resp.json()["choices"][0]["message"]["content"]
+    else:
+        import boto3
+        bedrock = boto3.client("bedrock-runtime", region_name=BEDROCK_REGION)
+        body = json.dumps({
+            "anthropic_version": "bedrock-2023-05-31",
+            "messages": [{"role": "user", "content": f"{system}\n\n{user}"}],
+            "max_tokens": max_tokens,
+            "temperature": 0.7,
+        })
+        response = bedrock.invoke_model(
+            modelId="anthropic.claude-3-haiku-20240307-v1:0", body=body
+        )
+        result = json.loads(response["body"].read())
+        return result["content"][0]["text"]
+
+
+# ══════════════════════════════════════════════════════════
+# 5. SCHEDULE MEETING WITH SENDER
+# ══════════════════════════════════════════════════════════
+
+@router.post("/schedule-meeting")
+async def schedule_meeting(req: ScheduleMeetingRequest):
+    meeting_id = str(uuid.uuid4())[:8]
+    cal_link = f"{CALENDAR_LINK_BASE}/{meeting_id}"
+
+    supabase.table("meeting_proposals").insert({
+        "id": meeting_id,
+        "recipient_name": req.recipient_name,
+        "recipient_email": req.recipient_email,
+        "topic": req.topic,
+        "duration_minutes": req.duration_minutes,
+        "proposed_times": req.proposed_times,
+        "status": "proposed",
+        "created_at": datetime.utcnow().isoformat(),
+    }).execute()
+
+    times_li = ""
+    for t in req.proposed_times:
+        dt = datetime.fromisoformat(t)
+        times_li += f'<li>{dt.strftime("%A, %B %d at %I:%M %p")}</li>'
+    if not times_li:
+        times_li = "<li>Click below to pick a time that works.</li>"
+
+    body = f"""
+    <p>Hi {req.recipient_name},</p>
+    <p>I'd love to schedule a <strong>{req.duration_minutes}-minute
+       {req.topic}</strong> call.</p>
+    <ul>{times_li}</ul>
+    <p style="text-align:center; margin:24px 0;">
+      <a href="{cal_link}"
+         style="display:inline-block; padding:12px 32px; background:#0ff1ce;
+                color:#0a0a0a; border-radius:8px; text-decoration:none;
+                font-weight:bold;">📅 Pick a Time</a>
+    </p>
+    <p>Looking forward to it!</p>"""
+
+    if req.sender_signature_id:
+        sig = await get_sender_signature(req.sender_signature_id)
+        body = sig.get("header_html", "") + body + sig.get("footer_html", "")
+
+    return {
+        "meeting_id": meeting_id,
+        "calendar_link": cal_link,
+        "email_body": body,
+        "status": "proposed",
+    }
+
+
+# ══════════════════════════════════════════════════════════
+# 6. SEND EMAIL (template + signature injection + audit log)
+# ══════════════════════════════════════════════════════════
+
+@router.post("/send")
+async def send_email(req: SendEmailRequest):
+    import boto3
+
+    final_html = req.body_html
+    header = ""
+    footer = ""
+
+    # Inject sender signature header/footer
+    if req.sender_signature_id:
+        sig = await get_sender_signature(req.sender_signature_id)
+        header = sig.get("header_html", "")
+        footer = sig.get("footer_html", "")
+    else:
+        # Use default signature
+        default = (
+            supabase.table("sender_signatures")
+            .select("*")
+            .eq("is_default", True)
+            .limit(1)
+            .execute()
+        )
+        if default.data:
+            header = default.data[0].get("header_html", "")
+            footer = default.data[0].get("footer_html", "")
+
+    wrapped = f"""
+    <div style="max-width:600px; margin:0 auto; font-family:sans-serif;
+                background:#0a0a0a; color:#e0e0e0;">
+      {header}
+      <div style="padding:24px;">{final_html}</div>
+      {footer}
+    </div>"""
+
+    ses = boto3.client("ses", region_name=SES_REGION)
+    response = ses.send_email(
+        Source=SES_FROM,
+        Destination={"ToAddresses": [req.to]},
+        Message={
+            "Subject": {"Data": req.subject},
+            "Body": {
+                "Html": {"Data": wrapped},
+                "Text": {"Data": _strip_html(final_html)},
+            },
+        },
+    )
+
+    # Audit log
+    supabase.table("email_send_log").insert({
+        "to_email": req.to,
+        "subject": req.subject,
+        "template_slug": req.template_slug,
+        "signature_id": req.sender_signature_id,
+        "ai_generated": False,
+        "status": "sent",
+        "ses_message_id": response.get("MessageId", ""),
+    }).execute()
+
+    return {"status": "sent", "message_id": response.get("MessageId")}
+
+
+def _strip_html(html: str) -> str:
+    """Naive HTML stripper for plain-text fallback."""
+    import re
+    return re.sub(r"<[^>]+>", "", html).strip()
+```
+
+---
+
+
+## Frontend — React Component
+
+File: `src/components/EmailCompose.jsx`
+```javascript
+/**
+ * EmailCompose.jsx — Citadel Nexus Email System
+ * Features: template dropdown, AI generate, client rehydration,
+ *           sender signature, meeting scheduler, live preview
+ */
+import React, { useState, useEffect, useCallback } from "react";
+import debounce from "lodash.debounce";
+
+const API = "/api/email";
+
+export default function EmailCompose() {
+  // ── State ─────────────────────────────────────────
+  const [templates, setTemplates] = useState([]);
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [signatures, setSignatures] = useState([]);
+  const [selectedSignature, setSelectedSignature] = useState(null);
+
+  const [to, setTo] = useState("");
+  const [toSuggestions, setToSuggestions] = useState([]);
+  const [clientData, setClientData] = useState(null);
+
+  const [subject, setSubject] = useState("");
+  const [bodyHtml, setBodyHtml] = useState("");
+  const [topic, setTopic] = useState("");
+  const [nextSteps, setNextSteps] = useState("");
+
+  const [aiTone, setAiTone] = useState("professional");
+  const [aiIntent, setAiIntent] = useState("follow_up");
+  const [aiLoading, setAiLoading] = useState(false);
+
+  const [meetingTopic, setMeetingTopic] = useState("");
+  const [meetingDuration, setMeetingDuration] = useState(30);
+  const [proposedTimes, setProposedTimes] = useState([""]);
+  const [showMeetingPanel, setShowMeetingPanel] = useState(false);
+
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState(null);
+
+  // ── Load templates + signatures on mount ──────────
+  useEffect(() => {
+    fetch(`${API}/templates`)
+      .then((r) => r.json())
+      .then(setTemplates);
+    fetch(`${API}/sender-signatures`)
+      .then((r) => r.json())
+      .then((sigs) => {
+        setSignatures(sigs);
+        const def = sigs.find((s) => s.is_default);
+        if (def) setSelectedSignature(def);
+      });
+  }, []);
+
+  // ── Template selection ────────────────────────────
+  const onTemplateSelect = async (slug) => {
+    if (!slug) {
+      setSelectedTemplate(null);
+      setSubject("");
+      setBodyHtml("");
+      return;
+    }
+    const res = await fetch(`${API}/templates/${slug}`);
+    const tmpl = await res.json();
+    setSelectedTemplate(tmpl);
+    setSubject(tmpl.subject);
+    setBodyHtml(tmpl.body_html);
+  };
+
+  // ── Client rehydration (To: field autocomplete) ───
+  const searchClients = useCallback(
+    debounce(async (q) => {
+      if (q.length < 2) return setToSuggestions([]);
+      const res = await fetch(
+        `${API}/rehydrate/search?q=${encodeURIComponent(q)}`
+      );
+      setToSuggestions(await res.json());
+    }, 300),
+    []
+  );
+
+  const onSelectClient = async (client) => {
+    setTo(client.email);
+    setToSuggestions([]);
+    // Full rehydration
+    const res = await fetch(
+      `${API}/rehydrate?email=${encodeURIComponent(client.email)}`
+    );
+    const data = await res.json();
+    if (data.found) {
+      setClientData(data.client);
+      // Inject client name into template variables
+      if (bodyHtml.includes("recipient_name")) {
+        setBodyHtml(
+          bodyHtml.replace(/\{\{recipient_name\}\}/g, data.client.name)
+        );
+      }
+      if (subject.includes("recipient_name")) {
+        setSubject(
+          subject.replace(/\{\{recipient_name\}\}/g, data.client.name)
+        );
+      }
+    }
+  };
+
+  // ── AI Generation ─────────────────────────────────
+  const handleAIGenerate = async () => {
+    setAiLoading(true);
+    try {
+      const res = await fetch(`${API}/ai-generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          template_slug: selectedTemplate?.slug || null,
+          recipient_name: clientData?.name || to.split("@")[0],
+          recipient_email: to,
+          topic: topic || subject,
+          context: nextSteps || null,
+          tone: aiTone,
+          intent: aiIntent,
+        }),
+      });
+      const data = await res.json();
+      setBodyHtml(data.generated_body);
+    } catch (err) {
+      console.error("AI generation failed:", err);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  // ── Schedule Meeting ──────────────────────────────
+  const handleScheduleMeeting = async () => {
+    const res = await fetch(`${API}/schedule-meeting`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        recipient_name: clientData?.name || to.split("@")[0],
+        recipient_email: to,
+        proposed_times: proposedTimes.filter(Boolean),
+        duration_minutes: meetingDuration,
+        topic: meetingTopic || topic || "Follow-up call",
+        sender_signature_id: selectedSignature?.id || null,
+      }),
+    });
+    const data = await res.json();
+    setBodyHtml(data.email_body);
+    setSubject(`Meeting: ${meetingTopic || topic || "Follow-up"}`);
+    setShowMeetingPanel(false);
+  };
+
+  // ── Send ───────────────────────────────────────────
+  const handleSend = async () => {
+    setSending(true);
+    setSendResult(null);
+    try {
+      const res = await fetch(`${API}/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to,
+          subject,
+          body_html: bodyHtml,
+          sender_signature_id: selectedSignature?.id || null,
+          template_slug: selectedTemplate?.slug || null,
+        }),
+      });
+      const data = await res.json();
+      setSendResult(data);
+    } catch (err) {
+      setSendResult({ status: "error", message: err.message });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  // ── Variable injection helper ─────────────────────
+  const injectVariables = (html) => {
+    if (!html) return html;
+    let result = html;
+    if (clientData) {
+      result = result
+        .replace(/\{\{recipient_name\}\}/g, clientData.name || "")
+        .replace(/\{\{company\}\}/g, clientData.company || "")
+        .replace(/\{\{phone\}\}/g, clientData.phone || "");
+    }
+    result = result
+      .replace(/\{\{topic\}\}/g, topic || "")
+      .replace(/\{\{next_steps\}\}/g, nextSteps || "")
+      .replace(
+        /\{\{sender_name\}\}/g,
+        selectedSignature?.sender_name || "Citadel Nexus"
+      );
+    return result;
+  };
+
+  // ── Render ─────────────────────────────────────────
+  return (
+    <div className="email-compose" style={styles.container}>
+      {/* ── Header row: Template + Sender dropdown ── */}
+      <div style={styles.row}>
+        <label style={styles.label}>Template</label>
+        <select
+          style={styles.select}
+          onChange={(e) => onTemplateSelect(e.target.value)}
+          value={selectedTemplate?.slug || ""}
+        >
+          <option value="">— Select Template —</option>
+          {templates.map((t) => (
+            <option key={t.slug} value={t.slug}>
+              {t.name} ({t.category})
+            </option>
+          ))}
+        </select>
+
+        <label style= ...styles.label, marginLeft: 16 >From</label>
+        <select
+          style={styles.select}
+          onChange={(e) => {
+            const sig = signatures.find((s) => s.id === e.target.value);
+            setSelectedSignature(sig || null);
+          }}
+          value={selectedSignature?.id || ""}
+        >
+          {signatures.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.sender_name} ({s.sender_email})
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* ── To: with autocomplete + rehydration ── */}
+      <div style={styles.row}>
+        <label style={styles.label}>To</label>
+        <div style= position: "relative", flex: 1 >
+          <input
+            style={styles.input}
+            placeholder="Name or email@example.com"
+            value={to}
+            onChange={(e) => {
+              setTo(e.target.value);
+              searchClients(e.target.value);
+            }}
+          />
+          {toSuggestions.length > 0 && (
+            <div style={styles.dropdown}>
+              {toSuggestions.map((c) => (
+                <div
+                  key={c.id}
+                  style={styles.dropdownItem}
+                  onClick={() => onSelectClient(c)}
+                >
+                  <strong>{c.name}</strong> — {c.email}
+                  {c.company && ` (${c.company})`}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        {clientData && (
+          <span style={styles.rehydratedBadge}>
+            ✅ {clientData.name}
+            {clientData.company && ` · ${clientData.company}`}
+          </span>
+        )}
+      </div>
+
+      {/* ── Subject ── */}
+      <div style={styles.row}>
+        <label style={styles.label}>Subject</label>
+        <input
+          style={styles.input}
+          value={subject}
+          onChange={(e) => setSubject(e.target.value)}
+        />
+      </div>
+
+      {/* ── Topic + Next Steps (template variables) ── */}
+      <div style={styles.row}>
+        <label style={styles.label}>Topic</label>
+        <input
+          style={styles.input}
+          placeholder="AI workflow demo"
+          value={topic}
+          onChange={(e) => setTopic(e.target.value)}
+        />
+      </div>
+      <div style={styles.row}>
+        <label style={styles.label}>Next Steps</label>
+        <input
+          style={styles.input}
+          placeholder="We'll schedule a kickoff call..."
+          value={nextSteps}
+          onChange={(e) => setNextSteps(e.target.value)}
+        />
+      </div>
+
+      {/* ── AI Generation controls ── */}
+      <div style={styles.row}>
+        <select
+          style={styles.selectSmall}
+          value={aiTone}
+          onChange={(e) => setAiTone(e.target.value)}
+        >
+          <option value="professional">Professional</option>
+          <option value="friendly">Friendly</option>
+          <option value="formal">Formal</option>
+          <option value="casual">Casual</option>
+        </select>
+        <select
+          style={styles.selectSmall}
+          value={aiIntent}
+          onChange={(e) => setAiIntent(e.target.value)}
+        >
+          <option value="follow_up">Follow Up</option>
+          <option value="intro">Introduction</option>
+          <option value="proposal">Proposal</option>
+          <option value="thank_you">Thank You</option>
+          <option value="schedule">Schedule</option>
+        </select>
+        <button
+          style={styles.aiButton}
+          onClick={handleAIGenerate}
+          disabled={aiLoading || !to}
+        >
+          {aiLoading ? "⏳ Generating..." : "✨ AI Generate"}
+        </button>
+        <button
+          style={styles.meetingButton}
+          onClick={() => setShowMeetingPanel(!showMeetingPanel)}
+        >
+          📅 Schedule Meeting
+        </button>
+      </div>
+
+      {/* ── Meeting scheduler panel ── */}
+      {showMeetingPanel && (
+        <div style={styles.meetingPanel}>
+          <h4 style= margin: "0 0 8px", color: "#0ff1ce" >
+            📅 Schedule Meeting
+          </h4>
+          <input
+            style={styles.input}
+            placeholder="Meeting topic"
+            value={meetingTopic}
+            onChange={(e) => setMeetingTopic(e.target.value)}
+          />
+          <div style= display: "flex", gap: 8, marginTop: 8 >
+            <select
+              style={styles.selectSmall}
+              value={meetingDuration}
+              onChange={(e) => setMeetingDuration(+e.target.value)}
+            >
+              <option value={15}>15 min</option>
+              <option value={30}>30 min</option>
+              <option value={45}>45 min</option>
+              <option value={60}>60 min</option>
+            </select>
+            {proposedTimes.map((t, i) => (
+              <input
+                key={i}
+                type="datetime-local"
+                style={styles.input}
+                value={t}
+                onChange={(e) => {
+                  const copy = [...proposedTimes];
+                  copy[i] = e.target.value;
+                  setProposedTimes(copy);
+                }}
+              />
+            ))}
+            <button
+              style={styles.smallBtn}
+              onClick={() => setProposedTimes([...proposedTimes, ""])}
+            >
+              + Time
+            </button>
+          </div>
+          <button
+            style= ...styles.aiButton, marginTop: 8 
+            onClick={handleScheduleMeeting}
+          >
+            Generate Meeting Email
+          </button>
+        </div>
+      )}
+
+      {/* ── Editor ── */}
+      <div style={styles.row}>
+        <label style={styles.label}>Body</label>
+        <textarea
+          style={styles.textarea}
+          rows={12}
+          value={bodyHtml}
+          onChange={(e) => setBodyHtml(e.target.value)}
+        />
+      </div>
+
+      {/* ── Action buttons ── */}
+      <div style={styles.row}>
+        <button
+          style={styles.sendButton}
+          onClick={handleSend}
+          disabled={sending || !to || !subject}
+        >
+          {sending ? "Sending..." : "📤 Send"}
+        </button>
+        <button
+          style={styles.previewButton}
+          onClick={() =>
+            window.open(
+              "about:blank"
+            )
+          }
+        >
+          👁 Preview
+        </button>
+      </div>
+
+      {sendResult && (
+        <div
+          style=
+            ...styles.result,
+            color: sendResult.status === "sent" ? "#0ff1ce" : "#ff4444",
+          
+        >
+          {sendResult.status === "sent"
+            ? `✅ Sent! Message ID: ${sendResult.message_id}`
+            : `❌ Error: ${sendResult.message}`}
+        </div>
+      )}
+
+      {/* ── Live Preview Pane ── */}
+      <div style={styles.previewPane}>
+        <h4 style= color: "#888", margin: "0 0 8px" >Preview</h4>
+        <div
+          style={styles.previewFrame}
+          dangerouslySetInnerHTML={{
+            __html: `
+              <div style="max-width:600px; margin:0 auto; background:#0a0a0a;
+                          color:#e0e0e0; font-family:sans-serif;">
+                ${selectedSignature?.header_html || ""}
+                <div style="padding:24px;">
+                  ${injectVariables(bodyHtml)}
+                </div>
+                ${selectedSignature?.footer_html || ""}
+              </div>
+            `,
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ── Inline styles (matches your dark Citadel theme) ──
+const styles = {
+  container: {
+    background: "#111",
+    borderRadius: 12,
+    padding: 24,
+    color: "#e0e0e0",
+    fontFamily: "sans-serif",
+  },
+  row: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
+  label: {
+    width: 80,
+    color: "#888",
+    fontSize: 13,
+    flexShrink: 0,
+  },
+  input: {
+    flex: 1,
+    background: "#1a1a2e",
+    border: "1px solid #333",
+    borderRadius: 6,
+    padding: "8px 12px",
+    color: "#e0e0e0",
+    fontSize: 14,
+  },
+  select: {
+    background: "#1a1a2e",
+    border: "1px solid #333",
+    borderRadius: 6,
+    padding: "8px 12px",
+    color: "#e0e0e0",
+    fontSize: 14,
+    minWidth: 180,
+  },
+  selectSmall: {
+    background: "#1a1a2e",
+    border: "1px solid #333",
+    borderRadius: 6,
+    padding: "6px 10px",
+    color: "#e0e0e0",
+    fontSize: 13,
+  },
+  textarea: {
+    flex: 1,
+    background: "#1a1a2e",
+    border: "1px solid #333",
+    borderRadius: 6,
+    padding: 12,
+    color: "#e0e0e0",
+    fontSize: 14,
+    fontFamily: "monospace",
+    resize: "vertical",
+  },
+  dropdown: {
+    position: "absolute",
+    top: "100%",
+    left: 0,
+    right: 0,
+    background: "#1a1a2e",
+    border: "1px solid #333",
+    borderRadius: "0 0 6px 6px",
+    zIndex: 100,
+    maxHeight: 200,
+    overflowY: "auto",
+  },
+  dropdownItem: {
+    padding: "8px 12px",
+    cursor: "pointer",
+    borderBottom: "1px solid #222",
+    fontSize: 13,
+  },
+  rehydratedBadge: {
+    background: "#0ff1ce22",
+    color: "#0ff1ce",
+    padding: "4px 10px",
+    borderRadius: 12,
+    fontSize: 12,
+    whiteSpace: "nowrap",
+  },
+  aiButton: {
+    background: "linear-gradient(135deg, #0ff1ce, #00bfa5)",
+    color: "#0a0a0a",
+    border: "none",
+    borderRadius: 6,
+    padding: "8px 16px",
+    fontWeight: "bold",
+    cursor: "pointer",
+    fontSize: 13,
+  },
+  meetingButton: {
+    background: "#2a2a4e",
+    color: "#0ff1ce",
+    border: "1px solid #0ff1ce44",
+    borderRadius: 6,
+    padding: "8px 16px",
+    cursor: "pointer",
+    fontSize: 13,
+  },
+  meetingPanel: {
+    background: "#1a1a2e",
+    border: "1px solid #0ff1ce44",
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
+  },
+  smallBtn: {
+    background: "#333",
+    color: "#ccc",
+    border: "none",
+    borderRadius: 4,
+    padding: "6px 10px",
+    cursor: "pointer",
+    fontSize: 12,
+  },
+  sendButton: {
+    background: "#0ff1ce",
+    color: "#0a0a0a",
+    border: "none",
+    borderRadius: 8,
+    padding: "10px 28px",
+    fontWeight: "bold",
+    cursor: "pointer",
+    fontSize: 15,
+  },
+  previewButton: {
+    background: "#2a2a4e",
+    color: "#ccc",
+    border: "1px solid #333",
+    borderRadius: 8,
+    padding: "10px 20px",
+    cursor: "pointer",
+    fontSize: 13,
+  },
+  result: { marginTop: 12, fontSize: 14 },
+  previewPane: {
+    marginTop: 24,
+    border: "1px solid #333",
+    borderRadius: 8,
+    padding: 16,
+    background: "#0a0a0a",
+  },
+  previewFrame: {
+    background: "#0a0a0a",
+    minHeight: 200,
+  },
+};
+```
+
+---
+
+
+## Wire It Up — `main.py`
+
+```python
+# In your main FastAPI app
+from src.api.routes.email_routes import router as email_router
+
+app.include_router(email_router)
+```
+
+---
+
+
+## Env Vars Required
+
+Add these to `workspace.env`:
+```bash
+# Email system
+SES_REGION=us-east-1
+SES_FROM_EMAIL=noreply@citadel-nexus.com
+SES_OPS_EMAIL=ops@citadel-nexus.com
+SES_DOMAIN=citadel-nexus.com
+
+# AI generation
+OPENAI_API_KEY=sk-...           # preferred; leave blank to use Bedrock
+BEDROCK_REGION=us-east-1        # fallback if no OpenAI key
+
+# Meeting scheduler
+CALENDAR_LINK_BASE=https://citadel-nexus.com/meet
+
+# Supabase (already in your env)
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_SERVICE_KEY=eyJ...
+```
+
+---
+
+
+## Feature Summary
+
+| **Feature** | **Backend Endpoint** | **Frontend Hook** | **Data Source** |
+| Template Dropdown | `GET /api/email/templates` | `onTemplateSelect()` | Supabase `email_templates` |
+| AI Generation | `POST /api/email/ai-generate` | `handleAIGenerate()` | OpenAI / Bedrock |
+| Client Rehydration | `GET /api/email/rehydrate` | `onSelectClient()` | Supabase `clients` |
+| Sender Signature | `GET /api/email/sender-signatures` | From dropdown | Supabase `sender_signatures` |
+| Header/Footer Inject | Auto on `POST /send` | Live preview pane | Signature → `_build_header/footer` |
+| Schedule Meeting | `POST /api/email/schedule-meeting` | `handleScheduleMeeting()` | Supabase `meeting_proposals` |
+
+---
+
+
+## Deployment Checklist
+
+- [ ] Run Supabase migration (SQL above)
+- [ ] Add env vars to `workspace.env`
+- [ ] Wire `email_router` into `main.py`
+- [ ] Drop `EmailCompose.jsx` into your admin operations page
+- [ ] Verify AWS SES is out of sandbox (CNWB-82)
+- [ ] Test: select template → rehydrate client → AI generate → preview → send
+- [ ] Test: schedule meeting flow end-to-end

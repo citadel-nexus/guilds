@@ -1,0 +1,106 @@
+# VCC Health Check — VCC-FIN-20260228-2000
+(Page ID: a989b5ba-81ea-4909-9a45-1945a891d7a2)
+(URL: https://www.notion.so/VCC-Health-Check-VCC-FIN-20260228-2000-a989b5ba81ea49099a451945a891d7a2)
+
+[Total top-level blocks: 30]
+
+
+## §1 Health Check Header
+
+| **Field** | **Value** |
+| Cycle ID | `VCC-FIN-20260228-2000` |
+| Type | 🩺 Scheduled Health Check (Daily 8:00 PM CT) |
+| Timestamp | 2026-02-28T20:00:00-06:00 (America/Chicago) |
+| Current Phase | **Phase 1.8** — 6/9 Phase 1 routers complete, Dashboard UI + Invoice List UI in progress |
+| Commit Check | ⚠️ Unable to verify — VCC Notion agent does not have git access |
+| Previous Cycle | `VCC-FIN-20260227-2000` — Health Check (3 failed automation runs) |
+
+---
+
+
+## §2 Previous Cycle Summary
+
+Yesterday's health check (VCC-FIN-20260227-2000) reported **3 consecutive automation failures** on Feb 27, all caused by the same `hydrate_context` charmap encoding error. No successful build cycle has completed since.
+| **Metric** | **Feb 27 Value** | **Feb 28 Status** |
+| Automation Pipeline | 🚫 FAILED (3/3 runs) | 🚫 Still blocked — `hydrate_context` encoding error unresolved |
+| Health Score | 59 / 100 (CRITICAL) | 🚫 Presumed CRITICAL — no new telemetry run |
+| Phase Position | 1.8 | ⏸️ 1.8 — stalled pending pipeline fix |
+| Linear Backlog | 23 urgent issues | ⚠️ Unverified — no Linear access from Notion |
+
+---
+
+
+## §3 Persistent Blockers
+
+
+[CALLOUT] 🚨 **BLOCKER-001: **`**hydrate_context**`** charmap encoding error (Day 2)**
+
+  The `hydrate_context` step fails with `'charmap' codec can't decode byte 0x8f in position 6248: character maps to <undefined>`. This has persisted for **2 consecutive daily cycles** (Feb 27 + Feb 28). The automation pipeline (`vcc_cycle_reporter.py`) cannot complete a full CRP cycle until this is fixed.
+  **Fix:** Open the file being read at position 6248 and either save it as UTF-8, or update the reader to use `encoding='utf-8', errors='replace'`. **Operator action required.**
+
+[CALLOUT] ⚠️ **BLOCKER-002: L1 diagnostic function undefined**
+
+  The `perplexity_diagnose` function is not defined in the diagnostic pipeline, causing L1 analysis to fail. This degrades the quality of health assessments.
+
+[CALLOUT] ⚠️ **BLOCKER-003: Monitor alert fatigue**
+
+  17 of 24 Datadog monitors were alerting as of Feb 27. Either thresholds need tuning or real issues need triage.
+
+---
+
+
+## §4 Flags & Questions
+
+
+[CALLOUT] ❓ **VCC-QUESTION-001 (carried forward):** The `hydrate_context` charmap encoding error has now persisted for **2 days**. This is escalating from a transient failure to a systemic blocker. **Operator action required — priority CRITICAL.**
+
+
+[CALLOUT] ❓ **VCC-QUESTION-002 (carried forward):** Phase position discrepancy — Build Instructions callout says **1.6** but automation reports **1.8**. Operator should verify filesystem state and update the callout accordingly.
+
+
+[CALLOUT] ❓ **VCC-QUESTION-003 (new):** No new commits or cycle results have been detected since Feb 27. Is development paused, or are commits happening outside the monitored branch? **Operator should confirm.**
+
+
+---
+
+
+## §5 Phase Progress Snapshot
+
+| **Phase 1 Step** | **Component** | **Status** |
+| 1.1 | Stripe Connect onboarding (`router_integrations.py`) | ✅ Complete |
+| 1.2 | Customer CRUD (`router_customers.py`) | ✅ Complete |
+| 1.3 | Service Catalog CRUD (`router_service_catalog.py`) | ✅ Complete |
+| 1.4 | Invoice CRUD (`router_invoices.py`) | ✅ Complete |
+| 1.5 | Text-to-Pay (`router_payments.py`) | ✅ Complete |
+| 1.6 | Dashboard stats (`router_dashboard.py`) | ✅ Complete |
+| 1.7 | Dashboard UI component | ⏳ In progress / unverified |
+| 1.8 | Invoice List UI | ⏳ In progress / unverified |
+| 1.9 | Webhook handler (`router_webhooks_stripe.py`) | ⬜ Not started |
+
+---
+
+
+## §6 Next Cycle Intent
+
+- **Priority 1 (CRITICAL):** Fix `hydrate_context` encoding error — **Day 2 unresolved**. Without this, the full CRP automation pipeline remains offline.
+- **Priority 2:** Fix `perplexity_diagnose` undefined function in diagnostic pipeline
+- **Priority 3:** Verify actual phase position by scanning codebase (git + filesystem)
+- **Priority 4:** Continue Phase 1.8 (Invoice List UI) → 1.9 (Webhook handler) once pipeline is unblocked
+- **Priority 5:** Triage 23 urgent Linear issues and 17 alerting Datadog monitors
+
+---
+
+
+## §7 Health Metrics
+
+| **Metric** | **Value** |
+| Notion Sync | ✅ Operational — health check posted successfully |
+| Last Successful CRP | ⚠️ None recorded — automation has not completed a full cycle |
+| Automation Pipeline | 🚫 BLOCKED — `hydrate_context` encoding error (Day 2) |
+| Telemetry Collection | ⚠️ Stale — last collection was Feb 27 Run 3 (13 sources) |
+| Build Execution | ⚠️ Placeholder only — manual work needed |
+| Slack Post (`#vcc-builds`) | ⚠️ Not posted — VCC Notion agent lacks Slack integration |
+| NATS Publish | ⚠️ Not published — VCC Notion agent lacks NATS access |
+| Days Since Last Successful Build | **N/A** — no successful automation cycle on record |
+
+[CALLOUT] 📊 **Trend: Stalled.** No forward progress since Feb 27. The automation pipeline remains blocked by the same encoding error. Health score is presumed CRITICAL (59/100) based on last available telemetry. Operator intervention required to unblock.

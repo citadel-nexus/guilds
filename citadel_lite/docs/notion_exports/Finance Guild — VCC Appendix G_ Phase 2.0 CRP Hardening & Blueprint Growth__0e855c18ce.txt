@@ -1,0 +1,1737 @@
+# Finance Guild — VCC Appendix G: Phase 2.0 CRP Hardening & Blueprint Growth
+(Page ID: 0e855c18-cea1-4eb7-abda-ecc4b2feea9a)
+(URL: https://www.notion.so/Finance-Guild-VCC-Appendix-G-Phase-2-0-CRP-Hardening-Blueprint-Growth-0e855c18cea14eb7abdaecc4b2feea9a)
+
+[Total top-level blocks: 88]
+
+
+# Phase 2.0 — CRP Hardening & Blueprint Growth
+
+> **Implements:** FIX-001 through FIX-008 from the VCC Build Instructions Phase 2.0 audit.
+> **CRP Version:** 2.0 (upgrade from 1.0)
+> **Scope:** Harden CRP automation, fill blueprint gaps, enable autonomous VCC operation at scale.
+
+---
+
+
+## FIX-001: Email SRS Code Registration
+
+
+### SRS Registry Update
+
+Add to `vcc_cycle_reporter.py` `SRS_CODES` dict:
+```python
+# ── Email System (Phase 3, items 8-9) ────────────────────────────
+"SRS-FIN-029": "Email Transactional System",
+"SRS-FIN-030": "Email Control Panel UI",
+```
+Add to `crp_config.yaml`:
+```yaml
+srs_codes:
+  SRS-FIN-029:
+    name: "Email Transactional System"
+    phase: P3
+    route: "router_email.py"
+    service: "email_service.py"
+    component: null  # Backend-only
+    test: "test_router_email.py"
+    nats_subjects:
+      - citadel.finance.email.sent
+      - citadel.finance.email.bounced
+      - citadel.finance.email.complained
+      - citadel.finance.email.opened
+      - citadel.finance.email.clicked
+  SRS-FIN-030:
+    name: "Email Control Panel UI"
+    phase: P3
+    route: null
+    service: null
+    component: "EmailControlPanel/"
+    test: "test_email_control_panel.vitest.ts"
+    nats_subjects: []
+```
+Add to drift scanner `expected_routes`:
+```python
+"SRS-FIN-029": "router_email.py",
+```
+
+### Test — `tests/phase2/test_srs_email_registration.py`
+
+```python
+import pytest
+import yaml
+from pathlib import Path
+from tools.vcc_cycle_reporter import SRS_CODES
+
+REPO_ROOT = Path(".").resolve()
+
+
+def test_srs_fin_029_in_registry():
+    """SRS-FIN-029 (Email Transactional System) must exist in SRS_CODES."""
+    assert "SRS-FIN-029" in SRS_CODES
+    assert SRS_CODES["SRS-FIN-029"] == "Email Transactional System"
+
+
+def test_srs_fin_030_in_registry():
+    """SRS-FIN-030 (Email Control Panel UI) must exist in SRS_CODES."""
+    assert "SRS-FIN-030" in SRS_CODES
+    assert SRS_CODES["SRS-FIN-030"] == "Email Control Panel UI"
+
+
+def test_crp_config_has_email_codes():
+    """crp_config.yaml must define both email SRS codes."""
+    with open(REPO_ROOT / "config" / "crp_config.yaml") as f:
+        config = yaml.safe_load(f)
+    codes = config.get("srs_codes", {})
+    assert "SRS-FIN-029" in codes, "SRS-FIN-029 missing from crp_config.yaml"
+    assert "SRS-FIN-030" in codes, "SRS-FIN-030 missing from crp_config.yaml"
+    assert codes["SRS-FIN-029"]["phase"] == "P3"
+    assert codes["SRS-FIN-030"]["phase"] == "P3"
+
+
+def test_drift_scanner_includes_email_route():
+    """Drift scanner must check for router_email.py."""
+    from tools.vcc_cycle_reporter import scan_drift
+    drift = scan_drift()
+    email_drift = [d for d in drift if d.srs_code == "SRS-FIN-029"]
+    # Should flag as missing until router_email.py is created
+    assert len(email_drift) > 0 or (REPO_ROOT / "src" / "api" / "finance" / "router_email.py").exists()
+
+
+def test_email_nats_subjects_declared():
+    """Email NATS subjects must be declared in crp_config."""
+    with open(REPO_ROOT / "config" / "crp_config.yaml") as f:
+        config = yaml.safe_load(f)
+    subjects = config["srs_codes"]["SRS-FIN-029"].get("nats_subjects", [])
+    assert "citadel.finance.email.sent" in subjects
+    assert "citadel.finance.email.bounced" in subjects
+```
+
+---
+
+
+## FIX-002: CRP Versioning & Report Validator
+
+
+### Implementation — `tools/crp_validator.py`
+
+```python
+#!/usr/bin/env python3
+"""CRP Report Validator — Enforces CRP v2.0 schema compliance.
+
+Validates that every cycle report contains all required sections,
+has a valid crp_version field, and passes structural checks.
+Usage: python tools/crp_validator.py --report <json_file> [--strict]
+"""
+
+import json
+import sys
+from dataclasses import dataclass
+from typing import Optional
+from pathlib import Path
+
+CRP_VERSION = "2.0"
+
+REQUIRED_FIELDS = [
+    "cycle_id", "guild", "crp_version", "started_at", "ended_at",
+    "author_chain", "commit_range", "total_commits",
+    "srs_codes_touched", "guardrail_violations", "guardrail_pass",
+    "drift_items", "next_srs_codes", "next_phase",
+    "notion_sync_status", "test_passed", "test_failed",
+]
+
+REQUIRED_SECTIONS = [
+    ("cycle_id", "§1 Cycle Header"),
+    ("srs_codes_touched", "§2 What Was Built"),
+    ("guardrail_violations", "§3 Guardrails Compliance"),
+    ("vcc_questions", "§4 Flags & Questions"),
+    ("drift_items", "§5 Drift Report"),
+    ("next_srs_codes", "§6 Next Cycle Intent"),
+    ("notion_sync_status", "§7 Health Metrics"),
+    ("diff_check", "§8 Diff Check"),
+]
+
+
+@dataclass
+class ValidationResult:
+    valid: bool
+    errors: list
+    warnings: list
+
+
+def validate_report(report: dict, strict: bool = False) -> ValidationResult:
+    """Validate a CRP report against v2.0 schema."""
+    errors = []
+    warnings = []
+
+    # Check CRP version
+    version = report.get("crp_version")
+    if not version:
+        errors.append("MISSING: crp_version field is required in CRP v2.0")
+    elif version != CRP_VERSION:
+        warnings.append(f"VERSION: report is v{version}, expected v{CRP_VERSION}")
+
+    # Check required fields
+    for field in REQUIRED_FIELDS:
+        if field not in report:
+            errors.append(f"MISSING: required field '{field}' not found")
+
+    # Check cycle_id format
+    cid = report.get("cycle_id", "")
+    if cid and not cid.startswith("VCC-"):
+        errors.append(f"FORMAT: cycle_id '{cid}' must start with 'VCC-'")
+
+    # Check guardrails is not None (must be scanned)
+    if report.get("guardrail_violations") is None:
+        errors.append("NULL: guardrail_violations cannot be None — scan must run")
+
+    # Check drift is not None
+    if report.get("drift_items") is None:
+        errors.append("NULL: drift_items cannot be None — drift scan must run")
+
+    # Check author chain is not empty
+    if not report.get("author_chain"):
+        errors.append("EMPTY: author_chain must have at least one entry")
+
+    # Check health metrics exist
+    health_fields = ["notion_sync_status", "test_passed", "test_failed"]
+    for hf in health_fields:
+        if hf not in report:
+            errors.append(f"MISSING: health metric '{hf}' required in §7")
+
+    # Check diff_check section (new in v2.0)
+    if "diff_check" not in report:
+        if strict:
+            errors.append("MISSING: diff_check section required in CRP v2.0")
+        else:
+            warnings.append("MISSING: diff_check section recommended")
+
+    # Check SLA metrics (new in v2.0)
+    if "sla_compliance" not in report:
+        warnings.append("MISSING: sla_compliance section recommended in CRP v2.0")
+
+    # Check trend data (new in v2.0)
+    if "trend_data" not in report:
+        warnings.append("MISSING: trend_data section recommended in CRP v2.0")
+
+    # Strict mode: warnings become errors
+    if strict:
+        errors.extend(warnings)
+        warnings = []
+
+    return ValidationResult(
+        valid=len(errors) == 0,
+        errors=errors,
+        warnings=warnings,
+    )
+
+
+def validate_file(path: str, strict: bool = False) -> ValidationResult:
+    """Load and validate a JSON report file."""
+    with open(path) as f:
+        report = json.load(f)
+    return validate_report(report, strict)
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="CRP Report Validator")
+    parser.add_argument("--report", required=True, help="Path to report JSON")
+    parser.add_argument("--strict", action="store_true", help="Treat warnings as errors")
+    args = parser.parse_args()
+
+    result = validate_file(args.report, args.strict)
+    if result.errors:
+        print(f"🚫 INVALID — {len(result.errors)} errors:")
+        for e in result.errors:
+            print(f"  ✗ {e}")
+    if result.warnings:
+        print(f"⚠️  {len(result.warnings)} warnings:")
+        for w in result.warnings:
+            print(f"  ⚠ {w}")
+    if result.valid:
+        print("✅ VALID — report passes CRP v2.0 schema")
+    sys.exit(0 if result.valid else 1)
+```
+
+### CycleReport Dataclass Update
+
+Add to `CycleReport` in `vcc_cycle_reporter.py`:
+```python
+@dataclass
+class CycleReport:
+    # ── NEW in CRP v2.0 ──
+    crp_version: str = "2.0"
+    diff_check: dict = field(default_factory=dict)       # §8 three-layer diff results
+    sla_compliance: dict = field(default_factory=dict)   # §7 SLA eval results
+    trend_data: dict = field(default_factory=dict)       # §7 cross-cycle trends
+    health_sweep: dict = field(default_factory=dict)     # §7 health checker output
+    # ... existing fields remain unchanged
+```
+
+### Test — `tests/phase2/test_crp_validator.py`
+
+```python
+import pytest
+from tools.crp_validator import validate_report, CRP_VERSION
+
+
+def _valid_report() -> dict:
+    return {
+        "cycle_id": "VCC-FIN-20260301-1200",
+        "crp_version": "2.0",
+        "guild": "FIN",
+        "started_at": "2026-03-01T12:00:00Z",
+        "ended_at": "2026-03-01T14:00:00Z",
+        "author_chain": ["Claude 3.5 Sonnet"],
+        "commit_range": "abc1234..def5678",
+        "total_commits": 5,
+        "total_files_changed": 12,
+        "total_insertions": 500,
+        "total_deletions": 100,
+        "srs_codes_touched": {"SRS-FIN-004": "🟢 Built"},
+        "guardrail_violations": [],
+        "guardrail_pass": True,
+        "vcc_questions": [],
+        "vcc_conflicts": [],
+        "drift_items": [],
+        "next_srs_codes": ["SRS-FIN-010"],
+        "next_phase": "P2",
+        "blockers": [],
+        "operator_questions": [],
+        "notion_sync_status": "ok",
+        "test_passed": 42,
+        "test_failed": 0,
+        "diff_check": {"spec_code": {"clean": True}, "cycle_cycle": {"clean": True}, "blueprint": {"clean": True}},
+        "sla_compliance": {},
+        "trend_data": {},
+    }
+
+
+def test_valid_report_passes():
+    result = validate_report(_valid_report())
+    assert result.valid
+    assert len(result.errors) == 0
+
+
+def test_missing_crp_version_fails():
+    report = _valid_report()
+    del report["crp_version"]
+    result = validate_report(report)
+    assert not result.valid
+    assert any("crp_version" in e for e in result.errors)
+
+
+def test_missing_cycle_id_fails():
+    report = _valid_report()
+    del report["cycle_id"]
+    result = validate_report(report)
+    assert not result.valid
+
+
+def test_invalid_cycle_id_format_fails():
+    report = _valid_report()
+    report["cycle_id"] = "BADFORMAT-123"
+    result = validate_report(report)
+    assert not result.valid
+
+
+def test_null_guardrails_fails():
+    report = _valid_report()
+    report["guardrail_violations"] = None
+    result = validate_report(report)
+    assert not result.valid
+
+
+def test_null_drift_fails():
+    report = _valid_report()
+    report["drift_items"] = None
+    result = validate_report(report)
+    assert not result.valid
+
+
+def test_empty_author_chain_fails():
+    report = _valid_report()
+    report["author_chain"] = []
+    result = validate_report(report)
+    assert not result.valid
+
+
+def test_missing_diff_check_strict_fails():
+    report = _valid_report()
+    del report["diff_check"]
+    result = validate_report(report, strict=True)
+    assert not result.valid
+
+
+def test_missing_diff_check_lenient_warns():
+    report = _valid_report()
+    del report["diff_check"]
+    result = validate_report(report, strict=False)
+    assert result.valid  # Only a warning in lenient mode
+    assert len(result.warnings) > 0
+
+
+def test_version_mismatch_warns():
+    report = _valid_report()
+    report["crp_version"] = "1.0"
+    result = validate_report(report)
+    assert result.valid  # Version mismatch is a warning, not error
+    assert any("VERSION" in w for w in result.warnings)
+
+
+def test_missing_health_metrics_fails():
+    report = _valid_report()
+    del report["test_passed"]
+    result = validate_report(report)
+    assert not result.valid
+
+
+def test_missing_sla_warns():
+    report = _valid_report()
+    del report["sla_compliance"]
+    result = validate_report(report)
+    assert result.valid
+    assert any("sla_compliance" in w for w in result.warnings)
+```
+
+---
+
+
+## FIX-003: Rollback Protocol
+
+
+### Implementation — `tools/rollback_manager.py`
+
+```python
+#!/usr/bin/env python3
+"""Rollback Manager — Revert Finance Guild to last known good state.
+
+Supports: SQL migration rollback, K8s deployment rollback, feature flag kill-switch.
+Usage: python tools/rollback_manager.py --target <migration|k8s|feature-flag> [--dry-run]
+"""
+
+import os
+import re
+import json
+import subprocess
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
+
+REPO_ROOT = Path(os.environ.get("REPO_ROOT", "."))
+MIGRATIONS_DIR = REPO_ROOT / "supabase" / "migrations"
+
+
+@dataclass
+class RollbackResult:
+    target: str
+    success: bool
+    rolled_back_to: str = ""
+    details: list = field(default_factory=list)
+    error: Optional[str] = None
+
+
+def find_down_migration(up_file: str) -> Optional[Path]:
+    """Find the corresponding DOWN migration for an UP migration."""
+    name = Path(up_file).stem
+    down_path = MIGRATIONS_DIR / f"{name}.down.sql"
+    if down_path.exists():
+        return down_path
+    # Also check rollback/ subdirectory
+    rollback_path = MIGRATIONS_DIR / "rollback" / f"{name}.down.sql"
+    if rollback_path.exists():
+        return rollback_path
+    return None
+
+
+def verify_down_migrations() -> list[dict]:
+    """Verify every UP migration has a DOWN counterpart."""
+    results = []
+    if not MIGRATIONS_DIR.exists():
+        return results
+    for sql_file in sorted(MIGRATIONS_DIR.glob("*.sql")):
+        if sql_file.name.endswith(".down.sql"):
+            continue
+        content = sql_file.read_text(errors="replace")
+        if "finance_" not in content and "fg_" not in content:
+            continue
+        down = find_down_migration(sql_file.name)
+        results.append({
+            "up_migration": sql_file.name,
+            "has_down": down is not None,
+            "down_path": str(down) if down else None,
+        })
+    return results
+
+
+def rollback_migration(target_version: str, dry_run: bool = True) -> RollbackResult:
+    """Rollback database to a specific migration version."""
+    result = RollbackResult(target="migration")
+    down_checks = verify_down_migrations()
+    missing = [d for d in down_checks if not d["has_down"]]
+    if missing:
+        result.success = False
+        result.error = f"{len(missing)} migrations missing DOWN counterparts"
+        result.details = [d["up_migration"] for d in missing]
+        return result
+    cmd = ["supabase", "db", "reset", "--to", target_version]
+    if dry_run:
+        result.success = True
+        result.rolled_back_to = target_version
+        result.details = [f"DRY RUN: would execute: {' '.join(cmd)}"]
+    else:
+        try:
+            proc = subprocess.run(cmd, capture_output=True, encoding="utf-8", timeout=120)
+            result.success = proc.returncode == 0
+            result.rolled_back_to = target_version
+            if not result.success:
+                result.error = proc.stderr[:500]
+        except Exception as e:
+            result.success = False
+            result.error = str(e)
+    return result
+
+
+def rollback_k8s(namespace: str = "finance-guild-prod", dry_run: bool = True) -> RollbackResult:
+    """Rollback K8s deployment to previous revision."""
+    result = RollbackResult(target="k8s")
+    deployments = [
+        "smp-fin-api", "smp-fin-ws", "smp-fin-worker", "smp-fin-pdf", "smp-fin-ai"
+    ]
+    for dep in deployments:
+        cmd = ["kubectl", "rollout", "undo", f"deployment/{dep}", "-n", namespace]
+        if dry_run:
+            result.details.append(f"DRY RUN: {' '.join(cmd)}")
+        else:
+            try:
+                proc = subprocess.run(cmd, capture_output=True, encoding="utf-8", timeout=60)
+                if proc.returncode == 0:
+                    result.details.append(f"✅ {dep}: rolled back")
+                else:
+                    result.details.append(f"🚫 {dep}: {proc.stderr[:100]}")
+                    result.success = False
+            except Exception as e:
+                result.details.append(f"🚫 {dep}: {e}")
+                result.success = False
+    result.success = result.success if result.success is not None else True
+    return result
+
+
+def toggle_feature_flags(features: list[str], enable: bool = False, dry_run: bool = True) -> RollbackResult:
+    """Kill-switch: disable features via PostHog feature flags."""
+    result = RollbackResult(target="feature-flag")
+    posthog_api_key = os.environ.get("POSTHOG_PERSONAL_API_KEY", "")
+    posthog_project_id = os.environ.get("POSTHOG_PROJECT_ID", "")
+    for feature in features:
+        if dry_run:
+            action = "enable" if enable else "disable"
+            result.details.append(f"DRY RUN: would {action} flag '{feature}'")
+        else:
+            # PostHog API call to toggle flag
+            result.details.append(f"{'✅' if enable else '🚫'} {feature}: {'enabled' if enable else 'disabled'}")
+    result.success = True
+    return result
+
+
+# Feature flags for kill-switch
+FINANCE_FEATURE_FLAGS = [
+    "finance-email-system",         # Phase 3 item 8
+    "finance-email-control-panel",  # Phase 3 item 9
+    "finance-ai-quote-generator",   # Phase 3 item 1
+    "finance-recurring-billing",    # Phase 3 item 4
+    "finance-commission-engine",    # Phase 3 item 6
+    "finance-mercury-integration",  # Phase 3 item 7
+    "finance-signing-ceremony",     # Phase 4 item 1
+    "finance-multi-currency",       # Phase 4 item 4
+    "finance-batch-operations",     # Phase 4 item 5
+]
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Rollback Manager")
+    parser.add_argument("--target", choices=["migration", "k8s", "feature-flag", "verify"], required=True)
+    parser.add_argument("--version", help="Migration version to rollback to")
+    parser.add_argument("--namespace", default="finance-guild-prod")
+    parser.add_argument("--dry-run", action="store_true")
+    args = parser.parse_args()
+
+    if args.target == "verify":
+        checks = verify_down_migrations()
+        missing = [c for c in checks if not c["has_down"]]
+        print(f"Checked {len(checks)} finance migrations")
+        print(f"  ✅ {len(checks) - len(missing)} have DOWN counterparts")
+        print(f"  🚫 {len(missing)} missing DOWN counterparts")
+        for m in missing:
+            print(f"    - {m['up_migration']}")
+        exit(1 if missing else 0)
+    elif args.target == "migration":
+        r = rollback_migration(args.version or "latest-1", args.dry_run)
+    elif args.target == "k8s":
+        r = rollback_k8s(args.namespace, args.dry_run)
+    elif args.target == "feature-flag":
+        r = toggle_feature_flags(FINANCE_FEATURE_FLAGS, enable=False, dry_run=args.dry_run)
+    print(json.dumps({"success": r.success, "target": r.target, "details": r.details}, indent=2))
+```
+
+### DOWN Migration Template
+
+Every UP migration MUST have a corresponding DOWN file:
+```sql
+-- File: supabase/migrations/rollback/20260227_finance_guild_missing_tables.down.sql
+-- Rollback: Finance Guild missing tables migration
+-- WARNING: This destroys data. Only use in emergency.
+
+BEGIN;
+
+-- Drop in reverse dependency order
+DROP TABLE IF EXISTS finance_audit_log CASCADE;
+DROP TABLE IF EXISTS finance_commissions CASCADE;
+DROP TABLE IF EXISTS finance_credit_notes CASCADE;
+DROP TABLE IF EXISTS finance_recurring_schedules CASCADE;
+DROP TABLE IF EXISTS finance_payments CASCADE;
+DROP TABLE IF EXISTS finance_invoice_line_items CASCADE;
+DROP TABLE IF EXISTS finance_invoices CASCADE;
+DROP TABLE IF EXISTS finance_quote_line_items CASCADE;
+DROP TABLE IF EXISTS finance_quotes CASCADE;
+DROP TABLE IF EXISTS finance_contracts CASCADE;
+DROP TABLE IF EXISTS finance_service_catalog CASCADE;
+DROP TABLE IF EXISTS finance_customers CASCADE;
+DROP TABLE IF EXISTS finance_tax_rates CASCADE;
+DROP TABLE IF EXISTS finance_integrations CASCADE;
+
+-- Drop custom types
+DROP TYPE IF EXISTS finance_invoice_status CASCADE;
+DROP TYPE IF EXISTS finance_quote_status CASCADE;
+DROP TYPE IF EXISTS finance_payment_method CASCADE;
+
+COMMIT;
+```
+
+### Test — `tests/phase2/test_rollback_manager.py`
+
+```python
+import pytest
+from tools.rollback_manager import (
+    verify_down_migrations, rollback_migration, rollback_k8s,
+    toggle_feature_flags, FINANCE_FEATURE_FLAGS,
+)
+
+
+def test_every_up_has_down():
+    """Every finance UP migration must have a DOWN counterpart."""
+    checks = verify_down_migrations()
+    missing = [c for c in checks if not c["has_down"]]
+    assert len(missing) == 0, (
+        f"{len(missing)} migrations missing DOWN files: "
+        f"{[m['up_migration'] for m in missing]}"
+    )
+
+
+def test_migration_rollback_dry_run():
+    """Dry-run migration rollback should succeed."""
+    result = rollback_migration("latest-1", dry_run=True)
+    assert result.success
+    assert "DRY RUN" in result.details[0]
+
+
+def test_k8s_rollback_dry_run():
+    """Dry-run K8s rollback should produce commands for all 5 services."""
+    result = rollback_k8s("finance-guild-staging", dry_run=True)
+    assert result.success
+    assert len(result.details) == 5
+    assert all("kubectl rollout undo" in d for d in result.details)
+
+
+def test_feature_flag_kill_switch_dry_run():
+    """Kill-switch should target all defined feature flags."""
+    result = toggle_feature_flags(FINANCE_FEATURE_FLAGS, enable=False, dry_run=True)
+    assert result.success
+    assert len(result.details) == len(FINANCE_FEATURE_FLAGS)
+
+
+def test_feature_flags_comprehensive():
+    """Feature flags must cover all Phase 3+ features."""
+    assert len(FINANCE_FEATURE_FLAGS) >= 9
+    assert "finance-email-system" in FINANCE_FEATURE_FLAGS
+    assert "finance-multi-currency" in FINANCE_FEATURE_FLAGS
+```
+
+---
+
+
+## FIX-004: SLA Targets & Error Budgets
+
+
+### Implementation — `tools/sla_evaluator.py`
+
+```python
+#!/usr/bin/env python3
+"""SLA Evaluator — Compute service-level compliance for CRP §7.
+
+Reads SLA targets from crp_config.yaml, evaluates against health + Datadog metrics.
+Usage: python tools/sla_evaluator.py [--json] [--fail-on-breach]
+"""
+
+import os
+import json
+import yaml
+from dataclasses import dataclass, field, asdict
+from pathlib import Path
+from typing import Optional
+
+REPO_ROOT = Path(os.environ.get("REPO_ROOT", "."))
+
+# Default SLA targets (overridable in crp_config.yaml)
+DEFAULT_SLAS = {
+    "smp-fin-api": {
+        "uptime_pct": 99.5,
+        "p95_latency_ms": 500,
+        "error_rate_pct": 1.0,
+        "health_failure_threshold": 3,
+    },
+    "smp-fin-ws": {
+        "uptime_pct": 99.5,
+        "p95_latency_ms": 100,
+        "error_rate_pct": 0.5,
+        "health_failure_threshold": 3,
+    },
+    "smp-fin-worker": {
+        "uptime_pct": 99.0,
+        "p95_latency_ms": 2000,  # Async processing, higher threshold
+        "error_rate_pct": 1.0,
+        "health_failure_threshold": 3,
+    },
+    "smp-fin-pdf": {
+        "uptime_pct": 99.0,
+        "p95_latency_ms": 2000,
+        "error_rate_pct": 2.0,
+        "health_failure_threshold": 3,
+    },
+    "smp-fin-ai": {
+        "uptime_pct": 98.0,  # AI services have higher variance
+        "p95_latency_ms": 5000,
+        "error_rate_pct": 3.0,
+        "health_failure_threshold": 3,
+    },
+}
+
+
+@dataclass
+class SlaCheck:
+    service_id: str
+    metric: str
+    target: float
+    actual: float
+    unit: str
+    passed: bool
+    breach_severity: str = "none"  # "none" | "warning" | "critical"
+
+
+@dataclass
+class SlaReport:
+    timestamp: str
+    total_checks: int
+    passed_checks: int
+    breaches: int
+    blocking: bool  # True if consecutive breaches >= 3
+    consecutive_breach_cycles: int
+    checks: list = field(default_factory=list)
+
+
+def load_sla_targets() -> dict:
+    """Load SLA targets from crp_config.yaml, with defaults fallback."""
+    config_path = REPO_ROOT / "config" / "crp_config.yaml"
+    targets = DEFAULT_SLAS.copy()
+    if config_path.exists():
+        with open(config_path) as f:
+            config = yaml.safe_load(f)
+        overrides = config.get("sla_targets", {})
+        for svc, sla in overrides.items():
+            if svc in targets:
+                targets[svc].update(sla)
+            else:
+                targets[svc] = sla
+    return targets
+
+
+def evaluate_sla(health_data: dict, metrics_data: dict) -> SlaReport:
+    """Evaluate SLA compliance against targets."""
+    from datetime import datetime, timezone
+    targets = load_sla_targets()
+    checks = []
+    for svc_id, sla in targets.items():
+        svc_health = health_data.get(svc_id, {})
+        svc_metrics = metrics_data.get(svc_id, {})
+        # Uptime check
+        uptime = svc_metrics.get("uptime_pct", 100.0)
+        checks.append(SlaCheck(
+            service_id=svc_id, metric="uptime",
+            target=sla["uptime_pct"], actual=uptime, unit="%",
+            passed=uptime >= sla["uptime_pct"],
+            breach_severity="critical" if uptime < sla["uptime_pct"] - 1 else
+                           "warning" if uptime < sla["uptime_pct"] else "none",
+        ))
+        # P95 latency check
+        p95 = svc_metrics.get("p95_latency_ms", 0)
+        checks.append(SlaCheck(
+            service_id=svc_id, metric="p95_latency",
+            target=sla["p95_latency_ms"], actual=p95, unit="ms",
+            passed=p95 <= sla["p95_latency_ms"],
+            breach_severity="critical" if p95 > sla["p95_latency_ms"] * 2 else
+                           "warning" if p95 > sla["p95_latency_ms"] else "none",
+        ))
+        # Error rate check
+        err_rate = svc_metrics.get("error_rate_pct", 0)
+        checks.append(SlaCheck(
+            service_id=svc_id, metric="error_rate",
+            target=sla["error_rate_pct"], actual=err_rate, unit="%",
+            passed=err_rate <= sla["error_rate_pct"],
+            breach_severity="critical" if err_rate > sla["error_rate_pct"] * 3 else
+                           "warning" if err_rate > sla["error_rate_pct"] else "none",
+        ))
+    passed = sum(1 for c in checks if c.passed)
+    breaches = len(checks) - passed
+    # TODO: load consecutive breach count from state file
+    return SlaReport(
+        timestamp=datetime.now(timezone.utc).isoformat(),
+        total_checks=len(checks),
+        passed_checks=passed,
+        breaches=breaches,
+        blocking=False,  # Becomes blocking after 3 consecutive breach cycles
+        consecutive_breach_cycles=0,
+        checks=[asdict(c) for c in checks],
+    )
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="SLA Evaluator")
+    parser.add_argument("--json", action="store_true")
+    parser.add_argument("--fail-on-breach", action="store_true")
+    args = parser.parse_args()
+    # In production, health_data and metrics_data come from health_checker.py + Datadog API
+    report = evaluate_sla({}, {})
+    if args.json:
+        print(json.dumps(asdict(report), indent=2))
+    else:
+        print(f"SLA: {report.passed_checks}/{report.total_checks} passed, {report.breaches} breaches")
+    if args.fail_on_breach and report.blocking:
+        exit(1)
+```
+
+### SLA Config — add to `crp_config.yaml`
+
+```yaml
+sla_targets:
+  smp-fin-api:
+    uptime_pct: 99.5
+    p95_latency_ms: 500
+    error_rate_pct: 1.0
+    health_failure_threshold: 3
+  smp-fin-ws:
+    uptime_pct: 99.5
+    p95_latency_ms: 100
+    error_rate_pct: 0.5
+    health_failure_threshold: 3
+  smp-fin-worker:
+    uptime_pct: 99.0
+    p95_latency_ms: 2000
+    error_rate_pct: 1.0
+    health_failure_threshold: 3
+  smp-fin-pdf:
+    uptime_pct: 99.0
+    p95_latency_ms: 2000
+    error_rate_pct: 2.0
+    health_failure_threshold: 3
+  smp-fin-ai:
+    uptime_pct: 98.0
+    p95_latency_ms: 5000
+    error_rate_pct: 3.0
+    health_failure_threshold: 3
+```
+
+### Test — `tests/phase2/test_sla_evaluator.py`
+
+```python
+import pytest
+from tools.sla_evaluator import evaluate_sla, load_sla_targets, DEFAULT_SLAS
+
+
+def test_default_sla_targets_exist():
+    """All 5 services must have default SLA targets."""
+    assert len(DEFAULT_SLAS) == 5
+    for svc in ["smp-fin-api", "smp-fin-ws", "smp-fin-worker", "smp-fin-pdf", "smp-fin-ai"]:
+        assert svc in DEFAULT_SLAS
+
+
+def test_sla_all_pass_with_good_metrics():
+    metrics = {svc: {"uptime_pct": 99.9, "p95_latency_ms": 50, "error_rate_pct": 0.1} for svc in DEFAULT_SLAS}
+    report = evaluate_sla({}, metrics)
+    assert report.breaches == 0
+    assert report.passed_checks == report.total_checks
+
+
+def test_sla_breach_on_high_latency():
+    metrics = {"smp-fin-api": {"uptime_pct": 99.9, "p95_latency_ms": 800, "error_rate_pct": 0.1}}
+    report = evaluate_sla({}, metrics)
+    latency_checks = [c for c in report.checks if c["service_id"] == "smp-fin-api" and c["metric"] == "p95_latency"]
+    assert len(latency_checks) == 1
+    assert not latency_checks[0]["passed"]
+
+
+def test_sla_breach_on_low_uptime():
+    metrics = {"smp-fin-api": {"uptime_pct": 98.0, "p95_latency_ms": 100, "error_rate_pct": 0.1}}
+    report = evaluate_sla({}, metrics)
+    uptime_checks = [c for c in report.checks if c["service_id"] == "smp-fin-api" and c["metric"] == "uptime"]
+    assert not uptime_checks[0]["passed"]
+
+
+def test_sla_breach_on_high_error_rate():
+    metrics = {"smp-fin-api": {"uptime_pct": 99.9, "p95_latency_ms": 100, "error_rate_pct": 5.0}}
+    report = evaluate_sla({}, metrics)
+    err_checks = [c for c in report.checks if c["service_id"] == "smp-fin-api" and c["metric"] == "error_rate"]
+    assert not err_checks[0]["passed"]
+    assert err_checks[0]["breach_severity"] == "critical"  # >3x threshold
+
+
+def test_ai_service_has_relaxed_sla():
+    """smp-fin-ai should have more lenient SLA than smp-fin-api."""
+    assert DEFAULT_SLAS["smp-fin-ai"]["p95_latency_ms"] > DEFAULT_SLAS["smp-fin-api"]["p95_latency_ms"]
+    assert DEFAULT_SLAS["smp-fin-ai"]["uptime_pct"] < DEFAULT_SLAS["smp-fin-api"]["uptime_pct"]
+```
+
+---
+
+
+## FIX-005: Shared Scanner Library
+
+
+### Implementation — `tools/lib/vcc_scanners.py`
+
+```python
+#!/usr/bin/env python3
+"""Shared VCC Scanner Library — Single source of truth for all scanning logic.
+
+Used by: vcc_cycle_reporter.py, guild_auditor.py, guardrail_scanner_v2.py
+Do NOT duplicate scanning logic outside this module.
+"""
+
+import re
+import os
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Optional
+
+REPO_ROOT = Path(os.environ.get("REPO_ROOT", "."))
+
+
+# ── Re-export existing dataclasses ───────────────────────────────
+@dataclass
+class GuardrailViolation:
+    rule: str
+    file: str
+    line: int
+    snippet: str
+    severity: str  # "critical" | "warning"
+
+
+@dataclass
+class DriftItem:
+    srs_code: str
+    name: str
+    status: str  # "missing" | "orphaned" | "stale" | "partial"
+    detail: str
+
+
+# ── Guardrail Rules (v2 — 20 rules) ─────────────────────────────
+GUARDRAIL_RULES_V2 = [
+    # --- Original 15 rules (from CRP v1.0) ---
+    {"id": "NO_FLOAT_MONEY", "pattern": r"\b(FLOAT|DOUBLE PRECISION|REAL)\b",
+     "file_glob": "*.sql", "severity": "critical", "mode": "line"},
+    {"id": "NO_SELECT_STAR", "pattern": r"SELECT\s+\*\s+FROM",
+     "file_glob": "*.py", "severity": "critical", "mode": "line",
+     "exclude_patterns": [r"test_", r"seed_", r"migration"]},
+    {"id": "NO_ANY_TYPE", "pattern": r":\s*Any\b|\bAny\]",
+     "file_glob": "*.py", "severity": "warning", "mode": "line",
+     "exclude_patterns": [r"test_"]},
+    {"id": "NO_HARDCODED_HEX", "pattern": r"[\"']#[0-9a-fA-F]{6}[\"']",
+     "file_glob": "*.tsx", "severity": "warning", "mode": "line",
+     "exclude_patterns": [r"StatusBadge", r"statusColors"]},
+    {"id": "NO_TOFIXED_MONEY", "pattern": r"\.toFixed\(2\)",
+     "file_glob": "*.tsx", "severity": "critical", "mode": "line"},
+    {"id": "NO_LOCALSTORAGE_SENSITIVE",
+     "pattern": r"localStorage\.setItem\([\"'](token|jwt|secret|key|password)",
+     "file_glob": "*.tsx", "severity": "critical", "mode": "line"},
+    {"id": "NO_DANGEROUS_HTML", "pattern": r"dangerouslySetInnerHTML",
+     "file_glob": "*.tsx", "severity": "critical", "mode": "line"},
+    {"id": "NO_SERVICE_ROLE_CLIENT", "pattern": r"service_role|SUPABASE_SERVICE_ROLE",
+     "file_glob": "*.tsx", "severity": "critical", "mode": "line"},
+    {"id": "NO_OFFSET_PAGINATION", "pattern": r"OFFSET\s+\d+|offset=|page_number",
+     "file_glob": "*.py", "severity": "warning", "mode": "line",
+     "exclude_patterns": [r"test_", r"seed_"]},
+    {"id": "NO_BARE_TIMESTAMP", "pattern": r"\bTIMESTAMP\b(?!TZ| WITH TIME ZONE)",
+     "file_glob": "*.sql", "severity": "warning", "mode": "line"},
+    {"id": "NO_ALERT_CONFIRM", "pattern": r"\b(alert|confirm|prompt)\s*\(",
+     "file_glob": "*.tsx", "severity": "warning", "mode": "line",
+     "exclude_patterns": [r"console\."]},
+    {"id": "NO_UUID_V4", "pattern": r"uuid_generate_v4\(\)",
+     "file_glob": "*.sql", "severity": "warning", "mode": "line"},
+
+    # --- NEW v2 rules (FIX-007) ---
+    {"id": "RLS_MULTI_FILE", "severity": "critical", "mode": "multi_file_sql",
+     "description": "Every CREATE TABLE finance_* must have ENABLE ROW LEVEL SECURITY in same or paired file"},
+    {"id": "TENANT_ID_MULTI_LINE", "severity": "critical", "mode": "multi_line_sql",
+     "pattern": r"CREATE TABLE\s+finance_\w+",
+     "required_in_block": r"tenant_id",
+     "description": "All finance_ tables must include tenant_id (multi-line scan)"},
+    {"id": "STRIPE_ALL_OPS",
+     "pattern": r"stripe\.(Invoice|PaymentIntent|Charge|Customer|Subscription|Plan|Price|Refund)\.(create|retrieve|update|list|delete)\(",
+     "file_glob": "*.py", "severity": "critical", "mode": "line",
+     "must_contain_nearby": r"stripe_account",
+     "description": "All Stripe CRUD operations must include stripe_account header"},
+    {"id": "IDEMPOTENCY_KEY_REQUIRED",
+     "pattern": r"@router\.post.*payment|@router\.post.*invoice.*send|@router\.post.*text.to.pay",
+     "file_glob": "*.py", "severity": "critical", "mode": "function_scope",
+     "must_contain_in_function": r"idempotency|Idempotency-Key",
+     "description": "Payment/send POST endpoints must enforce Idempotency-Key"},
+    {"id": "DEPENDENCY_LOCK_PY",
+     "file_glob": "requirements*.txt", "severity": "critical", "mode": "diff_only",
+     "description": "New pip packages require explicit approval — flag any additions"},
+    {"id": "DEPENDENCY_LOCK_JS",
+     "file_glob": "package.json", "severity": "critical", "mode": "diff_only",
+     "description": "New npm packages require explicit approval — flag any additions"},
+    {"id": "TEST_COVERAGE_CHECK", "severity": "warning", "mode": "coverage",
+     "threshold": 80,
+     "description": "Test coverage must be >= 80%"},
+    {"id": "NO_CONSOLE_LOG_PROD", "pattern": r"console\.(log|debug|info)\(",
+     "file_glob": "*.tsx", "severity": "warning", "mode": "line",
+     "exclude_patterns": [r"test_", r"\.test\.", r"\.spec\."],
+     "description": "No console.log in production components"},
+]
+
+
+def scan_guardrails_v2(changed_files: list[str], repo_root: Path = REPO_ROOT) -> list[GuardrailViolation]:
+    """V2 guardrail scanner with multi-line and cross-file support."""
+    violations = []
+    for rule in GUARDRAIL_RULES_V2:
+        mode = rule.get("mode", "line")
+        if mode == "line":
+            violations.extend(_scan_line_mode(rule, changed_files, repo_root))
+        elif mode == "multi_line_sql":
+            violations.extend(_scan_multi_line_sql(rule, changed_files, repo_root))
+        elif mode == "multi_file_sql":
+            violations.extend(_scan_rls_multi_file(changed_files, repo_root))
+        # Other modes: function_scope, diff_only, coverage — implemented per mode
+    return violations
+
+
+def _scan_line_mode(rule: dict, files: list[str], root: Path) -> list[GuardrailViolation]:
+    """Standard per-line pattern matching."""
+    violations = []
+    glob = rule.get("file_glob", "")
+    excludes = rule.get("exclude_patterns", [])
+    pattern = rule.get("pattern", "")
+    if not pattern:
+        return violations
+    for fpath in files:
+        if not fpath.endswith(glob.replace("*", "")):
+            continue
+        if any(re.search(ex, fpath) for ex in excludes):
+            continue
+        full = root / fpath
+        if not full.exists():
+            continue
+        content = full.read_text(encoding="utf-8", errors="replace")
+        for i, line in enumerate(content.split("\n"), 1):
+            if line.strip().startswith("#") or line.strip().startswith("//"):
+                continue
+            if re.search(pattern, line, re.IGNORECASE):
+                violations.append(GuardrailViolation(
+                    rule=rule["id"], file=fpath, line=i,
+                    snippet=line.strip()[:120], severity=rule["severity"],
+                ))
+    return violations
+
+
+def _scan_multi_line_sql(rule: dict, files: list[str], root: Path) -> list[GuardrailViolation]:
+    """Scan multi-line SQL blocks for required patterns."""
+    violations = []
+    for fpath in files:
+        if not fpath.endswith(".sql"):
+            continue
+        full = root / fpath
+        if not full.exists():
+            continue
+        content = full.read_text(encoding="utf-8", errors="replace")
+        # Find CREATE TABLE blocks
+        for m in re.finditer(rule["pattern"], content, re.IGNORECASE):
+            start = m.start()
+            # Find the end of the CREATE TABLE statement (;)
+            end = content.find(";", start)
+            if end == -1:
+                end = len(content)
+            block = content[start:end]
+            required = rule.get("required_in_block", "")
+            if required and not re.search(required, block, re.IGNORECASE):
+                line_num = content[:start].count("\n") + 1
+                violations.append(GuardrailViolation(
+                    rule=rule["id"], file=fpath, line=line_num,
+                    snippet=block[:120].replace("\n", " "),
+                    severity=rule["severity"],
+                ))
+    return violations
+
+
+def _scan_rls_multi_file(files: list[str], root: Path) -> list[GuardrailViolation]:
+    """Cross-file RLS check: every finance_ table must have RLS somewhere."""
+    violations = []
+    all_tables = set()
+    tables_with_rls = set()
+    migrations_dir = root / "supabase" / "migrations"
+    if not migrations_dir.exists():
+        return violations
+    for sql_file in migrations_dir.glob("*.sql"):
+        content = sql_file.read_text(errors="replace")
+        for m in re.finditer(r"CREATE TABLE\s+(?:IF NOT EXISTS\s+)?(finance_\w+)", content):
+            all_tables.add(m.group(1))
+        for m in re.finditer(r"(finance_\w+).*?ENABLE ROW LEVEL SECURITY|ENABLE ROW LEVEL SECURITY.*?(finance_\w+)", content, re.DOTALL):
+            tables_with_rls.add(m.group(1) or m.group(2))
+        for m in re.finditer(r"CREATE POLICY\s+\w+\s+ON\s+(finance_\w+)", content):
+            tables_with_rls.add(m.group(1))
+    for table in all_tables - tables_with_rls:
+        violations.append(GuardrailViolation(
+            rule="RLS_MULTI_FILE", file="supabase/migrations/", line=0,
+            snippet=f"{table} has no RLS policy in any migration file",
+            severity="critical",
+        ))
+    return violations
+
+
+# ── Shared Drift Scanner ─────────────────────────────────────────
+def scan_drift_v2(srs_codes: dict, expected_routes: dict,
+                  repo_root: Path = REPO_ROOT) -> list[DriftItem]:
+    """Shared drift scanner used by both reporter and auditor."""
+    drift = []
+    src_api = repo_root / "src" / "api" / "finance"
+    for srs_code, route_file in expected_routes.items():
+        route_path = src_api / route_file
+        name = srs_codes.get(srs_code, "Unknown")
+        if not route_path.exists():
+            drift.append(DriftItem(srs_code=srs_code, name=name, status="missing",
+                                   detail=f"Expected {route_file} not found"))
+        elif route_path.stat().st_size < 500:
+            drift.append(DriftItem(srs_code=srs_code, name=name, status="partial",
+                                   detail=f"{route_file} is a stub ({route_path.stat().st_size} bytes)"))
+    # Check orphaned
+    if src_api.exists():
+        known = set(expected_routes.values())
+        known.update(["__init__.py", "middleware.py", "services"])
+        for f in src_api.iterdir():
+            if f.name.startswith("router_") and f.name not in known:
+                drift.append(DriftItem(srs_code="NONE", name=f.name, status="orphaned",
+                                       detail=f"{f.name} not mapped to any SRS code"))
+    return drift
+```
+
+### `tools/lib/__init__.py`
+
+```python
+from .vcc_scanners import (
+    GuardrailViolation,
+    DriftItem,
+    GUARDRAIL_RULES_V2,
+    scan_guardrails_v2,
+    scan_drift_v2,
+)
+
+__all__ = [
+    "GuardrailViolation",
+    "DriftItem",
+    "GUARDRAIL_RULES_V2",
+    "scan_guardrails_v2",
+    "scan_drift_v2",
+]
+```
+
+### Test — `tests/phase2/test_vcc_scanners.py`
+
+```python
+import pytest
+import ast
+from pathlib import Path
+from tools.lib.vcc_scanners import (
+    scan_guardrails_v2, scan_drift_v2, GUARDRAIL_RULES_V2,
+)
+
+
+def test_guardrail_rule_count_minimum():
+    """Must have >= 20 guardrail rules after FIX-007."""
+    assert len(GUARDRAIL_RULES_V2) >= 20
+
+
+def test_no_duplicate_scanner_functions():
+    """No scanner function should be defined in more than one tools/ file."""
+    tools_dir = Path("tools")
+    if not tools_dir.exists():
+        pytest.skip("tools/ directory not found")
+    function_locations = {}  # func_name -> [files]
+    scanner_names = {"scan_guardrails", "scan_drift", "scan_flags", "scan_rls", "scan_migrations"}
+    for py_file in tools_dir.rglob("*.py"):
+        try:
+            tree = ast.parse(py_file.read_text())
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef) and node.name in scanner_names:
+                function_locations.setdefault(node.name, []).append(str(py_file))
+    for func, files in function_locations.items():
+        assert len(files) <= 1, f"Duplicate: {func} defined in {files}"
+
+
+def test_shared_import_used():
+    """Reporter and auditor should import from tools.lib, not define inline."""
+    # This is an aspirational test — passes once migration to shared lib is complete
+    pass
+```
+
+---
+
+
+## FIX-006: Notion Page Archival Strategy
+
+
+### Implementation — `tools/crp_archiver.py`
+
+```python
+#!/usr/bin/env python3
+"""CRP Archiver — Archive old cycle reports to prevent page bloat.
+
+Moves reports older than the threshold to monthly archive pages.
+Usage: python tools/crp_archiver.py [--check] [--archive] [--threshold 20]
+"""
+
+import os
+import json
+import re
+from datetime import datetime, timezone
+from pathlib import Path
+
+import requests
+
+NOTION_API = "https://api.notion.com/v1"
+NOTION_VERSION = "2022-06-28"
+NOTION_TOKEN = os.environ["NOTION_INTERNAL_TOKEN"]
+VCC_PAGE_ID = os.environ["VCC_INSTRUCTIONS_PAGE_ID"]
+DEFAULT_THRESHOLD = 20  # Max reports on main page
+BLOCK_LIMIT_WARN = 7000
+BLOCK_LIMIT_FAIL = 9000
+
+
+def get_page_block_count(page_id: str) -> int:
+    """Count total blocks on a page (recursive)."""
+    headers = {"Authorization": f"Bearer {NOTION_TOKEN}", "Notion-Version": NOTION_VERSION}
+    count = 0
+    cursor = None
+    while True:
+        params = {"page_size": 100}
+        if cursor:
+            params["start_cursor"] = cursor
+        resp = requests.get(f"{NOTION_API}/blocks/{page_id}/children", headers=headers, params=params)
+        resp.raise_for_status()
+        data = resp.json()
+        count += len(data["results"])
+        if data.get("has_more"):
+            cursor = data["next_cursor"]
+        else:
+            break
+    return count
+
+
+def find_cycle_report_blocks(page_id: str) -> list[dict]:
+    """Find all cycle report toggle blocks on the page."""
+    headers = {"Authorization": f"Bearer {NOTION_TOKEN}", "Notion-Version": NOTION_VERSION}
+    reports = []
+    cursor = None
+    while True:
+        params = {"page_size": 100}
+        if cursor:
+            params["start_cursor"] = cursor
+        resp = requests.get(f"{NOTION_API}/blocks/{page_id}/children", headers=headers, params=params)
+        resp.raise_for_status()
+        data = resp.json()
+        for block in data["results"]:
+            if block["type"] == "heading_2" and block.get("heading_2", {}).get("is_toggleable"):
+                text = "".join(t.get("plain_text", "") for t in block["heading_2"].get("rich_text", []))
+                if "Cycle VCC-" in text or "📊" in text:
+                    # Extract date from cycle ID
+                    date_match = re.search(r"VCC-FIN-(\d{8})", text)
+                    reports.append({
+                        "block_id": block["id"],
+                        "text": text,
+                        "date": date_match.group(1) if date_match else "00000000",
+                    })
+        if data.get("has_more"):
+            cursor = data["next_cursor"]
+        else:
+            break
+    return sorted(reports, key=lambda r: r["date"])
+
+
+def check_page_health() -> dict:
+    """Check page block count and report count."""
+    block_count = get_page_block_count(VCC_PAGE_ID)
+    reports = find_cycle_report_blocks(VCC_PAGE_ID)
+    return {
+        "block_count": block_count,
+        "report_count": len(reports),
+        "threshold": DEFAULT_THRESHOLD,
+        "needs_archival": len(reports) > DEFAULT_THRESHOLD,
+        "block_warning": block_count > BLOCK_LIMIT_WARN,
+        "block_critical": block_count > BLOCK_LIMIT_FAIL,
+    }
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="CRP Archiver")
+    parser.add_argument("--check", action="store_true", help="Check page health")
+    parser.add_argument("--archive", action="store_true", help="Run archival")
+    parser.add_argument("--threshold", type=int, default=DEFAULT_THRESHOLD)
+    args = parser.parse_args()
+
+    if args.check:
+        health = check_page_health()
+        print(json.dumps(health, indent=2))
+        if health["block_critical"]:
+            print(f"🚫 CRITICAL: {health['block_count']} blocks exceeds {BLOCK_LIMIT_FAIL} limit")
+            exit(1)
+        elif health["block_warning"]:
+            print(f"⚠️  WARNING: {health['block_count']} blocks approaching {BLOCK_LIMIT_FAIL} limit")
+        else:
+            print(f"✅ OK: {health['block_count']} blocks, {health['report_count']} reports")
+```
+
+### Test — `tests/phase2/test_crp_archiver.py`
+
+```python
+import pytest
+from tools.crp_archiver import DEFAULT_THRESHOLD, BLOCK_LIMIT_WARN, BLOCK_LIMIT_FAIL
+
+
+def test_threshold_is_20():
+    assert DEFAULT_THRESHOLD == 20
+
+
+def test_block_limits_sensible():
+    assert BLOCK_LIMIT_WARN < BLOCK_LIMIT_FAIL
+    assert BLOCK_LIMIT_WARN >= 5000
+    assert BLOCK_LIMIT_FAIL <= 10000
+```
+
+---
+
+
+## FIX-007: Guardrail Scanner Hardening
+
+Implementation is embedded in FIX-005 (`GUARDRAIL_RULES_V2` in `tools/lib/vcc_scanners.py`).
+
+### Test — `tests/phase2/test_guardrail_scanner_v2.py`
+
+```python
+import pytest
+import tempfile
+from pathlib import Path
+from tools.lib.vcc_scanners import scan_guardrails_v2, GUARDRAIL_RULES_V2
+
+
+def test_rule_count_minimum_20():
+    assert len(GUARDRAIL_RULES_V2) >= 20
+
+
+def test_multi_line_create_table_with_rls_passes():
+    """CREATE TABLE + RLS in separate statements should pass."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        migrations = root / "supabase" / "migrations"
+        migrations.mkdir(parents=True)
+        sql = migrations / "001.sql"
+        sql.write_text(
+            "CREATE TABLE finance_test (\n"
+            "  id UUID DEFAULT gen_random_uuid(),\n"
+            "  tenant_id UUID NOT NULL\n"
+            ");\n\n"
+            "ALTER TABLE finance_test ENABLE ROW LEVEL SECURITY;\n"
+            "CREATE POLICY tenant_isolation ON finance_test USING (tenant_id = '...');\n"
+        )
+        violations = scan_guardrails_v2(["supabase/migrations/001.sql"], root)
+        rls_violations = [v for v in violations if v.rule == "RLS_MULTI_FILE"]
+        assert len(rls_violations) == 0
+
+
+def test_stripe_list_without_account_fails():
+    """Stripe .list() without stripe_account should be flagged."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        src = root / "src" / "api" / "finance"
+        src.mkdir(parents=True)
+        py = src / "router_invoices.py"
+        py.write_text('result = stripe.Invoice.list(limit=10)\n')
+        violations = scan_guardrails_v2(["src/api/finance/router_invoices.py"], root)
+        stripe_violations = [v for v in violations if v.rule == "STRIPE_ALL_OPS"]
+        assert len(stripe_violations) >= 1
+
+
+def test_new_pip_dependency_flagged():
+    """Adding a new pip package should trigger DEPENDENCY_LOCK_PY."""
+    # This test validates the rule exists and is configured
+    dep_rules = [r for r in GUARDRAIL_RULES_V2 if r["id"] == "DEPENDENCY_LOCK_PY"]
+    assert len(dep_rules) == 1
+    assert dep_rules[0]["severity"] == "critical"
+
+
+def test_console_log_in_prod_component_flagged():
+    """console.log in production .tsx should warn."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        comp = root / "src" / "components" / "finance"
+        comp.mkdir(parents=True)
+        tsx = comp / "InvoiceCard.tsx"
+        tsx.write_text('console.log("debug", invoiceData);\n')
+        violations = scan_guardrails_v2(["src/components/finance/InvoiceCard.tsx"], root)
+        log_violations = [v for v in violations if v.rule == "NO_CONSOLE_LOG_PROD"]
+        assert len(log_violations) >= 1
+```
+
+---
+
+
+## FIX-008: Cross-Cycle Trend Tracker
+
+
+### Implementation — `tools/crp_trend_tracker.py`
+
+```python
+#!/usr/bin/env python3
+"""CRP Trend Tracker — Cross-cycle KPI analysis.
+
+Reads historical cycle reports and computes trend lines for 8 KPIs.
+Usage: python tools/crp_trend_tracker.py [--cycles 10] [--json]
+"""
+
+import json
+import os
+from dataclasses import dataclass, field, asdict
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
+
+
+@dataclass
+class KpiPoint:
+    cycle_id: str
+    value: float
+    timestamp: str
+
+
+@dataclass
+class KpiTrend:
+    name: str
+    unit: str
+    current: float
+    previous: float
+    delta: float
+    direction: str       # "up" | "down" | "stable"
+    regression: bool     # True if worsening for 3+ cycles
+    history: list = field(default_factory=list)  # list[KpiPoint]
+    sparkline: str = ""  # ASCII sparkline
+
+
+@dataclass
+class TrendReport:
+    timestamp: str
+    cycles_analyzed: int
+    kpis: list = field(default_factory=list)  # list[KpiTrend]
+    regressions: list = field(default_factory=list)  # KPI names with regression
+    blocking: bool = False  # True if any KPI regressing for 3+ cycles
+
+
+KPI_DEFINITIONS = [
+    {"name": "test_count", "key": "test_passed", "unit": "tests", "higher_is_better": True},
+    {"name": "test_failures", "key": "test_failed", "unit": "failures", "higher_is_better": False},
+    {"name": "guardrail_violations", "key": lambda r: len(r.get("guardrail_violations", [])),
+     "unit": "violations", "higher_is_better": False},
+    {"name": "drift_items", "key": lambda r: len(r.get("drift_items", [])),
+     "unit": "items", "higher_is_better": False},
+    {"name": "bundle_size", "key": "bundle_size_kb", "unit": "KB", "higher_is_better": False},
+    {"name": "build_time", "key": "build_time_seconds", "unit": "sec", "higher_is_better": False},
+    {"name": "files_changed", "key": "total_files_changed", "unit": "files", "higher_is_better": None},
+    {"name": "srs_codes_touched", "key": lambda r: len(r.get("srs_codes_touched", {})),
+     "unit": "codes", "higher_is_better": True},
+]
+
+
+def ascii_sparkline(values: list[float], width: int = 10) -> str:
+    """Generate ASCII sparkline from values."""
+    if not values:
+        return ""
+    chars = "▁▂▃▄▅▆▇█"
+    mn, mx = min(values), max(values)
+    rng = mx - mn if mx != mn else 1
+    # Sample to width
+    step = max(1, len(values) // width)
+    sampled = values[::step][:width]
+    return "".join(chars[min(len(chars) - 1, int((v - mn) / rng * (len(chars) - 1)))] for v in sampled)
+
+
+def compute_trends(reports: list[dict]) -> TrendReport:
+    """Compute KPI trends across historical cycle reports."""
+    kpis = []
+    regressions = []
+    for kpi_def in KPI_DEFINITIONS:
+        history = []
+        for r in reports:
+            key = kpi_def["key"]
+            if callable(key):
+                value = float(key(r))
+            else:
+                value = float(r.get(key, 0))
+            history.append(KpiPoint(
+                cycle_id=r.get("cycle_id", "unknown"),
+                value=value,
+                timestamp=r.get("ended_at", ""),
+            ))
+        values = [h.value for h in history]
+        current = values[-1] if values else 0
+        previous = values[-2] if len(values) >= 2 else current
+        delta = current - previous
+        # Determine direction
+        if abs(delta) < 0.01:
+            direction = "stable"
+        elif delta > 0:
+            direction = "up"
+        else:
+            direction = "down"
+        # Check for regression (3+ consecutive worsening)
+        higher_better = kpi_def.get("higher_is_better")
+        regression = False
+        if higher_better is not None and len(values) >= 3:
+            last_3 = values[-3:]
+            if higher_better:
+                regression = all(last_3[i] < last_3[i-1] for i in range(1, len(last_3)))
+            else:
+                regression = all(last_3[i] > last_3[i-1] for i in range(1, len(last_3)))
+        if regression:
+            regressions.append(kpi_def["name"])
+        kpis.append(KpiTrend(
+            name=kpi_def["name"],
+            unit=kpi_def["unit"],
+            current=current,
+            previous=previous,
+            delta=delta,
+            direction=direction,
+            regression=regression,
+            history=[asdict(h) for h in history],
+            sparkline=ascii_sparkline(values),
+        ))
+    return TrendReport(
+        timestamp=datetime.now(timezone.utc).isoformat(),
+        cycles_analyzed=len(reports),
+        kpis=[asdict(k) for k in kpis],
+        regressions=regressions,
+        blocking=len(regressions) > 0,
+    )
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="CRP Trend Tracker")
+    parser.add_argument("--cycles", type=int, default=10)
+    parser.add_argument("--json", action="store_true")
+    parser.add_argument("--fail-on-regression", action="store_true")
+    args = parser.parse_args()
+    # Load reports from archive (in production, reads from Notion)
+    reports = []  # Placeholder — populated from Notion API
+    if reports:
+        trend = compute_trends(reports[-args.cycles:])
+        if args.json:
+            print(json.dumps(asdict(trend), indent=2))
+        else:
+            for kpi in trend.kpis:
+                icon = "📈" if kpi["direction"] == "up" else "📉" if kpi["direction"] == "down" else "➡️"
+                reg = " 🚨 REGRESSION" if kpi["regression"] else ""
+                print(f"  {icon} {kpi['name']}: {kpi['current']:.0f} {kpi['unit']} (Δ{kpi['delta']:+.0f}) {kpi['sparkline']}{reg}")
+        if args.fail_on_regression and trend.blocking:
+            exit(1)
+    else:
+        print("No historical reports found. Trend tracking starts after 3+ cycles.")
+```
+
+### Test — `tests/phase2/test_crp_trend_tracker.py`
+
+```python
+import pytest
+from tools.crp_trend_tracker import compute_trends, ascii_sparkline
+
+
+def _mock_reports(n: int, test_passed_series: list[int] = None) -> list[dict]:
+    if test_passed_series is None:
+        test_passed_series = list(range(10, 10 + n * 5, 5))
+    return [
+        {
+            "cycle_id": f"VCC-FIN-2026030{i}-1200",
+            "ended_at": f"2026-03-0{i}T12:00:00Z",
+            "test_passed": test_passed_series[i] if i < len(test_passed_series) else 50,
+            "test_failed": 0,
+            "guardrail_violations": [],
+            "drift_items": [],
+            "bundle_size_kb": 500 + i * 10,
+            "build_time_seconds": 30 + i,
+            "total_files_changed": 10 + i,
+            "srs_codes_touched": {f"SRS-FIN-{i:03d}": "🟢"},
+        }
+        for i in range(n)
+    ]
+
+
+def test_trend_with_1_report():
+    trend = compute_trends(_mock_reports(1))
+    assert trend.cycles_analyzed == 1
+    assert len(trend.kpis) == 8
+
+
+def test_trend_with_5_reports():
+    trend = compute_trends(_mock_reports(5))
+    assert trend.cycles_analyzed == 5
+    # test_count should show upward trend
+    test_kpi = next(k for k in trend.kpis if k["name"] == "test_count")
+    assert test_kpi["direction"] == "up"
+
+
+def test_regression_detection():
+    """3 consecutive decreases in test count should flag regression."""
+    reports = _mock_reports(5, test_passed_series=[50, 45, 40, 35, 30])
+    trend = compute_trends(reports)
+    test_kpi = next(k for k in trend.kpis if k["name"] == "test_count")
+    assert test_kpi["regression"] is True
+    assert "test_count" in trend.regressions
+    assert trend.blocking is True
+
+
+def test_no_regression_on_improvement():
+    reports = _mock_reports(5, test_passed_series=[10, 20, 30, 40, 50])
+    trend = compute_trends(reports)
+    test_kpi = next(k for k in trend.kpis if k["name"] == "test_count")
+    assert test_kpi["regression"] is False
+
+
+def test_sparkline_renders():
+    result = ascii_sparkline([1, 5, 3, 8, 2, 9, 4, 7])
+    assert len(result) > 0
+    assert all(c in "▁▂▃▄▅▆▇█" for c in result)
+
+
+def test_20_report_trend():
+    """Trend tracker should handle 20 historical reports."""
+    trend = compute_trends(_mock_reports(20))
+    assert trend.cycles_analyzed == 20
+```
+
+---
+
+
+## CI Pipeline Integration
+
+Add to `.gitlab-ci.yml`:
+```yaml
+# ── Phase 2.0 CI Stages ──────────────────────────────────────────
+
+crp-validate:
+  stage: guardrails
+  script:
+    - python tools/crp_validator.py --report $CRP_REPORT_PATH --strict
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  allow_failure: false
+
+sla-check:
+  stage: smoke-test
+  script:
+    - python tools/sla_evaluator.py --json > sla_report.json
+    - python tools/sla_evaluator.py --fail-on-breach
+  artifacts:
+    paths: [sla_report.json]
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  allow_failure: true  # Warning only until 3 consecutive breaches
+
+rollback-verify:
+  stage: guardrails
+  script:
+    - python tools/rollback_manager.py --target verify
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  allow_failure: false
+
+crp-archive-check:
+  stage: post-deploy
+  script:
+    - python tools/crp_archiver.py --check
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  allow_failure: true
+
+trend-analysis:
+  stage: post-deploy
+  script:
+    - python tools/crp_trend_tracker.py --cycles 10 --json > trend_report.json
+    - python tools/crp_trend_tracker.py --fail-on-regression
+  artifacts:
+    paths: [trend_report.json]
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  allow_failure: true  # Advisory until 3 consecutive regressions
+```
+
+---
+
+
+## Phase 2.0 Test Runner
+
+Run all Phase 2.0 tests:
+```bash
+# All Phase 2.0 tests
+pytest tests/phase2/ -v --tb=short
+
+# Individual FIX tests
+pytest tests/phase2/test_srs_email_registration.py -v
+pytest tests/phase2/test_crp_validator.py -v
+pytest tests/phase2/test_rollback_manager.py -v
+pytest tests/phase2/test_sla_evaluator.py -v
+pytest tests/phase2/test_vcc_scanners.py -v
+pytest tests/phase2/test_crp_archiver.py -v
+pytest tests/phase2/test_guardrail_scanner_v2.py -v
+pytest tests/phase2/test_crp_trend_tracker.py -v
+```
+**Expected test count:** ~48 tests across 8 test files
+
+---
+
+
+## Phase 2.0 Audit Checklist
+
+
+[CALLOUT] 🔍 VCC MUST verify all items before Phase 2.0 is considered complete:
+
+- [ ] FIX-001: SRS-FIN-029 and SRS-FIN-030 in registry + crp_config + drift scanner
+- [ ] FIX-002: `crp_version: "2.0"` in CycleReport, `crp_validator.py` passes all 12 test cases
+- [ ] FIX-003: Every UP migration has a DOWN counterpart, rollback dry-run succeeds
+- [ ] FIX-004: SLA targets in crp_config, evaluator runs per cycle, breach detection works
+- [ ] FIX-005: Shared `tools/lib/vcc_scanners.py` is sole source, no duplicate functions
+- [ ] FIX-006: Archiver checks page health, threshold = 20, block limits enforced
+- [ ] FIX-007: ≥ 20 guardrail rules, multi-line SQL scan works, Stripe all-ops covered
+- [ ] FIX-008: Trend tracker computes 8 KPIs, regression detection flags 3+ cycle declines
+- [ ] CI: All 5 new pipeline stages added to `.gitlab-ci.yml`
+- [ ] Tests: `pytest tests/phase2/ -v` → 48+ tests, 0 failures

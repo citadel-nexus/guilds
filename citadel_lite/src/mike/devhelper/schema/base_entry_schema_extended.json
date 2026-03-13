@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Base Entry Schema",
+  "type": "object",
+  "required": [
+    "input_text", "refined_text", "language", "resonance_vector",
+    "reflection_score", "created_at"
+  ],
+  "properties": {
+    "input_text": { "type": "string" },
+    "refined_text": { "type": "string" },
+    "language": { "type": "string" },
+    "resonance_vector": {
+      "type": "array",
+      "items": { "type": "number" }
+    },
+    "reflection_score": { "type": "number" },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+
+    "tier": { "type": "string" },
+    "origin_file": { "type": "string" },
+    "source": { "type": "string" },
+    "category": { "type": "string" },
+    "status": { "type": "string" },
+    "parent_vector": { "type": "string" },
+    "child_vectors": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+
+    "recursive_cycles": { "type": "integer" },
+    "recursive_evolution_count": { "type": "integer" },
+    "refinement_loop_triggered": { "type": "boolean" },
+
+    "trust_score": { "type": "number" },
+    "clarity_score": { "type": "number" },
+    "insight_score": { "type": "number" },
+    "human_echo_score": { "type": "number" },
+    "self_rating": { "type": "number" },
+    "logic_quality_score": { "type": "number" }
+  }
+}

@@ -1,0 +1,112 @@
+# Citadel Lite — Responsible AI & Governance Policies
+# These policies are enforced by the Guardian agent and audited via hash chain.
+
+version: "1.0.0"
+framework: "Citadel Responsible AI Framework"
+
+principles:
+  - id: RAI-001
+    name: Human Oversight
+    description: "High-impact automated actions require human-in-the-loop approval"
+    enforcement: "Guardian escalates to need_approval when risk >= 0.25"
+
+  - id: RAI-002
+    name: Transparency & Explainability
+    description: "All agent decisions include rationale, evidence chain, and policy references"
+    enforcement: "Every Decision object contains rationale and policy_refs fields"
+
+  - id: RAI-003
+    name: Audit Trail Integrity
+    description: "Every pipeline execution produces a tamper-evident hash-chained audit log"
+    enforcement: "AuditLogger creates SHA-256 hash chain from genesis to completion"
+
+  - id: RAI-004
+    name: Proportional Response
+    description: "Automated actions are proportional to the assessed risk level"
+    enforcement: "Reflex rules gate actions by risk_score thresholds"
+
+  - id: RAI-005
+    name: Fail-Safe Default
+    description: "When uncertain, the system defaults to human review rather than autonomous action"
+    enforcement: "Unknown risk defaults to need_approval; errors default to block"
+
+  - id: RAI-006
+    name: Memory Privacy
+    description: "Incident memory stores only operational metadata, not sensitive data"
+    enforcement: "MemoryStore records summaries and tags, not raw logs or credentials"
+
+governance_rules:
+  - id: GOV-RISK-BAND-001
+    name: Auto-Approve Threshold
+    description: "Fixes with aggregated risk < 0.25 may be auto-approved"
+    risk_threshold: 0.25
+    action: approve
+
+  - id: GOV-RISK-BAND-002
+    name: Human Review Threshold
+    description: "Fixes with risk 0.25–0.65 require human review"
+    risk_threshold: 0.65
+    action: need_approval
+
+  - id: GOV-RISK-BAND-003
+    name: Block Threshold
+    description: "Fixes with risk >= 0.65 are blocked pending manual investigation"
+    risk_threshold: 1.0
+    action: block
+
+  - id: GOV-SEC-001
+    name: Security Escalation
+    description: "Critical security vulnerabilities always require human approval minimum"
+    trigger: "severity == critical AND security_vulnerability in signals"
+    action: need_approval
+
+  - id: GOV-EXEC-001
+    name: Execution Safeguard
+    description: "Production deployments require explicit human approval regardless of risk"
+    trigger: "environment == production"
+    action: need_approval
+
+compliance:
+  - standard: "Microsoft Responsible AI Standard"
+    alignment: "RAI-001 through RAI-006 implement fairness, reliability, transparency, and accountability"
+  - standard: "SOC 2 Type II"
+    alignment: "Hash-chained audit trail (RAI-003) provides immutable evidence for audit compliance"
+  - standard: "ISO 27001"
+    alignment: "Governance rules enforce access control and risk management requirements"
+
+auto_merge_rules:
+  - id: AUTO-MERGE-001
+    name: Auto-Merge Low-Risk Fixes
+    description: "Automatically merge PRs for low-risk fixes after CI passes"
+    condition: "risk_score < 0.25 AND ci_status == success AND decision.action == approve"
+    action: auto_merge
+    requires:
+      - ci_success: true
+      - risk_threshold: 0.25
+      - verification_steps: true
+
+  - id: AUTO-MERGE-002
+    name: Exclude Critical Branches
+    description: "Never auto-merge to main/master/production branches"
+    condition: "branch in [main, master, production]"
+    action: require_human_approval
+    priority: high
+
+  - id: AUTO-MERGE-003
+    name: Exclude Security Alerts
+    description: "Security vulnerabilities always require human review"
+    condition: "event_type == security_alert OR severity == critical"
+    action: require_human_approval
+    priority: high
+
+  - id: AUTO-MERGE-004
+    name: Medium-Risk Human Review
+    description: "Medium-risk fixes require human approval before merge"
+    condition: "0.25 <= risk_score < 0.65"
+    action: require_human_approval
+
+  - id: AUTO-MERGE-005
+    name: Block High-Risk Changes
+    description: "High-risk fixes are blocked from auto-merge and auto-approval"
+    condition: "risk_score >= 0.65"
+    action: block

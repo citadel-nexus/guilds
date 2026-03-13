@@ -1,0 +1,978 @@
+# AWS ECS Architecture — Parallel Federated Distributed Processing
+
+> **SRS:** SRS-ECS-ARCH-001
+> **CGRF:** v2.0
+> **Last Updated:** 2026-02-06
+> **Scope:** Complete AWS ECS, Fargate, ECR, CloudWatch, S3, Ray, and VPS↔ECS migration infrastructure
+
+---
+
+## Table of Contents
+
+1. [Architecture Overview](#1-architecture-overview)
+2. [AWS Account & Cluster](#2-aws-account--cluster)
+3. [ECS Services & Task Definitions](#3-ecs-services--task-definitions)
+4. [Federated Distributed Processing Model](#4-federated-distributed-processing-model)
+5. [VPS ↔ ECS Migration System](#5-vps--ecs-migration-system)
+6. [Auto-Scaling & CloudWatch Alarms](#6-auto-scaling--cloudwatch-alarms)
+7. [VPS Monitoring Daemon](#7-vps-monitoring-daemon)
+8. [Budget Management](#8-budget-management)
+9. [Agent Pipeline (Watcher → Scaler → Migrator → Curator → Budget)](#9-agent-pipeline)
+10. [ECR Repositories & Image Lifecycle](#10-ecr-repositories--image-lifecycle)
+11. [S3 Asset Storage & Lifecycle](#11-s3-asset-storage--lifecycle)
+12. [Ray Workers (EC2 Spot)](#12-ray-workers-ec2-spot)
+13. [Networking & Load Balancing](#13-networking--load-balancing)
+14. [Nginx Route Manager](#14-nginx-route-manager)
+15. [Docker Compose (VPS Runtime)](#15-docker-compose-vps-runtime)
+16. [Compute Bridge (NATS vs Ray)](#16-compute-bridge-nats-vs-ray)
+17. [Security & IAM](#17-security--iam)
+18. [Environment Variables](#18-environment-variables)
+19. [Deployment & CI/CD Integration](#19-deployment--cicd-integration)
+20. [Testing](#20-testing)
+21. [File Reference Index](#21-file-reference-index)
+
+---
+
+## 1. Architecture Overview
+
+The CNWB platform uses a **hybrid VPS + AWS ECS architecture** with federated distributed processing. Workloads are dynamically distributed between a single Hostinger VPS and AWS ECS Fargate, with intelligent migration driven by an AI agent pipeline.
+
+```
+┌───────────────────────────────────────────────────────────────────────┐
+│                         CNWB Hybrid Infrastructure                     │
+│                                                                       │
+│  ┌─────────────────────────┐       ┌──────────────────────────────┐  │
+│  │    VPS (147.93.43.117)  │       │     AWS ECS (us-east-1)      │  │
+│  │    Hostinger Ubuntu     │       │     citadel-cluster           │  │
+│  │                         │       │                              │  │
+│  │  ┌────────────────────┐ │       │  ┌────────────────────────┐ │  │
+│  │  │ Runtime Services   │◄├───────├──┤ Fargate Services       │ │  │
+│  │  │ (7 containers)     │ │  VPS  │  │ workshop (1-3 tasks)   │ │  │
+│  │  │ event-listener     │ │  ↔    │  │ worker (0-3 tasks)     │ │  │
+│  │  │ sake-builder       │ │  ECS  │  │ runtime (0-7 services) │ │  │
+│  │  │ governance-gateway │ │ nginx │  └────────────────────────┘ │  │
+│  │  │ smartbank          │ │ route │                              │  │
+│  │  │ guardian           │ │ mgr   │  ┌────────────────────────┐ │  │
+│  │  │ council            │ │       │  │ EC2 Spot (Ray Workers) │ │  │
+│  │  │ reflex-runtime     │ │       │  │ t3.medium (0-2 nodes)  │ │  │
+│  │  └────────────────────┘ │       │  └────────────────────────┘ │  │
+│  │                         │       │                              │  │
+│  │  ┌────────────────────┐ │       │  ┌────────────────────────┐ │  │
+│  │  │ Always-On VPS      │ │       │  │ Shared AWS Services    │ │  │
+│  │  │ nginx              │ │       │  │ S3: citadel-nexus-     │ │  │
+│  │  │ Redis 7            │ │       │  │     assets (1TB+)      │ │  │
+│  │  │ NATS server        │ │       │  │ CloudWatch             │ │  │
+│  │  │ Monitor daemon     │ │       │  │ ECR (2 repos)          │ │  │
+│  │  │ Zayara bot         │ │       │  │ Bedrock (Claude)       │ │  │
+│  │  │ GitLab Runner      │ │       │  │ Budgets ($400/mo)      │ │  │
+│  │  └────────────────────┘ │       │  └────────────────────────┘ │  │
+│  └─────────────────────────┘       └──────────────────────────────┘  │
+│                                                                       │
+│  ┌──────────────────────────────────────────────────────────────────┐ │
+│  │              Agent Pipeline (Citadel Lite)                       │ │
+│  │  Watcher → Scaler → MigrateOrchestrator → Curator → Budget      │ │
+│  │  (observe)  (scale)   (migrate VPS↔ECS)   (curate)  (cost)      │ │
+│  └──────────────────────────────────────────────────────────────────┘ │
+└───────────────────────────────────────────────────────────────────────┘
+```
+
+### Design Principles
+
+| Principle | Implementation |
+|-----------|---------------|
+| **Cost-first** | $400/mo hard cap; VPS as primary; ECS only on overflow |
+| **Federated processing** | NATS distributes light tasks to Fargate; Ray handles heavy compute |
+| **Zero-downtime migration** | nginx upstream switch + health checks before cutover |
+| **Budget-aware AI** | LLM + rule fallback decides migration based on CPU, memory, cost |
+| **Spot-first** | All ECS workers and Ray nodes use Spot instances |
+| **One-at-a-time** | Only one service migrates at a time to limit blast radius |
+
+---
+
+## 2. AWS Account & Cluster
+
+| Property | Value |
+|----------|-------|
+| **AWS Account ID** | `568721121468` |
+| **Region** | `us-east-1` |
+| **ECS Cluster** | `citadel-cluster` |
+| **ECR Base URL** | `568721121468.dkr.ecr.us-east-1.amazonaws.com` |
+| **S3 Bucket** | `citadel-nexus-assets` |
+| **CloudWatch Namespace** | `Citadel/VPS` |
+| **VPS Instance ID** | `vps-147-93-43-117` |
+| **Terraform Version** | >= 1.5.0 |
+| **AWS Provider** | >= 5.0 |
+
+**Source:** `infra/terraform/aws/main.tf:1-42`, `citadel_lite/src/agents/aws_agent.py:32-36`
+
+---
+
+## 3. ECS Services & Task Definitions
+
+### 3.1 Workshop Service (Always-On)
+
+| Property | Value |
+|----------|-------|
+| **Service Name** | `workshop-service` |
+| **Task Family** | `citadel-workshop` |
+| **CPU** | 1024 (1 vCPU) |
+| **Memory** | 2048 MB |
+| **Container Port** | 3000 |
+| **Desired Count** | 1 (scales 1–3) |
+| **Capacity Provider** | FARGATE (on-demand) |
+| **Load Balancer** | ALB target group `workshop` |
+| **ECR Image** | `citadel-workshop:latest` |
+
+**Source:** `infra/terraform/aws/scaling.tf:88-147`
+
+### 3.2 Worker Service (Scale-to-Zero)
+
+| Property | Value |
+|----------|-------|
+| **Service Name** | `worker-service` |
+| **Task Family** | `citadel-worker` |
+| **CPU** | 512 (0.5 vCPU) |
+| **Memory** | 1024 MB |
+| **Desired Count** | 0 (scales 0–3) |
+| **Capacity Provider** | FARGATE_SPOT |
+| **NATS URL** | `nats://nats-service.citadel:4222` |
+| **Datadog Sidecar** | Yes |
+| **ECR Image** | `citadel-worker:latest` |
+
+**Source:** `infra/terraform/aws/scaling.tf:33-86`
+
+### 3.3 Runtime Migration Services (7 Services, All Scale-to-Zero)
+
+All 7 runtime services share the `citadel-runtime` ECR image and use FARGATE_SPOT. They start at `desired_count = 0` and are activated by the MigrateOrchestrator.
+
+| Service | ECS Service Name | Port | CPU | Memory | Redis | Tier |
+|---------|-----------------|------|-----|--------|-------|------|
+| **event-listener** | `event-listener-service` | 8100 | 256 | 512 | Yes | 1 |
+| **sake-builder** | `sake-builder-service` | 8150 | 256 | 512 | Yes | 1 |
+| **governance-gateway** | `governance-gateway-service` | 8787 | 256 | 512 | Yes | 1 |
+| **smartbank** | `smartbank-service` | 8400 | 256 | 512 | No | 2 |
+| **guardian-runtime** | `guardian-runtime-service` | 8500 | 256 | 512 | No | 2 |
+| **council** | `council-service` | 8200 | 512 | 1024 | No | 2 |
+| **reflex-runtime** | `reflex-runtime-service` | 8170 | 512 | 1024 | Yes | 3 |
+
+**Tier explanation:**
+- **Tier 1**: Easiest to migrate — stateless, Redis-dependent (Redis stays on VPS)
+- **Tier 2**: Medium — some inter-service dependencies (council depends on smartbank + guardian)
+- **Tier 3**: Hardest — Redis-dependent with complex polling and internal state
+
+**Health checks:** All services expose `GET /health` with 30s interval, 3 retries, 60s start period.
+
+**Source:** `infra/terraform/aws/scaling.tf:524-681`
+
+### Inter-Service Dependencies (ECS)
+
+```
+governance-gateway
+  └── Redis (VPS:6379)
+
+event-listener
+  └── Redis (VPS:6379)
+
+sake-builder
+  └── Redis (VPS:6379)
+
+council
+  ├── smartbank (http://smartbank:8400)
+  └── guardian-runtime (http://guardian-runtime:8500)
+
+reflex-runtime
+  ├── Redis (VPS:6379)
+  └── council (http://council:8200)
+```
+
+---
+
+## 4. Federated Distributed Processing Model
+
+The platform implements **parallel federated distributed processing** where computation is split across three tiers based on workload characteristics:
+
+### Processing Tiers
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                 Federated Processing Architecture                 │
+│                                                                  │
+│  Tier 1: VPS (Primary)          Tier 2: ECS Fargate (Overflow)  │
+│  ┌────────────────────┐         ┌────────────────────────────┐  │
+│  │ Always-on services │         │ Scale-to-zero services     │  │
+│  │ Low-latency tasks  │ ──CPU──>│ CPU overflow tasks         │  │
+│  │ Redis-backed state │  >80%   │ NATS worker consumers      │  │
+│  │ NATS server        │         │ Runtime migration targets  │  │
+│  └────────────────────┘         └────────────────────────────┘  │
+│                                                                  │
+│  Tier 3: EC2 Spot (Heavy Compute)                               │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │ Ray cluster workers (t3.medium, max 2 nodes)               │ │
+│  │ GPU-class tasks: embeddings, model inference, ETL          │ │
+│  │ Activated by Compute Bridge when task weight > threshold   │ │
+│  └────────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### How Tasks Are Distributed
+
+1. **VPS handles** (always-on): Real-time requests, Redis operations, NATS server, database queries, nginx routing
+2. **NATS Workers handle** (Fargate Spot, scale 0–3): CPU-intensive processing, data transformation, notification dispatch
+3. **Ray Workers handle** (EC2 Spot, scale 0–2): Embedding generation, model inference, large ETL jobs
+
+### Distribution Decision Flow
+
+```python
+# Compute Bridge (server/services/compute_bridge.py)
+if task.category in ("cpu", "data_processing", "notification"):
+    # Light task → NATS → Fargate Spot worker
+    result = await task_distributor.submit_task(task.category, task.payload)
+else:
+    # Heavy task → Ray → EC2 Spot worker
+    result = await ray_client.submit(task)
+```
+
+### NATS-Based Task Federation
+
+```
+VPS Task Distributor
+  │
+  ├── publish("tasks.cpu", payload)        → Fargate Worker #1 subscribes
+  ├── publish("tasks.data_processing", p)  → Fargate Worker #2 subscribes
+  ├── publish("tasks.notification", p)     → Fargate Worker #3 subscribes
+  │
+  └── subscribe("results.*")              ← Workers publish results back
+```
+
+Each worker:
+- Subscribes to `tasks.{category}` for its configured categories
+- Processes tasks via registered handler functions
+- Publishes results to `results.{task_id}`
+- Sends heartbeat every 30s to `workers.heartbeat`
+
+### Parallel Processing Guarantees
+
+| Property | Mechanism |
+|----------|-----------|
+| **At-most-once delivery** | NATS core PubSub (no JetStream for tasks) |
+| **Result correlation** | `task_id` in request → `results.{task_id}` subject |
+| **Timeout** | Configurable per `submit_task()` call (default 30s) |
+| **Worker failure** | No heartbeat → CloudWatch alarm → ECS replaces task |
+| **Graceful shutdown** | SIGTERM → `nc.drain()` → finish in-flight → exit |
+
+---
+
+## 5. VPS ↔ ECS Migration System
+
+### State Machine
+
+```
+                     ┌─────────────────┐
+                     │   VPS_RUNNING   │ ← Default state
+                     └────────┬────────┘
+                              │ CPU > 80% + budget < 80%
+                     ┌────────▼────────┐
+                     │ MIGRATING_TO_ECS│
+                     └────────┬────────┘
+                        ┌─────┴─────┐
+                        │           │
+                   ┌────▼───┐ ┌────▼───┐
+                   │  FAILED │ │  ECS   │
+                   └────┬───┘ │RUNNING │
+                        │     └───┬────┘
+                        │         │ CPU < 40% OR budget > 80%
+                        │    ┌────▼────────────┐
+                        │    │MIGRATING_TO_VPS  │
+                        │    └────────┬────────┘
+                        │         ┌───┴───┐
+                        └─────────┤       │
+                                  ▼       ▼
+                            VPS_RUNNING  FAILED
+```
+
+### Migration Thresholds
+
+| Threshold | Value | Action |
+|-----------|-------|--------|
+| VPS CPU > 80% | `_MIGRATE_CPU_THRESHOLD` | Migrate highest-CPU container to ECS |
+| Container CPU > 15% | `_CONTAINER_CPU_THRESHOLD` | Eligible for migration |
+| VPS CPU < 40% | `_REVERSE_CPU_THRESHOLD` | Migrate back to VPS (cost savings) |
+| Budget > 80% | `_BUDGET_WARNING_PCT` | Start reversing lowest-priority services |
+| Budget > 90% | `_BUDGET_CRITICAL_PCT` | Force all services back to VPS |
+| Concurrent migrations | 1 | Only one service migrates at a time |
+
+### Migration Decision Priority
+
+1. **Budget critical** (≥90%) → Force ALL back to VPS
+2. **Budget warning** (≥80%) → Reverse one low-priority service
+3. **VPS CPU low** (<40%) → Reverse one service (cost savings)
+4. **VPS CPU high** (≥80%) → Migrate one high-CPU container to ECS
+
+### Migration Execution Steps
+
+#### VPS → ECS
+
+```bash
+# 1. Scale ECS service to 1
+aws ecs update-service --cluster citadel-cluster --service <svc>-service --desired-count 1
+
+# 2. Wait for ECS task health check (60s start period)
+# ... CloudWatch health check passes ...
+
+# 3. Switch nginx upstream to ECS ALB
+python3 nginx_route_manager.py switch <service> ecs --alb-dns <alb-dns>
+
+# 4. Stop VPS Docker container
+docker compose -f docker-compose.runtime.yaml stop <service>
+
+# 5. Verify traffic flows through ECS (no error rate increase)
+```
+
+#### ECS → VPS
+
+```bash
+# 1. Start VPS Docker container
+docker compose -f docker-compose.runtime.yaml start <service>
+
+# 2. Wait for VPS health check (30 attempts × 2s = 60s max)
+curl -sf http://localhost:<port>/health
+
+# 3. Switch nginx upstream back to VPS
+python3 nginx_route_manager.py switch <service> vps
+
+# 4. Scale ECS service to 0
+aws ecs update-service --cluster citadel-cluster --service <svc>-service --desired-count 0
+```
+
+### LLM vs Rule Mode
+
+The MigrateOrchestrator supports two decision modes:
+
+| Mode | Engine | When Used |
+|------|--------|-----------|
+| **LLM mode** | Bedrock (Claude Haiku/Sonnet/Opus) | When LLM client is available and responsive |
+| **Rule mode** | Threshold-based deterministic logic | Fallback when LLM unavailable |
+
+LLM mode provides nuanced decisions considering cross-service dependencies and risk estimates. Rule mode uses the fixed threshold priorities above.
+
+**Source:** `citadel_lite/src/agents/migrate_orchestrator.py:1-534`
+
+---
+
+## 6. Auto-Scaling & CloudWatch Alarms
+
+### ECS Auto-Scaling Targets
+
+| Service | Min | Max | Policy Type | Cooldown |
+|---------|-----|-----|-------------|----------|
+| Workshop | 1 | 3 | Step Scaling | 300s |
+| Worker | 0 | 3 | Step Scaling | 300s |
+| Runtime (7) | 0 | — | Manual (MigrateOrchestrator) | — |
+
+### CloudWatch Alarms
+
+| Alarm | Metric | Namespace | Threshold | Periods | Action |
+|-------|--------|-----------|-----------|---------|--------|
+| `vps-cpu-high` | `cpu_usage_user` | `Citadel/VPS` | > 80% | 2 × 60s | Scale up workers |
+| `vps-cpu-low` | `cpu_usage_user` | `Citadel/VPS` | < 40% | 5 × 60s | Scale down workers |
+| `vps-memory-high` | `mem_used_percent` | `Citadel/VPS` | > 90% | 3 × 60s | (alert only) |
+| `vps-disk-high` | `disk_used_percent` | `Citadel/VPS` | > 85% | 1 × 300s | (alert only) |
+
+### Scaling Flow
+
+```
+VPS CPU > 80% for 2 minutes
+  → CloudWatch alarm "vps-cpu-high" triggers
+    → Step scaling policy "worker-scale-up"
+      → aws_appautoscaling_target.worker +1
+        → ECS launches Fargate Spot task
+          → nats_worker.py connects to NATS
+            → Subscribes to tasks.{category}
+            → Takes load off VPS
+
+VPS CPU < 40% for 5 minutes
+  → CloudWatch alarm "vps-cpu-low" triggers
+    → Step scaling policy "worker-scale-down"
+      → aws_appautoscaling_target.worker -1
+        → ECS terminates Fargate task
+          → Worker drains NATS connection, exits
+```
+
+**Source:** `infra/terraform/aws/main.tf:44-212`, `infra/terraform/aws/scaling.tf:149-277`
+
+---
+
+## 7. VPS Monitoring Daemon
+
+**File:** `infra/vps/monitor_daemon.py` (355 lines)
+**SRS:** SRS-MONITOR-DAEMON-001, SRS-MIGRATE-MONITOR-001
+
+Runs as a systemd service on the VPS. Collects metrics every 60s and pushes to CloudWatch.
+
+### Metrics Collected
+
+| Metric | Source | Unit | CloudWatch Dimension |
+|--------|--------|------|---------------------|
+| `cpu_usage_user` | `psutil.cpu_percent()` | Percent | `InstanceId` |
+| `mem_used_percent` | `psutil.virtual_memory()` | Percent | `InstanceId` |
+| `mem_available_mb` | `psutil.virtual_memory()` | Megabytes | `InstanceId` |
+| `disk_used_percent` | `psutil.disk_usage("/")` | Percent | `InstanceId` |
+| `disk_free_gb` | `psutil.disk_usage("/")` | Gigabytes | `InstanceId` |
+| `process_count` | `len(psutil.pids())` | Count | `InstanceId` |
+| `uptime_hours` | `psutil.boot_time()` | Count | `InstanceId` |
+| `nginx_running` | `systemctl is-active nginx` | Count (0/1) | `InstanceId` |
+| `docker_running` | `systemctl is-active docker` | Count (0/1) | `InstanceId` |
+| `redis_healthy` | `redis-cli ping` | Count (0/1) | `InstanceId` |
+
+### Per-Container Metrics (SRS-MIGRATE-MONITOR-001)
+
+| Metric | Source | Dimensions |
+|--------|--------|-----------|
+| `container_cpu_percent` | `docker stats --no-stream` | `InstanceId` + `ContainerName` |
+| `container_mem_percent` | `docker stats --no-stream` | `InstanceId` + `ContainerName` |
+
+These per-container metrics feed the MigrateOrchestrator's migration candidate selection.
+
+### State File
+
+The daemon writes current state to `/tmp/citadel-monitor-state.json` for local consumers:
+- ZigZag collector
+- MigrateOrchestrator
+
+### Installation
+
+```bash
+sudo cp citadel-monitor.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable citadel-monitor
+sudo systemctl start citadel-monitor
+```
+
+---
+
+## 8. Budget Management
+
+### AWS Budget ($400/mo Hard Cap)
+
+**Source:** `infra/terraform/aws/scaling.tf:408-485`
+
+| Resource | Type | Value |
+|----------|------|-------|
+| `aws_budgets_budget.monthly` | COST | $400/mo |
+| `aws_sns_topic.budget_alerts` | SNS | `citadel-budget-alerts` |
+
+### Alert Thresholds
+
+| Threshold | Spend | Type | Action |
+|-----------|-------|------|--------|
+| 50% | $200 | Actual | SNS notification |
+| 80% | $320 | Actual | SNS + MigrateOrchestrator reverses services |
+| 100% | $400 | Actual | SNS + force all back to VPS |
+| 100% | $400 | Forecasted | Early warning SNS |
+
+### Budget Agent (Citadel Lite)
+
+**File:** `citadel_lite/src/agents/budget_v2.py`
+
+| Config | Value |
+|--------|-------|
+| `MONTHLY_BUDGET_USD` | $400.00 |
+| `WARNING_THRESHOLD` | 80% ($320) |
+| `CRITICAL_THRESHOLD` | 90% ($360) |
+| `HARD_CAP_THRESHOLD` | 100% ($400) |
+
+**Integrations:**
+- AWS Cost Explorer (actual spend)
+- Datadog DogStatsD (UDP 8125)
+- PostHog API (usage tracking)
+- CloudWatch custom metrics (`Citadel/Budget` namespace)
+
+---
+
+## 9. Agent Pipeline
+
+The Citadel Lite agent pipeline runs as a continuous loop, making infrastructure decisions:
+
+```
+┌──────────┐    ┌──────────┐    ┌──────────────────┐    ┌──────────┐    ┌──────────┐
+│ Watcher  │ ──>│ Scaler   │ ──>│ MigrateOrch.     │ ──>│ Curator  │ ──>│ Budget   │
+│ v2       │    │ v2       │    │ (VPS↔ECS)        │    │ v2       │    │ v2       │
+│          │    │          │    │                  │    │          │    │          │
+│ Observe  │    │ Scale    │    │ Migrate          │    │ Curate   │    │ Cost     │
+│ metrics  │    │ ECS up/  │    │ services         │    │ data     │    │ control  │
+│          │    │ down     │    │ VPS↔ECS          │    │          │    │          │
+└──────────┘    └──────────┘    └──────────────────┘    └──────────┘    └──────────┘
+```
+
+### Watcher v2 (`citadel_lite/src/agents/watcher_v2.py`, 276 lines)
+
+**Monitoring thresholds:**
+
+| Metric | Warning | Critical |
+|--------|---------|----------|
+| CPU | 80% | 90% |
+| Memory | 80% | 90% |
+| S3 size | 900 GB | 1000 GB |
+| Container CPU | 15% | — |
+
+**Data collected:** VPS CPU/memory (CloudWatch), per-container CPU/memory (CloudWatch), ECS service status, CloudWatch alarms, S3 bucket stats.
+
+### Scaler v2 (`citadel_lite/src/agents/scaler_v2.py`, 230 lines)
+
+| Signal | Action |
+|--------|--------|
+| `cpu_critical` (>90%) | Scale up worker +2 |
+| `cpu_high` (>80%) | Scale up worker +1 |
+| `cpu_low` (<40%) | Scale down worker -1 |
+| `memory_critical` (>90%) | Scale up worker +1 |
+| `container_cpu_high` (>15%) | Defer to MigrateOrchestrator |
+
+**Limits:** max 3 tasks, min 1 workshop, min 0 workers.
+
+### MigrateOrchestrator (`citadel_lite/src/agents/migrate_orchestrator.py`, 534 lines)
+
+See [Section 5](#5-vps--ecs-migration-system) for full details.
+
+### Budget v2 (`citadel_lite/src/agents/budget_v2.py`)
+
+See [Section 8](#8-budget-management) for full details.
+
+---
+
+## 10. ECR Repositories & Image Lifecycle
+
+### Repositories
+
+| Repository | Purpose | Image | Lifecycle |
+|------------|---------|-------|-----------|
+| `citadel-worker` | NATS task workers | `python:3.11-slim` + `nats-py psutil` | Keep last 10 |
+| `citadel-runtime` | All 7 runtime services | Shared runtime image | Keep last 10 |
+| `citadel-workshop` | Workshop web service | Next.js standalone | Keep last 10 |
+
+### Build & Push
+
+```bash
+# Worker image (worker/build-and-push.sh)
+aws ecr get-login-password --region us-east-1 | \
+  docker login --username AWS --password-stdin 568721121468.dkr.ecr.us-east-1.amazonaws.com
+
+docker build -t citadel-worker ./worker/
+docker tag citadel-worker:latest 568721121468.dkr.ecr.us-east-1.amazonaws.com/citadel-worker:latest
+docker push 568721121468.dkr.ecr.us-east-1.amazonaws.com/citadel-worker:latest
+```
+
+**Image scanning:** Enabled on push for all repositories.
+
+**Source:** `infra/terraform/aws/scaling.tf:9-31,487-509`, `worker/build-and-push.sh`
+
+---
+
+## 11. S3 Asset Storage & Lifecycle
+
+**Bucket:** `citadel-nexus-assets` (1TB+)
+
+### Lifecycle Rules
+
+| Rule | Prefix | Action | Timeline |
+|------|--------|--------|----------|
+| `cleanup-builds` | `builds/` | Standard → IA → Glacier IR → Delete | 30d → 90d → 180d |
+| `archive-logs` | `logs/` | Standard → IA → Deep Archive | 30d → 365d (7yr compliance) |
+| `cleanup-temp` | `tmp/` | Delete | 7d |
+| `tier-assets` | `assets/` | Standard → Intelligent Tiering → Glacier IR | 30d → 365d |
+| `cleanup-embeddings` | `embeddings/` | Standard → IA → Delete | 90d → 365d |
+| `tier-books` | `books/` | Standard → Intelligent Tiering → Glacier IR | 30d → 365d |
+
+### Cost Estimate
+
+```
+S3 Standard: ~1TB × $0.023/GB = ~$23/mo
+With lifecycle tiering: estimated ~$12-15/mo
+```
+
+**Source:** `infra/terraform/aws/main.tf:214-337`, `infra/terraform/aws/scaling.tf:309-406`
+
+---
+
+## 12. Ray Workers (EC2 Spot)
+
+For heavy compute tasks that exceed NATS worker capabilities.
+
+### Configuration
+
+| Property | Value |
+|----------|-------|
+| **Instance Type** | t3.medium |
+| **Market** | Spot (max $0.025/hr) |
+| **Min/Max** | 0–2 instances |
+| **AMI** | Amazon Linux 2 (latest) |
+| **Setup** | python3-pip, docker, `ray start --address=147.93.43.117:6379 --num-cpus=2` |
+| **Capacity Provider** | `citadel-ec2-spot` |
+
+### Ray Head Node
+
+The Ray head runs on VPS (`147.93.43.117:6379`). EC2 Spot workers connect to it.
+
+### Compute Bridge Routing
+
+```python
+# server/services/compute_bridge.py
+if task_weight == "light":
+    # → NATS → Fargate Spot
+    result = await task_distributor.submit_task(category, payload)
+elif task_weight == "heavy":
+    # → Ray → EC2 Spot
+    result = ray.get(remote_function.remote(payload))
+```
+
+**Source:** `infra/terraform/aws/main.tf:339-424`, `server/services/compute_bridge.py`
+
+---
+
+## 13. Networking & Load Balancing
+
+### VPC
+
+| Resource | Value |
+|----------|-------|
+| Subnets | `public_a`, `public_b` |
+| Security Group | `ecs` (allows inbound from ALB) |
+| Public IP | Assigned to all Fargate tasks |
+
+### ALB
+
+| Resource | Target |
+|----------|--------|
+| Workshop target group | `citadel-workshop` → port 3000 |
+| Runtime target groups | `citadel-{service}` → port `{service_port}` |
+| Health check path | `/health` (30s interval, 2 healthy, 3 unhealthy) |
+
+### Service Discovery
+
+ECS services use Cloud Map for internal discovery:
+- `nats://nats-service.citadel:4222` — NATS server accessible from Fargate tasks
+- Runtime services communicate via ALB or Cloud Map endpoints
+
+**Source:** `infra/terraform/aws/scaling.tf:663-681`
+
+---
+
+## 14. Nginx Route Manager
+
+**File:** `infra/vps/nginx_route_manager.py` (244 lines)
+**SRS:** SRS-MIGRATE-ORCH-20260205-001-V3.0
+
+Dynamically switches nginx upstream between VPS localhost and ECS ALB.
+
+### Commands
+
+```bash
+# Switch service to ECS
+python3 nginx_route_manager.py switch event-listener ecs --alb-dns my-alb.us-east-1.elb.amazonaws.com
+
+# Switch service back to VPS
+python3 nginx_route_manager.py switch event-listener vps
+
+# Show current routing state
+python3 nginx_route_manager.py status
+```
+
+### Generated Upstream Config
+
+```nginx
+# /etc/nginx/conf.d/upstream-event-listener.conf
+# Auto-managed by nginx_route_manager.py
+# Service: event-listener, Target: vps
+# Updated: 2026-02-06T12:00:00+00:00
+upstream event_listener_backend {
+    server 127.0.0.1:8100;
+}
+```
+
+When switched to ECS:
+```nginx
+upstream event_listener_backend {
+    server my-alb.us-east-1.elb.amazonaws.com:80;
+}
+```
+
+### Safety Features
+
+1. **Backup** existing config before every switch
+2. **nginx -t** validation after writing new config
+3. **Auto-revert** on validation or reload failure
+4. **State persistence** to `/tmp/nginx-route-state.json`
+
+---
+
+## 15. Docker Compose (VPS Runtime)
+
+**File:** `docker-compose.runtime.yaml` (168 lines)
+
+All 7 runtime services + Redis on the VPS:
+
+```
+redis (7-alpine, port 6379)
+  ├── event-listener (port 8100) — depends on redis
+  ├── sake-builder (port 8150) — depends on event-listener
+  ├── governance-gateway (port 8787) — depends on redis
+  ├── smartbank (port 8400) — standalone
+  ├── guardian (port 8500) — standalone
+  ├── council (port 8200) — depends on smartbank + guardian
+  └── reflex-runtime (port 8170) — depends on sake-builder + council
+```
+
+**Shared volumes:** `redis_data` (Redis persistence), `runtime_data` (runtime state)
+
+**Health checks:** All services use `curl -f http://localhost:<port>/health` (30s interval, 10s timeout, 3 retries)
+
+---
+
+## 16. Compute Bridge (NATS vs Ray)
+
+**File:** `server/services/compute_bridge.py`
+**SRS:** SRS-COMPUTE-BRIDGE-001
+
+Unified task routing layer. Decides whether to send a task to:
+
+| Destination | Via | Use Case | Cost |
+|-------------|-----|----------|------|
+| NATS Workers | `task_distributor.submit_task()` | CPU, data processing, notifications | Fargate Spot (~$0.01/hr) |
+| Ray Workers | `ray.get(func.remote())` | Embeddings, model inference, large ETL | EC2 Spot (~$0.025/hr) |
+
+---
+
+## 17. Security & IAM
+
+### IAM Roles
+
+| Role | Purpose | Used By |
+|------|---------|---------|
+| `ecs_task_execution` | ECR pull, CloudWatch logs write | All ECS tasks |
+| `ecs_task` | S3 access, Bedrock invoke, CloudWatch metrics | Worker + runtime tasks |
+
+### Security Groups
+
+| Group | Inbound | Purpose |
+|-------|---------|---------|
+| `ecs` | ALB → container ports | ECS tasks |
+| ALB | 443 (HTTPS) | Public traffic |
+
+### Secrets Management
+
+| Secret | Storage | Access |
+|--------|---------|--------|
+| Redis password | Docker Compose env / Terraform variable | `REDIS_PASSWORD` |
+| Supabase keys | Docker Compose env | `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` |
+| Stripe keys | governance-gateway env | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` |
+| OpenAI key | governance-gateway env | `OPENAI_API_KEY` |
+
+---
+
+## 18. Environment Variables
+
+### ECS Task Environment
+
+| Variable | Service | Value |
+|----------|---------|-------|
+| `NATS_URL` | Worker | `nats://nats-service.citadel:4222` |
+| `AWS_DEFAULT_REGION` | All | `us-east-1` |
+| `NODE_ENV` | Workshop | `production` |
+| `REDIS_URL` | event-listener, sake-builder, governance-gateway, reflex-runtime | `redis://:pass@VPS_IP:6379` |
+| `RUNTIME_QUEUE_BACKEND` | event-listener, sake-builder, reflex-runtime | `redis` |
+| `SAKE_POLL_INTERVAL` | sake-builder | `1.0` |
+| `REFLEX_POLL_INTERVAL` | reflex-runtime | `1.0` |
+| `SMARTBANK_URL` | council | `http://smartbank:8400` |
+| `GUARDIAN_URL` | council | `http://guardian-runtime:8500` |
+| `COUNCIL_URL` | reflex-runtime | `http://council:8200` |
+| `WORKER_CATEGORIES` | Worker | `cpu,data_processing,notification` |
+| `WORKER_ID` | Worker | Auto-generated UUID |
+
+### VPS Monitoring Daemon Environment
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `AWS_REGION` | `us-east-1` | CloudWatch region |
+| `CW_NAMESPACE` | `Citadel/VPS` | CloudWatch namespace |
+| `CW_INSTANCE_ID` | `vps-147-93-43-117` | Instance identifier |
+| `COLLECTION_INTERVAL` | `60` | Seconds between collections |
+| `COLLECT_CONTAINER_STATS` | `1` | Enable per-container metrics |
+
+---
+
+## 19. Deployment & CI/CD Integration
+
+### GitLab CI → ECS Deploy
+
+The `.gitlab-ci.yml` pipeline includes jobs that:
+1. Build Docker images on `cnwb-build` runner
+2. Push to ECR repositories
+3. Force new deployment via `aws ecs update-service --force-new-deployment`
+
+### AWS Agent CLI
+
+```bash
+# Check ECS cluster status
+python -m citadel_lite.src.agents.aws_agent status
+
+# Scale a service
+python -m citadel_lite.src.agents.aws_agent scale --service worker --count 2
+
+# Force new deployment
+python -m citadel_lite.src.agents.aws_agent deploy --service workshop
+
+# Comprehensive health check (7-point)
+python -m citadel_lite.src.agents.aws_agent health-check
+
+# Get VPS metrics
+python -m citadel_lite.src.agents.aws_agent vps-metrics --minutes 10
+
+# Get per-container metrics
+python -m citadel_lite.src.agents.aws_agent container-metrics --minutes 10
+
+# View CloudWatch alarms
+python -m citadel_lite.src.agents.aws_agent alarms
+
+# S3 bucket stats
+python -m citadel_lite.src.agents.aws_agent s3-stats
+```
+
+### AWS Agent A2A Protocol
+
+The AWS agent also registers with the Agent-to-Agent (A2A) protocol:
+
+```python
+register_aws_agent(protocol)
+# Capabilities: ecs-control, bedrock-invoke, s3-storage,
+#   cloudwatch-logs, cloudwatch-metrics, auto-scaling,
+#   s3-lifecycle, health-check
+```
+
+### Health Check (7-Point)
+
+The AWS agent performs comprehensive infrastructure health checks:
+
+1. **ECS Services** — desired vs running counts
+2. **CloudWatch Alarms** — any in ALARM state
+3. **CloudWatch VPS Metrics** — data freshness
+4. **S3 Bucket** — accessibility and size
+5. **Auto-scaling** — policies configured
+6. **ECR Repositories** — accessible
+7. **Budget** — utilization percentage
+
+Returns: `healthy`, `degraded`, or `critical` status.
+
+---
+
+## 20. Testing
+
+### Migration Orchestrator Tests
+
+**File:** `citadel_lite/tests/test_migrate_orchestrator.py` (282 lines)
+
+| Test Area | Coverage |
+|-----------|----------|
+| State machine transitions | Valid/invalid transitions |
+| Migration candidate selection | Tier sorting, CPU threshold filtering |
+| Budget-aware decisions | Warning, critical, force-reverse |
+| LLM fallback | Rule mode when LLM unavailable |
+| State persistence | File save/load |
+
+### End-to-End Migration Tests
+
+**File:** `citadel_lite/tests/test_migrate_e2e.py` (240 lines)
+
+| Test Area | Coverage |
+|-----------|----------|
+| VPS → ECS roundtrip | Full migration lifecycle |
+| ECS → VPS roundtrip | Reverse migration |
+| Failure recovery | Health check failures, rollback |
+| Concurrent migration guard | Only one at a time |
+
+---
+
+## 21. File Reference Index
+
+### Terraform
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `infra/terraform/aws/main.tf` | 445 | ECS auto-scaling, CloudWatch alarms, S3 lifecycle, Ray EC2 Spot |
+| `infra/terraform/aws/scaling.tf` | 704 | ECR repos, ECS task definitions, services, runtime locals, ALB, budgets |
+
+### Agent Pipeline
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `citadel_lite/src/agents/watcher_v2.py` | 276 | VPS/ECS metric observation |
+| `citadel_lite/src/agents/scaler_v2.py` | 230 | ECS auto-scaling decisions |
+| `citadel_lite/src/agents/migrate_orchestrator.py` | 534 | VPS↔ECS migration orchestration |
+| `citadel_lite/src/agents/budget_v2.py` | 200+ | AWS cost management |
+| `citadel_lite/src/agents/aws_agent.py` | 818 | AWS CLI wrapper + A2A agent |
+
+### VPS Infrastructure
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `infra/vps/monitor_daemon.py` | 355 | VPS → CloudWatch metrics pusher |
+| `infra/vps/migration_executor.sh` | 158 | VPS-side migration execution |
+| `infra/vps/nginx_route_manager.py` | 244 | Dynamic nginx upstream switching |
+
+### Worker System
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `worker/nats_worker.py` | 197 | ECS Fargate NATS task consumer |
+| `worker/Dockerfile` | 13 | Worker container definition |
+| `worker/build-and-push.sh` | 51 | ECR push script |
+
+### Compute Services
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `server/services/compute_bridge.py` | ~100 | NATS vs Ray task routing |
+| `server/services/task_distributor.py` | 146 | NATS request/reply task distribution |
+
+### Docker
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `docker-compose.runtime.yaml` | 168 | VPS runtime services (7 + Redis) |
+
+### Configuration
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `citadel_lite/citadel.config.yaml` | 102 | AWS, ECS, S3, ECR, CloudWatch, Ray, NATS config |
+
+### Tests
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `citadel_lite/tests/test_migrate_orchestrator.py` | 282 | Migration orchestrator unit tests |
+| `citadel_lite/tests/test_migrate_e2e.py` | 240 | End-to-end migration tests |
+
+### Documentation
+
+| File | Purpose |
+|------|---------|
+| `infra/docs/ecs-architecture.md` | **This file** |
+| `infra/docs/workload-map.md` | VPS/ECS workload allocation |
+| `infra/docs/nats.md` | NATS cluster (includes ECS worker integration) |
+
+---
+
+## Statistics
+
+| Metric | Value |
+|--------|-------|
+| **Terraform resources** | ~30 (ECS, ECR, CloudWatch, S3, ALB, ASG, Budgets) |
+| **ECS services** | 9 (workshop + worker + 7 runtime) |
+| **ECR repositories** | 2 (worker, runtime) + 1 (workshop implied) |
+| **CloudWatch alarms** | 4 (CPU high/low, memory high, disk high) |
+| **S3 lifecycle rules** | 6 (builds, logs, temp, assets, embeddings, books) |
+| **Agent pipeline stages** | 5 (Watcher → Scaler → Migrator → Curator → Budget) |
+| **Migration state machine states** | 5 (VPS_RUNNING, MIGRATING_TO_ECS, ECS_RUNNING, MIGRATING_TO_VPS, FAILED) |
+| **Runtime service ports** | 7 (8100, 8150, 8787, 8400, 8500, 8200, 8170) |
+| **Budget cap** | $400/mo |
+| **Max Fargate tasks** | 3 (worker) + 3 (workshop) + 7 (runtime) = 13 |
+| **Max EC2 Spot instances** | 2 (Ray workers) |

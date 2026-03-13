@@ -1,0 +1,46 @@
+# Citadel Lite — Reflex Rules Manifest
+# Declarative rules that augment Guardian decisions with policy-driven actions.
+# Adapted from CNWB data/runtime/reflex_manifest.yaml for the DevOps context.
+
+rules:
+  - id: RX_CI_FAILURE_LOW_RISK
+    trigger: ci_failed
+    condition: "risk_score < 0.3"
+    action: auto_fix_and_rerun
+    description: "Auto-fix and rerun CI for low-risk failures (missing deps, typos)"
+    enabled: true
+
+  - id: RX_CI_FAILURE_MED_RISK
+    trigger: ci_failed
+    condition: "risk_score >= 0.3 and risk_score < 0.7"
+    action: request_approval
+    description: "Request human approval for medium-risk CI fixes"
+    enabled: true
+
+  - id: RX_CI_FAILURE_HIGH_RISK
+    trigger: ci_failed
+    condition: "risk_score >= 0.7"
+    action: escalate_and_block
+    description: "Block and escalate high-risk CI failures"
+    enabled: true
+
+  - id: RX_SECURITY_ALERT_CRITICAL
+    trigger: security_alert
+    condition: "severity == critical"
+    action: escalate_and_block
+    description: "Immediately escalate critical security alerts"
+    enabled: true
+
+  - id: RX_DEPLOY_FAILURE
+    trigger: deploy_failed
+    condition: ""
+    action: log_and_alert
+    description: "Log and alert on deployment failures"
+    enabled: true
+
+  - id: RX_TEST_REGRESSION
+    trigger: ci_failed
+    condition: "test_regression == true"
+    action: request_approval
+    description: "Request review for test regressions"
+    enabled: true

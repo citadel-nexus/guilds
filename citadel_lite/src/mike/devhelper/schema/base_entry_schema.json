@@ -1,0 +1,285 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Unified Thought Entry Schema (from base_entry_schema.json)",
+  "type": "object",
+  "properties": {
+    "origin_prompt": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "last_updated": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "tier": {
+      "type": "string"
+    },
+    "current_FAISS_index": {
+      "type": "string"
+    },
+    "origin_file": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "domain": {
+      "type": "string"
+    },
+    "thought_type": {
+      "type": "string"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "guessed_intent": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    },
+    "routed_to": {
+      "type": "string"
+    },
+    "parent_vector": {
+      "type": "string"
+    },
+    "child_vectors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "synthetic_lineage_id": {
+      "type": "string"
+    },
+    "recursive_cycles": {
+      "type": "string"
+    },
+    "times_referenced": {
+      "type": "string"
+    },
+    "used_in_sessions": {
+      "type": "string"
+    },
+    "validated_by": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "agent_review_score_avg": {
+      "type": "number"
+    },
+    "confidence_score": {
+      "type": "number"
+    },
+    "trust_score": {
+      "type": "number"
+    },
+    "contradiction_score": {
+      "type": "number"
+    },
+    "importance_score": {
+      "type": "number"
+    },
+    "self_rating": {
+      "type": "number"
+    },
+    "insight_score": {
+      "type": "number"
+    },
+    "score": {
+      "type": "number"
+    },
+    "user_behavior_signature": {
+      "type": "object"
+    },
+    "user_emotional_arc_stage": {
+      "type": "string"
+    },
+    "feedback_count": {
+      "type": "number"
+    },
+    "feedback_loop_depth": {
+      "type": "number"
+    },
+    "user_bounce_risk_score": {
+      "type": "number"
+    },
+    "thought_loop_origin_tag": {
+      "type": "string"
+    },
+    "active_agent_dependency_score": {
+      "type": "number"
+    },
+    "behavioral_proximity_to_sub": {
+      "type": "number"
+    },
+    "meta_learning_triggered": {
+      "type": "boolean"
+    },
+    "recursive_evolution_count": {
+      "type": "number"
+    },
+    "insight_regeneration_flag": {
+      "type": "boolean"
+    },
+    "self_replication_signal": {
+      "type": "boolean"
+    },
+    "refinement_loop_triggered": {
+      "type": "boolean"
+    },
+    "thought_reinforcement_ratio": {
+      "type": "number"
+    },
+    "zero_day_learning_score": {
+      "type": "number"
+    },
+    "embedding_fatigue_index": {
+      "type": "number"
+    },
+    "vector_attention_ratio": {
+      "type": "number"
+    },
+    "vector_novelty_footprint": {
+      "type": "number"
+    },
+    "memory_link_density": {
+      "type": "number"
+    },
+    "retention_probability_score": {
+      "type": "number"
+    },
+    "is_federated": {
+      "type": "boolean"
+    },
+    "distribution_access_tier": {
+      "type": "string"
+    },
+    "parallel_system_relevance": {
+      "type": "string"
+    },
+    "cluster_distortion_risk": {
+      "type": "string"
+    },
+    "inter_agent_credit_flow": {
+      "type": "string"
+    },
+    "agent_conflict_trace_id": {
+      "type": "string"
+    },
+    "triggered_agent_index": {
+      "type": "string"
+    },
+    "public_visibility": {
+      "type": "string"
+    },
+    "monetization_potential": {
+      "type": "string"
+    },
+    "openai_cost_efficiency_ratio": {
+      "type": "number"
+    },
+    "user_value_estimate": {
+      "type": "number"
+    },
+    "market_fit_alignment": {
+      "type": "number"
+    },
+    "contextualtization_channel_map": {
+      "type": "string"
+    },
+    "content_type_signature": {
+      "type": "string"
+    },
+    "content_ownership_pathway": {
+      "type": "string"
+    },
+    "goal_alignment": {
+      "type": "string"
+    },
+    "mission_alignment_score": {
+      "type": "number"
+    },
+    "human_echo_score": {
+      "type": "number"
+    },
+    "influence_score": {
+      "type": "number"
+    },
+    "neural_value_weight": {
+      "type": "number"
+    },
+    "meta_insight_likelihood": {
+      "type": "number"
+    },
+    "public_response_estimate": {
+      "type": "number"
+    },
+    "temporal_scalability": {
+      "type": "number"
+    },
+    "trust_anchor_presence": {
+      "type": "string"
+    },
+    "healing_prompt": {
+      "type": "string"
+    },
+    "reasoning_trace": {
+      "type": "object"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "raw_text": {
+      "type": "string"
+    },
+    "clarity_score": {
+      "type": "number"
+    },
+    "abstractness": {
+      "type": "string"
+    },
+    "is_foundational": {
+      "type": "boolean"
+    },
+    "logic_quality_score": {
+      "type": "number"
+    },
+    "token_count": {
+      "type": "number"
+    },
+    "depth_score": {
+      "type": "number"
+    },
+    "merge_suitability": {
+      "type": "number"
+    },
+    "data_confidence_level": {
+      "type": "number"
+    },
+    "knowledge_ethics_score": {
+      "type": "number"
+    },
+    "schema_integrity_score": {
+      "type": "number"
+    },
+    "ai_training_value": {
+      "type": "number"
+    },
+    "reflection_score": {
+      "type": "number"
+    },
+    "category": {
+      "type": "string"
+    }
+  }
+}

@@ -1,0 +1,394 @@
+# PROGRESSION-METRICS-001.yaml
+# Blueprint Autodev Orchestrator — Progression & Comparative Intelligence Specification
+# =======================================================================================
+# CGRF v2.0 | Status: Production | Created: 2026-02-23
+#
+# This document governs the PROGRESSION phase of the autodev pipeline:
+#   - ProgressionWriter: accumulates per-cycle comparison reports
+#   - phase_progression(): builds cycle entries from all phase outputs
+#   - Context injection: progression history fed back into THINK each cycle
+#
+# Design intent:
+#   The progression system gives the loop sapient memory. Each cycle, two AI
+#   perspectives (GPT-4o primary vs Claude Bedrock audit) are compared across:
+#   code metrics, design choices, flaws, and intent alignment. This history
+#   is injected into THINK so the AI learns from its own work over time.
+#
+# SRS code format:  AOD-PROG-<NNN>
+# Schema:           src/governance/schemas/progression_metrics_schema.json
+# Output file:      citadel_lite/progression.yaml
+
+_document_schema: CGRF-v2.0
+_module: autodev.orchestrator.progression
+_srs_code: SRS-AUTODEV-PROG-001
+_purpose: >-
+  SRS codes and reflex definitions for the Progression tracking system
+  of the Blueprint Autodev Orchestrator. The progression system provides
+  cross-cycle AI comparison memory, design decision accumulation, flaw
+  tracking, and context injection into THINK.
+_owner: CNWB
+_compliance: CGRF v2.0
+_status: Production
+
+
+# =============================================================================
+# SECTION 1: SRS REQUIREMENTS
+# =============================================================================
+
+# ── ProgressionWriter Class ──────────────────────────────────────────────────
+
+AOD-PROG-001:
+  title: ProgressionWriter Initialization and Persistence
+  description: >-
+    ProgressionWriter initializes from progression.yaml at loop start (if it
+    exists) or creates a fresh scaffold. It persists progression data using
+    PyYAML (preferred) or JSON fallback. Accumulates per-cycle entries, rolling
+    flaw lists, and design decisions across all runs that share the same file.
+  priority: critical
+  status: implemented
+  file: citadel_lite/blueprint_autodev_orchestrator.py
+  function: ProgressionWriter.__init__
+  caps_minimum: B
+  acceptance_criteria:
+    - Loads existing progression.yaml on startup without error
+    - Creates fresh scaffold with _meta, summary, cycles sections if file absent
+    - Saves to disk after every cycle (YAML preferred, JSON fallback)
+    - Preserves history across separate orchestrator runs
+    - MAX_KNOWN_FLAWS=20 and MAX_DESIGN_DECISIONS=30 caps enforced
+
+AOD-PROG-002:
+  title: Cycle Entry Recording and Summary Accumulation
+  description: >-
+    phase_progression() builds a structured cycle entry from all phase outputs
+    and calls ProgressionWriter.record_cycle(). Each entry captures both AI
+    perspectives (primary_layer from GPT-4o reasoning, audit_layer from Claude
+    review), code_metrics, design_choices, flaws, and intent_alignment.
+    The summary section accumulates known_flaws (major/critical only, deduped)
+    and design_decisions (deduped by choice text) with rolling averages for
+    difficulty and intent alignment.
+  priority: critical
+  status: implemented
+  file: citadel_lite/blueprint_autodev_orchestrator.py
+  function: phase_progression
+  caps_minimum: B
+  acceptance_criteria:
+    - Outcome correctly set to committed|blocked_audit|blocked_test|no_files|skipped
+    - Both AI perspectives captured in primary_layer and audit_layer fields
+    - code_metrics.complexity_score contributes to accumulated_difficulty_score average
+    - intent_alignment contributes to avg_intent_alignment and alignment_trend
+    - Major/critical flaws appended to summary.known_flaws (deduped, capped at 20)
+    - Design decisions appended to summary.design_decisions (deduped, capped at 30)
+    - Progression file saved to disk after every call
+    - phase_progression called AFTER phase_write so outcome=committed is accurate
+
+AOD-PROG-003:
+  title: Progression Context Injection into THINK
+  description: >-
+    ProgressionWriter.get_context_summary() generates a structured text block
+    injected into phase_think() system prompt. The block includes: recent cycle
+    outcomes with both perspectives, known flaws (do NOT repeat), locked design
+    decisions, intent alignment trend, and completed goals. Returns empty string
+    on first cycle so the prompt is not polluted before any history exists.
+  priority: critical
+  status: implemented
+  file: citadel_lite/blueprint_autodev_orchestrator.py
+  function: ProgressionWriter.get_context_summary
+  caps_minimum: B
+  acceptance_criteria:
+    - Returns empty string when no history exists (cycle 1)
+    - Injects last MAX_CONTEXT_CYCLES=5 recent cycle entries
+    - Includes known flaws with severity labels
+    - Includes design decisions with rationale and alternatives
+    - Includes divergence_notes when Claude and GPT-4o disagreed
+    - Context block clearly delimited (=== PROGRESSION CONTEXT === / === END ===)
+    - Does NOT exceed 2000 characters to stay within token budget
+
+AOD-PROG-004:
+  title: Perspective Comparison Fields in BedrockAuditClient
+  description: >-
+    BedrockAuditClient.audit() is extended to return perspective_comparison,
+    code_metrics, design_choices, flaws_identified, and intent_alignment fields
+    alongside the existing verdict/issues/risk_score output. Claude is asked
+    to infer what approach GPT-4o took from the generated code and provide its
+    own perspective on how it would have done this differently. The alignment
+    field (aligned|partial|diverged) and divergence_notes are the key signals.
+  priority: critical
+  status: implemented
+  file: citadel_lite/blueprint_autodev_orchestrator.py
+  function: BedrockAuditClient.audit
+  caps_minimum: B
+  llm_backend: bedrock
+  acceptance_criteria:
+    - Returns perspective_comparison.primary_approach (inferred from code)
+    - Returns perspective_comparison.claude_perspective (Claude's view)
+    - Returns perspective_comparison.alignment (aligned|partial|diverged)
+    - Returns code_metrics.complexity_score (integer 1-10)
+    - Returns code_metrics.design_pattern (e.g. dataclass, factory, strategy)
+    - Returns design_choices list with choice/rationale/alternatives
+    - Returns flaws_identified list with severity/description/location
+    - Returns intent_alignment (0.0-1.0)
+    - _audit_unavailable() returns all new fields with safe defaults
+
+AOD-PROG-005:
+  title: Progression Schema Validation
+  description: >-
+    progression_metrics_schema.json provides JSON Schema 2020-12 validation
+    for the progression.yaml structure. Schema covers: _meta, summary,
+    cycles array, and all nested types (CycleEntry, FlawEntry, DesignDecision,
+    CodeMetrics, PerspectiveComparison, etc.) with appropriate required fields
+    and enum constraints.
+  priority: high
+  status: implemented
+  file: citadel_lite/src/governance/schemas/progression_metrics_schema.json
+  caps_minimum: C
+  acceptance_criteria:
+    - Schema ID follows urn:citadel:cgrf:progression-metrics:v1
+    - All OutcomeEnum, AlignmentEnum, DifficultyEnum, SeverityEnum values listed
+    - CycleEntry requires cycle, ts, task, caps_grade, outcome
+    - FlawEntry requires severity and description
+    - Schema passes jsonschema.validate() against a sample progression.yaml
+
+
+# =============================================================================
+# SECTION 2: PROGRESSION REFLEX DEFINITIONS
+# =============================================================================
+#
+# Reflexes governing the PROGRESSION phase of the pipeline.
+# Added to REFLEX_AUTODEV_PIPELINE_V1 as tier_1 automations (progression
+# is fully automated — no human approval required for recording).
+
+REFLEX_PROGRESSION_V1:
+  family_id: REFLEX_PROGRESSION_V1
+  version: "1.0.0"
+  srs_code: SRS-AUTODEV-PROG-001
+  description: >-
+    REFLEX definitions for the progression tracking system.
+    All progression reflexes are tier_1 (automated) — recording and context
+    injection are background infrastructure, not decision gates.
+
+  tier_1_automated:
+    description: >-
+      Progression phase events. Fully automated, logged in journal.
+      No human notification or approval required.
+
+    RFX-PROG-001:
+      title: Progression Cycle Recorded — Normal
+      description: >-
+        Triggered at the end of every cycle when phase_progression() successfully
+        records the cycle entry to progression.yaml. This is the happy path —
+        entry written, summary updated, file saved.
+      srs_ref: AOD-PROG-002
+      triggers:
+        - F_PROG_001  # phase_progression() returns without error
+      actions:
+        - A_PROG_001  # Write cycle entry to progression.yaml
+        - A_PROG_002  # Update summary (flaws, decisions, averages)
+        - A_PROG_003  # Save file to disk
+        - A_PROG_004  # Journal progression summary entry
+      expected_resolutions:
+        - R_PROG_001  # progression.yaml updated, cycle entry stored
+      max_autonomy: 4        # AUTONOMOUS
+      caps_minimum: C
+
+    RFX-PROG-002:
+      title: Progression Context Injected into THINK
+      description: >-
+        Triggered at the start of every THINK call after cycle 1, when
+        ProgressionWriter.get_context_summary() returns a non-empty string.
+        The context is injected into the system prompt so GPT-4o is aware
+        of history, known flaws, design decisions, and intent alignment.
+      srs_ref: AOD-PROG-003
+      triggers:
+        - F_PROG_002  # cycle > 1 and progression.yaml has entries
+      actions:
+        - A_PROG_005  # Call get_context_summary(n_cycles=5)
+        - A_PROG_006  # Inject context block into phase_think system_prompt
+        - A_PROG_007  # Log cycle count injected
+      expected_resolutions:
+        - R_PROG_002  # THINK uses history to make informed decision
+      max_autonomy: 4        # AUTONOMOUS
+      caps_minimum: C
+
+    RFX-PROG-003:
+      title: Perspective Divergence Detected
+      description: >-
+        Triggered when audit_output.perspective_comparison.alignment == "diverged".
+        The divergence_notes are included in the git commit message and logged
+        prominently. Next cycle's THINK context will include this divergence.
+        Not a blocking event — divergence is informational, not a gate.
+      srs_ref: AOD-PROG-004
+      triggers:
+        - F_PROG_003  # audit_output["perspective_comparison"]["alignment"] == "diverged"
+      actions:
+        - A_PROG_008  # Log divergence prominently with divergence_notes
+        - A_PROG_009  # Include divergence in commit message (phase_write)
+        - A_PROG_010  # Store in cycle entry for context injection
+      expected_resolutions:
+        - R_PROG_003  # Divergence noted; next THINK sees it as context
+      max_autonomy: 4        # AUTONOMOUS
+      caps_minimum: B        # Divergence is a B-level signal (worth watching)
+
+    RFX-PROG-004:
+      title: High Flaw Accumulation — Maintenance Alert
+      description: >-
+        Triggered when known_flaws accumulates >= 10 entries. This signals
+        that the pipeline is generating more flaws than it is resolving.
+        Logged as WARNING. The flaw list is prominently featured in the next
+        THINK context so the AI is pushed toward fix_test/refactor tasks.
+      srs_ref: AOD-PROG-002
+      triggers:
+        - F_PROG_004  # len(summary.known_flaws) >= 10
+      actions:
+        - A_PROG_011  # Log WARNING: high flaw accumulation
+        - A_PROG_012  # Boost flaw visibility in next context summary
+      expected_resolutions:
+        - R_PROG_004  # THINK prioritizes flaw resolution over new features
+      max_autonomy: 4        # AUTONOMOUS
+      caps_minimum: C
+      escalate_if_repeated: 3  # 3 cycles with >= 10 flaws → supervisor alert
+
+    RFX-PROG-005:
+      title: Intent Alignment Declining — Drift Warning
+      description: >-
+        Triggered when avg_intent_alignment drops below 0.4 (less than 40% of
+        work aligns with blueprint goals). This indicates feature drift —
+        the pipeline is building things that don't serve the stated goals.
+        Logged as WARNING and injected into THINK as a priority signal.
+      srs_ref: AOD-PROG-003
+      triggers:
+        - F_PROG_005  # avg_intent_alignment < 0.4
+      actions:
+        - A_PROG_013  # Log WARNING: intent drift below 40%
+        - A_PROG_014  # Inject high-priority warning into THINK context
+      expected_resolutions:
+        - R_PROG_005  # THINK re-focuses on blueprint-aligned tasks
+      max_autonomy: 3        # MONITORED — log and alert, no auto-halt
+      caps_minimum: B
+      min_tp: 45
+
+
+# =============================================================================
+# SECTION 3: PROGRESSION CAPS GATE TABLE
+# =============================================================================
+
+PROGRESSION_CAPS_GATES:
+  description: >-
+    CAPS gate entries for progression phase operations.
+
+  gates:
+    progression_record_cycle:
+      srs_ref: AOD-PROG-002
+      caps_minimum: C
+      rationale: >-
+        Recording to progression.yaml is low-risk IO. C-grade minimum
+        ensures only functional pipeline stages write progression data.
+      description: Gate for ProgressionWriter.record_cycle() and save()
+
+    progression_context_inject:
+      srs_ref: AOD-PROG-003
+      caps_minimum: C
+      rationale: >-
+        Context injection into THINK is read-only from progression.yaml.
+        Low risk — only C grade required.
+      description: Gate for ProgressionWriter.get_context_summary()
+
+    progression_divergence_flag:
+      srs_ref: AOD-PROG-004
+      caps_minimum: B
+      rationale: >-
+        Perspective divergence signals require B-grade review. A pipeline
+        operating with consistent divergence may have architectural issues
+        that need operator attention.
+      description: >-
+        Gate for RFX-PROG-003 (divergence detected). A-grade tasks that
+        diverge (CAPS S) escalate to supervisor notification.
+
+    progression_flaw_accumulation:
+      srs_ref: AOD-PROG-002
+      caps_minimum: B
+      rationale: >-
+        High flaw accumulation (>= 10) is a signal that the pipeline
+        quality is degrading. B-grade minimum ensures this reflex only
+        fires in active pipeline contexts.
+      description: Gate for RFX-PROG-004 (maintenance alert)
+
+
+# =============================================================================
+# SECTION 4: PROGRESSION DATA CONTRACT
+# =============================================================================
+#
+# Documents the exact fields written to progression.yaml and their semantics.
+# Cross-references schema: src/governance/schemas/progression_metrics_schema.json
+
+PROGRESSION_DATA_CONTRACT:
+  schema_file: src/governance/schemas/progression_metrics_schema.json
+  output_file: citadel_lite/progression.yaml
+  serialization: PyYAML (preferred) | JSON (fallback when pyyaml absent)
+
+  top_level_sections:
+    _meta:
+      description: Document metadata — schema version, run_id, blueprint, timestamps
+      required: true
+    summary:
+      description: >-
+        Rolling aggregated statistics across all cycles in this file.
+        Injected into THINK for contextual awareness.
+      required: true
+      fields:
+        total_cycles: integer — cumulative cycle count
+        goals_completed: list[str] — tasks that were committed
+        known_flaws: list[FlawEntry] — major/critical flaws, max 20, deduped
+        design_decisions: list[DesignDecision] — locked design choices, max 30, deduped
+        accumulated_difficulty_score: float — rolling avg complexity_score 1-10
+        avg_intent_alignment: float — rolling avg intent alignment 0.0-1.0
+        alignment_trend: list[float] — last 10 intent_alignment values
+    cycles:
+      description: Array of CycleEntry objects, one per orchestrator cycle
+      required: true
+
+  cycle_entry_fields:
+    cycle: integer — cycle number (1-based)
+    ts: str — ISO 8601 timestamp
+    task: str — priority_task from THINK
+    caps_grade: S|A|B|C|D — CAPS grade assigned
+    outcome: committed|blocked_audit|blocked_test|no_files|skipped
+
+    primary_layer:
+      backend: azure|openai|bedrock|fallback
+      approach: >-
+        Claude's inference of what strategy GPT-4o used (from perspective_comparison.primary_approach)
+      reasoning: THINK.reasoning field
+      hint: THINK.implementation_hint field
+
+    audit_layer:
+      verdict: approved|needs_revision|rejected
+      risk_score: float 0.0-1.0
+      rationale: str
+      claude_perspective: str — how Claude would have approached this
+      alignment: aligned|partial|diverged|unknown
+      divergence_notes: str — key differences (empty if aligned)
+      issues_count: int
+      srs_refs_failed: list[str]
+
+    code_metrics:
+      difficulty: trivial|simple|moderate|complex|expert|unknown
+      complexity_score: int 1-10
+      design_pattern: str — primary pattern (dataclass, factory, strategy, etc.)
+      maintainability: good|acceptable|poor
+
+    design_choices: list[DesignDecision] — choices made in this specific cycle
+    flaws: list[FlawEntry] — ALL flaws (minor + major + critical)
+    intent_alignment: float 0.0-1.0 — how aligned with blueprint goals
+
+    diff_summary:
+      lines_added: int
+      lines_removed: int
+      files_written: list[str]
+      assessment_alignment: str — from DIFF metric 1
+
+    test_result:
+      passed: int
+      failed: int
+      errors: int
+
+    implementation_score: int 0-100 — blueprint completion % at this cycle

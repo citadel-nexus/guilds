@@ -1,0 +1,520 @@
+# Workspace container runtime environment
+# Generated from local .mcp.env and .env to mirror the current development setup on the VPS.
+
+# MCP / Citadel backend access
+# MCP_URL=
+# MCP_TOKEN=
+# MCP_BASIC_USER=
+# CNWB_RUNNER_KEY=
+# CNWB_RUNNER_TOKEN=
+# MCP_BASIC_PASS=
+# MCP_ACCEPT=
+# BUBBLE_API=
+# Access: Combined Citadel Workshop
+# When building a combined CNWB + CitadelWorkshop bundle, set these.
+# Set WORKSHOP_COMBINED=
+# workshop URL used by the frontend at build/runtime.
+# WORKSHOP_COMBINED=
+# VITE_CITADEL_WORKSHOP_URL=
+# STRIPE_PUB_KEY=
+# STRIPE_SECRET_KEY=
+# STRIPE_WEBHOOK_SECRET=
+# GitLab access tokens
+# GITLAB_URL=
+# GITLAB_TOKEN=
+# GITLAB_TOKEN_AUTOMATION=
+# GITLAB_WEBHOOK_SECRET=
+# GitLab Admin API — Identity Convergence (SRS-IDENTITY-LINKED-001)
+# GITLAB_ADMIN_TOKEN=
+# GITLAB_DEFAULT_GROUP_ID=
+# GITLAB_AUTO_PROVISION=
+# SUPABASE_SERVICE_ROLE_KEY=
+# SUPABASE_SERVICE_KEY=
+# SUPABASE_SK_KEY=
+# SUPABASE_URL=
+# CITADEL_AGENT_REGISTRY_PROJECT=
+# POSTGRES_PASSWORD=
+# DATABASE_URL=
+# OAD_R1_GITLAB_PAT=
+# VPS connection wiring for helper tooling
+# AWS_ACCESS_KEY_ID=
+# AWS_SECRET_ACCESS_KEY=
+# AWS_REGION=
+# AWS_SES_REGION=
+# AWS_ACCOUNT_ID=
+# AWS_ACTIVATE_CREDITS=
+# AWS_MONTHLY_BUDGET=
+# VPS_HOST=
+# VPS_USER=
+# VPS_API_URL=
+# VPS_SERVER_ID=
+# VPS_IDENTITY_FILE=
+# VPS_API_KEY=
+# VPS_USAGE_URL=
+# CITADEL_HELPER_SSH_KEY=
+# CITADEL_HELPER_SSH_OPTIONS=
+# CITADEL_GITLAB_TOKEN_FILE=
+
+# Agent Gateway (tools.citadel-nexus.com → 147.93.43.117:3202)
+# GATEWAY_PUBLIC_URL=
+# GATEWAY_API_KEY=
+
+# C.R.E.W. — Central Resource & Entitlement Workforce
+# CREW_TEMPLATE_AGENT_ID=
+# STRIPE_CREW_WEBHOOK_SECRET=
+# CREW_ENTITLEMENT_ENABLED=
+# CREW_ADMIN_ORG_IDS=
+
+# Cal.com API Configuration (generated 2026-02-16)
+CALCOM_API_KEY=
+CALCOM_BASE=
+
+# =
+# CUSTOMER.IO - CUSTOMER ENGAGEMENT & LIFECYCLE AUTOMATION
+# =
+# Multi-channel campaigns (Email, SMS, Push, Webhooks)
+# Behavioral triggers, transactional messages, journey automation
+# Added: 2026-02-18
+
+# Track API - Events & User Data (identify, track events)
+CUSTOMERIO_SITE_ID=
+CUSTOMERIO_TRACK_API_KEY=
+
+# App API - Campaigns & Transactional Messages (trigger campaigns, send emails/sms)
+CUSTOMERIO_APP_API_KEY=
+
+# Webhook Signing Key - Verify webhook authenticity
+CUSTOMERIO_WEBHOOK_SIGNING_KEY=
+
+# Configuration
+CUSTOMERIO_REGION=
+CUSTOMERIO_TRACK_API_URL=
+CUSTOMERIO_APP_API_URL=
+HOSTINGER_SMTP_PASS =
+HOSTINGER_CLIENT_SECRET=
+HOSTINGER_SMTP_USER=
+HOSTINGER_SMTP_HOST =
+HOSTINGER_SMTP_PORT =
+GITLAB_NOTIFY_RECIPIENTS =
+SIGNUP_NOTIFY_RECIPIENTS=
+VPS_API_URL=
+VPS_USAGE_URL=
+VPS_API_AUTH_STYLE=
+CITADEL_HELPER_DISCORD_WEBHOOK=
+# Shared API keys (trim as needed)
+OPENAI_API_KEY=
+OPENAI_API_KEY_ALT1=
+DISCORD_TOKEN=
+DISCORD_BOT_TOKEN=
+
+# Zayara Admin Panel (Roleplay Control)
+ZAYARA_ADMIN_SECRET=
+ZAYARA_ADMIN_PORT=
+
+WEBHOOK_JPTOEN=
+WEBHOOK_ENTOJP=
+WEBHOOK_ZAYARA=
+WEBHOOK_ZAYARA_CARD=
+
+# Brotherhood Discord Configuration (The Brotherhood Guild - Agent Gaming Stats)
+BROTHERHOOD_CHANNEL_ID=
+BROTHERHOOD_WEBHOOK=
+OAD_DISCORD_PROGRESS_WEBHOOK=
+OAD_PROGRESS_CHANNEL_ID=
+
+WATCHER_CHANNEL_ID=
+CHANNEL_PAIRINGS=
+
+# BABEL / Stable Diffusion
+BABEL_RELAY_API=
+SD_CMD_PATH=
+SD_URL=
+SD_WEBHOOK_URL=
+SD_ALLOWED_CHANNEL_ID=
+LINEAR_API_TOKEN=
+DARPA_UPGRADE_PAGE_ID=
+# Zayara / Agent config
+ZAYARA_ENABLE=
+ZAYARA_SYS_PROMPT=
+ZAYARA_ALIASES=
+ZAYARA_URL=
+ZAYARA_CORE_URL=
+ZAYARA_CHAT_URL=
+ZAYARA_DISCORD_TOKEN=
+INTERCOM_API=
+GITLAB_PROJECT_PATH=
+GITLAB_PROJECT_ID=
+OAD_R1_GITLAB_PAT_WATCHER=
+# GitHub runner wiring
+GITHUB_TOKEN=
+GITHUB_VPS_RUNNER_PAT=
+GH_RUNNER_URL=
+GH_RUNNER_TOKEN=
+GH_RUNNER_VERSION=
+GH_RUNNER_PATH=
+GH_RUNNER_LABELS=
+GH_RUNNER_SERVICE=
+GH_RUNNER_START=
+GH_RUNNER_AUTO=
+PPLX_API_KEY=
+# Miscellaneous defaults (trim or override per environment)
+ENABLE_TOOLCALLS=
+ENABLE_ENGINE_ROUTER=
+ENABLE_FALLBACK=
+ENABLE_RATE_LIMIT=
+BABEL_LOG_LEVEL=
+LLAMA_WATCHDOG_INTERVAL=
+LLAMA_WATCHDOG_LOG_EVERY=
+LLAMA_SERVER_VERBOSITY=
+VPS_ROOT=
+
+# -----------------------------------------------------------------------------
+# Fill in the values below as needed when cloning or rotating secrets.
+# -----------------------------------------------------------------------------
+supabase_access_key=
+SUPABASE_SECRET_API_KEY=
+supabase_url=
+SUPABASE_SERVICE_ROLE_KEY=
+supabase_public_anon_key=
+# Workshop Auth — Unified Supabase Login (Google + Discord + Email)
+NEXT_PUBLIC_FASTAPI_BACKEND_AUTH_TYPE=
+NEXT_PUBLIC_CITADEL_NEXUS_SUPABASE_URL=
+NEXT_PUBLIC_CITADEL_NEXUS_SUPABASE_ANON_KEY=
+AUTH_TYPE=
+REGISTRATION_ENABLED=
+# =
+# --- Integrations (fill with real secrets for production) ---
+SLACK_API_TOKEN=
+NOTION_API_TOKEN=
+NOTION_TOKEN=
+NOTION_API_KEY=
+NOTION_SOURCE_DB_ID=
+NOTION_TRANSCRIPTS_DB_ID=
+# Guild Apply System - Datarooms for interview chambers (Finance Guild pattern reused)
+NOTION_DATAROOMS_DB_ID=
+
+DROPBOX_API_TOKEN=
+DISCOURSE_API_KEY=
+DISCOURSE_BASE_URL=
+WHATSAPP_TOKEN=
+TELEGRAM_BOT_TOKEN=
+SENTRY_DSN=
+SERPAPI_API_KEY=
+
+# Observability / dashboards wired into citadel-nexus.com
+GRAFANA_DASHBOARD_URL=
+NOTION_GUILD_DASHBOARD_URL=
+NOTION_APPLICATIONS_BOARD_URL=
+SLACK_GUILD_CHANNEL_URL=
+
+# Sapient Home / RAG wiring
+SAPIENT_RAG_API_URL=
+NEXT_PUBLIC_SAPIENT_RAG_API_URL=
+
+# Citadel Helper preflight overrides / optional integrations
+# Skip Supabase gitlab-user-notify email check when functions are unavailable
+CITADEL_HELPER_PREFLIGHT_SKIP_GITLAB_EMAIL=
+CITADEL_HELPER_PREFLIGHT_SKIP_GITLAB_PROJECTS=
+
+# Optional Reddit integration (values must be supplied manually if used)
+REDDIT_CLIENT_ID=
+REDDIT_CLIENT_SECRET=
+REDDIT_USER_AGENT=
+REDDIT_USERNAME=
+
+# -----------------------------------------------------------------------------
+# NATS JetStream Configuration (Messaging Infrastructure)
+# -----------------------------------------------------------------------------
+# NATS server running on VPS (147.93.43.117:4222)
+# Streams: CITADEL_CORE, CITADEL_INTEGRATIONS, CITADEL_ECONOMY, CITADEL_AUDIT, CITADEL_DLQ, CITADEL_COLLEGE
+# See: infra/nats/streams.yaml, infra/nats/nats.conf
+
+NATS_URL=
+NATS_USER=
+NATS_PASSWORD=
+NATS_MONITOR_INTERVAL=
+
+# -----------------------------------------------------------------------------
+# OAD (Onboarding / Awareness / Diagnosis) wiring
+# These defaults are safe for dry-run; replace placeholders for live use.
+# -----------------------------------------------------------------------------
+
+# Prefer a dedicated OAD PAT; falls back to GITLAB_TOKEN / GITLAB_TOKEN_AUTOMATION when unset.
+# Updated 2026-02-19: rotated from expired project_50_bot watcher token to OAD_R1_GITLAB_PAT (project 75, CNWB)
+OAD_PAT=
+CITADEL_HELPER_PAT=
+# Default guild identity used when seeding guild_ops.guild_project_registry during onboarding.
+OAD_GUILD_ID=
+OAD_GUILD_NAME=
+OAD_MISSION_CODENAME=
+OAD_ONBOARD_PROJECT=
+OAD_ONBOARD_PROJECT_NAME=
+CNWB_SUPABASE_PROJECT_UUID=
+OAD_PROJECT_PATH=
+
+# Notion + Slack wiring for onboarding artifacts (required for live mode).
+# Replace these with real IDs when you are ready to persist.
+NOTION_PARENT_PAGE_ID=
+NOTION_TASKS_DATABASE_ID=
+DEFAULT_SLACK_CHANNEL=
+
+# Optional OAD-specific overrides (preferred when set).
+OAD_NOTION_MISSIONS_DB=
+OAD_SLACK_CHANNEL=
+
+# OAD Reflex dispatch and gating (templates for future extension)
+# Slack channel name or ID for reflex notifications
+OAD_SLACK_CHANNEL_REFLEX=
+# Discord targets (choose one or set all as needed)
+OAD_DISCORD_CHANNEL_ID=
+OAD_RIG2_DISCORD_CHANNEL_ID=
+OAD_RIG3_DISCORD_CHANNEL_ID=
+# Linear gating: reuse existing issues or allow creation
+LINEAR_REFLEX_STATUS_ISSUE_ID=
+LINEAR_REFLEX_FAILURE_ISSUE_ID=
+LINEAR_REFLEX_ALLOW_NEW_STATUS=
+LINEAR_REFLEX_ALLOW_NEW_FAIL=
+# Notion checklist DB/view for notion_blockers metric
+OAD_NOTION_CHECKLIST_DB_ID=
+OAD_NOTION_CHECKLIST_VIEW_ID=
+
+# Optional local LLM wiring for OAD narrative generation.
+# When unset, OAD falls back to deterministic dry-run text.
+OAD_MODEL_PATH=
+OAD_GENERATE_CMD=
+
+# Optional project selection hint for OAD dry-runs (comma-separated GitLab paths or ids).
+OAD_PROJECTS=
+
+OAD_DISCORD_CHANNEL_ID=
+
+# =
+# BROTHERHOOD GAMING STATS - MISSION & XP TRACKING
+# =
+# PostHog Analytics - Track all mission events, XP changes, level ups
+POSTHOG_API_KEY=
+POSTHOG_HOST=
+POSTHOG_PROJECT_ID=
+# Camb.ai Voice
+CAMB_AI_API_KEY=
+CAMB_AI_API_BASE=
+CAMB_AI_VOICE_ID=
+# Perplexity AI - Generate lore and educational content for missions
+PERPLEXITY_API_KEY=
+
+# Supabase XP/USO Banking (uses existing SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY)
+# Tables: brotherhood_members, brotherhood_xp_transactions, brotherhood_missions
+# Tables: uso_accounts, uso_transactions
+
+# Linear Team/Project for Brotherhood Missions
+LINEAR_BROTHERHOOD_TEAM_ID=
+LINEAR_BROTHERHOOD_PROJECT_ID=
+LINEAR_TEAM_ID=
+
+# Slack Channel for Mission Announcements
+SLACK_BROTHERHOOD_CHANNEL=
+
+# =
+# GCP / GCS - MULTI-TENANT GOOGLE CLOUD PLATFORM
+# =
+# Primary GCP account: mr.nobody@citadel-nexus.com (replaces cureall-agent-worker)
+GCP_SERVICE_ACCOUNT=
+GCP_PROJECT_ID=
+GCP_REGION=
+GOOGLE_CLOUD_PROJECT=
+# GCloud CLI path
+GCLOUD_PATH=
+# Multi-tenant GCP projects (format: tenant1:project-id-1,tenant2:project-id-2)
+# TENANT_GCP_PROJECTS=
+OAD_TENANT_ID=
+
+# =
+# DATADOG - VPS MONITORING & LOG COLLECTION
+# =
+DD_API_KEY=
+DD_SITE=
+DD_ENV=
+DD_LOGS_CONFIG_PROCESS_COLLECT_ALL=
+
+# =
+# ELEVENLABS - VOICE AI & CONVERSATIONAL AGENTS
+# =
+ELEVENLABS_API_KEY=
+ELEVENLABS_AGENT_ID=
+ELEVENLABS_TB_AGENT_ID=
+NEXT_PUBLIC_ELEVENLABS_AGENT_ID=
+NEXT_PUBLIC_ELEVENLABS_TB_AGENT_ID=
+
+# ZES RAG Knowledge Base (Notion database)
+ZES_RAG_KB_DB_ID=
+
+# ZES Sales Agent (Zayara - ZES Sales)
+ZAYARA_ZES_SALES_AGENT_ID=
+ZAYARA_DISCORD_AGENT_ID=
+ZAYARA_ADMIN_URL=
+
+# =
+# CLOUDFLARE - DNS & WORKERS (citadel-nexus.com zone)
+# =
+CLOUDFLARE_API_TOKEN=
+CLOUDFLARE_ACCOUNT_ID=
+CLOUDFLARE_ZONE_ID=
+
+# =
+# EVOLUTION TRACKER - PUBLIC SHOWCASE (evo.citadel-nexus.com)
+# =
+EVO_TRACKER_PAGE_ID=
+EVO_HISTORY_DB_ID=
+EVO_CALLOUT_BLOCK_ID=
+EVO_TRACKER_DB_DATA_SOURCE=
+EVO_COLLEGE_DB_DATA_SOURCE=
+
+# ═══════════════════════════════════════════════════════════════════
+# Finance-Guild Discord Integration
+# ═══════════════════════════════════════════════════════════════════
+# Discord channel IDs (populated after running /finance-guild-setup)
+FG_DISCORD_CATEGORY_ID=
+FG_ANNOUNCEMENTS_CHANNEL_ID=
+FG_DEALS_CHANNEL_ID=
+FG_COMMISSIONS_CHANNEL_ID=
+FG_GUILDMASTER_CHANNEL_ID=
+FG_SHOP_CHANNEL_ID=
+FG_CLIENT_HUB_FORUM_ID=
+FG_DEAL_ROOMS_FORUM_ID=
+
+# Discord webhook for Finance-Guild notifications
+FG_DISCORD_WEBHOOK=
+
+# Automated upsell configuration
+FG_UPSELL_CHECK_HOUR=
+FG_UPSELL_MIN_TENURE_DAYS=
+
+# ═══════════════════════════════════════════════════════════════
+# Brotherhood ZES (Zayara Engagement System)
+# ═══════════════════════════════════════════════════════════════
+# Channel IDs — right-click channel in Discord → Copy Channel ID
+ZES_CHANNEL_SHOP=
+ZES_CHANNEL_ANNOUNCEMENTS=
+ZES_CHANNEL_ACHIEVEMENTS=
+# Engagement tenant identifier
+ENGAGEMENT_TENANT_ID=
+# RPG auto-image Discord channel (set after /finance-guild-setup)
+RPG_DISCORD_IMAGE_CHANNEL=
+
+# Finance-Guild Brain (LLM + Notion)
+# Page where Discord comments get notated (auto-created if blank)
+NOTION_FG_COMMENT_PAGE_ID=
+# Finance Guild AWS Cost Report page (read by Perplexity control loop)
+NOTION_FG_COST_REPORT_PAGE_ID=
+# TradeBuilder Business Reference Sheet (toll-free, pricing, SES config)
+NOTION_TRADEBUILDER_SHEET_PAGE_ID=
+# Local cache dir for Notion content (on VPS)
+NOTION_CACHE_DIR=
+# Hours between Notion cache refreshes
+NOTION_CACHE_REFRESH_HOURS=
+# ═══════════════════════════════════════════════════════════════════════
+# ZAYARA WAKE WORD SYSTEM (OpenWakeWord + ElevenLabs Voice)
+# ═══════════════════════════════════════════════════════════════════════
+
+# ─── Wake Word Configuration ───
+WAKE_WORD=
+WAKE_THRESHOLD=
+WAKE_COOLDOWN=
+
+# ─── NATS Event Bus (ECS citadel-nats-service) ───
+NATS_URL=
+NATS_HTTP_BRIDGE_URL=
+
+# ─── n8n Orchestration Webhook ───
+N8N_WAKE_WEBHOOK=
+
+# ─── ElevenLabs Voice Agent ───
+# (Confirm ELEVENLABS_API_KEY and ELEVENLABS_AGENT_ID already set)
+# ELEVENLABS_API_KEY=
+# ELEVENLABS_AGENT_ID=
+
+# ─── Discord Admin Notifications ───
+DISCORD_ADMIN_WEBHOOK=
+
+# ─── Control Loop v2 — Missing Keys (CNWB-73 / CNWB-74 / CNWB-78) ───
+# Datadog Application Key — needed for metrics queries (DD_API_KEY alone is insufficient)
+# Get from: Datadog → Organization Settings → Application Keys → New Key
+DD_APP_KEY=
+# DD_APP_KEY_NAME=
+# DD_APP_KEY_ID=
+
+# PostHog Personal API Key — phc_* capture key does NOT work for query API
+# Get from: PostHog → Settings → Personal API Keys → Create key (prefix: phx_)
+POSTHOG_PERSONAL_API_KEY=
+
+# Finance Guild Lead Hunter — Notion leads database ID
+# DB: Finance Guild — Lead Hunter | Created 2026-02-19
+NOTION_LEADS_DB_ID=
+
+# =
+# AWS SES — Email Channel (configured 2026-02-19)
+# =
+# Domain identity created: citadel-nexus.com (DKIM pending DNS propagation)
+# Sender identities: noreply@citadel-nexus.com, ops@citadel-nexus.com
+# Production access: PENDING review (~24h)
+SES_REGION=
+SES_FROM_EMAIL=
+SES_OPS_EMAIL=
+SES_DOMAIN=
+# DKIM CNAME records — add to Cloudflare DNS (CLOUDFLARE_API_TOKEN needs refresh):
+
+
+# =
+# AMAZON CONNECT — Voice Channel (configured 2026-02-19)
+# =
+CONNECT_INSTANCE_ID=
+CONNECT_INSTANCE_ARN=
+CONNECT_INSTANCE_ALIAS=
+CONNECT_REGION=
+CONNECT_PHONE_NUMBER=
+CONNECT_PHONE_NUMBER_ID=
+CONNECT_PHONE_NUMBER_ARN=
+
+# =
+# OAD ENHANCED LOOP v2 — oad_enhanced_loop.py (upgraded 2026-02-19)
+# Deep GitLab collector: commits+diffs, SAST, SBOM, CAPS, secrets
+# =
+
+# v1 DBs (kept for reference)
+NOTION_OAD_DB_ID=
+NOTION_REFLEX_DB_ID=
+
+# v2 DBs — new schema with security fields (created 2026-02-19)
+NOTION_OAD_DASHBOARD_DB_ID=
+NOTION_OAD_REFLEX_DB_ID=
+
+# v2 required aliases
+# SUPABASE_SERVICE_KEY: read by oad_enhanced_loop.py line 36
+SUPABASE_SERVICE_KEY=
+# v1 alias kept for backward compat
+SUPABASE_KEY=
+
+# Discord webhook for OAD cycle notifications (uses Brotherhood/OAD progress channel)
+DISCORD_WEBHOOK_URL=
+
+LINEAR_API_KEY=
+DISCORD_CHANNEL_ID=
+
+# Rig identity + timing
+OAD_RIG_ID=
+OAD_CYCLE_SECONDS=
+OAD_LOOKBACK_HOURS=
+# v1 compat
+OAD_LOOP_INTERVAL=
+OAD_DEDUP_WINDOW=
+GITLAB_SEARCH_TERM=
+
+# Notion parent page for DB setup scripts
+NOTION_CITADEL_MASTER_PAGE_ID=
+
+# SQL MIGRATION v2 REQUIRED — run tools/oad_migration.sql in Supabase SQL Editor:
+# https://supabase.com/dashboard/project/hvbvvbkybvzfsrzkpbzl/sql/new
+NOTION_SUPABASE_SCHEMA_PAGE_ID=
+
+# CREW Leads Notion Database
+NOTION_LEADS_DATABASE_ID=

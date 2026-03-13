@@ -1,0 +1,10 @@
+﻿__pycache__/
+*.pyc
+.env
+out/
+outbox/
+old/
+.local/
+.replit/
+models/*.gguf
+.nexus/sanctum/

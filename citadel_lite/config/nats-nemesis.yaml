@@ -1,0 +1,42 @@
+# config/nats-nemesis.yaml
+# NATS JetStream stream definitions for Nemesis L3/L4
+# Apply with: nats stream add --config config/nats-nemesis.yaml
+#
+# Subjects used by Nemesis:
+#   citadel.nemesis.l2.*          — L2 Inspector blocks
+#   citadel.nemesis.l3.*          — L3 Honeypot hits
+#   citadel.nemesis.l4.*          — L4 Oracle verdicts / quarantine events
+#   citadel.nemesis.alerts.*      — High-severity alerts to Security team
+
+streams:
+  - name: CITADEL_NEMESIS
+    description: "Nemesis threat intelligence events (L2/L3/L4)"
+    subjects:
+      - "citadel.nemesis.>"
+    storage: file
+    retention: limits
+    max_age: 604800      # 7 days in seconds
+    max_bytes: 524288000 # 500 MB
+    max_msg_size: 65536  # 64 KB per message
+    num_replicas: 1
+    discard: old
+    duplicate_window: 60 # seconds — deduplicate burst events
+
+  - name: CITADEL_NEMESIS_ALERTS
+    description: "Nemesis high-severity alerts (quarantine, flood, critical)"
+    subjects:
+      - "citadel.nemesis.alerts.>"
+    storage: file
+    retention: limits
+    max_age: 2592000     # 30 days
+    max_bytes: 104857600 # 100 MB
+    num_replicas: 1
+    discard: old
+    duplicate_window: 120
+
+# ── Subject reference ─────────────────────────────────────────────────────────
+# citadel.nemesis.l2.block         — L2 Inspector blocked a request
+# citadel.nemesis.l3.honeypot_hit  — L3 Honeypot decoy endpoint triggered
+# citadel.nemesis.l4.verdict       — L4 Oracle classification verdict
+# citadel.nemesis.l4.quarantine    — IP quarantine event
+# citadel.nemesis.alerts.critical  — Critical threat requiring human review

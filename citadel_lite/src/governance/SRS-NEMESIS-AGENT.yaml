@@ -1,0 +1,735 @@
+# citadel_lite/src/governance/SRS-NEMESIS-AGENT.yaml
+# Nemesis Adversarial Resilience System - Security Requirements Specification
+# Version: 1.0.0
+# Author: Citadel Security Team
+# Last Updated: 2026-02-05
+# Classification: TIER-1 (Core Trade Secret - Perpetual Protection)
+
+metadata:
+  domain: "NEMESIS"
+  srs_range: "NEM-001 to NEM-099"
+  compliance_frameworks:
+    - "NIST SP 800-53 Rev 5"
+    - "FedRAMP Moderate"
+    - "SOC 2 Type II"
+    - "ISO 27001:2022"
+  review_cadence: "quarterly"
+  owner: "security@citadel-nexus.com"
+
+# ==============================================================================
+# SUBSYSTEM 1: ADVERSARY REGISTRY (NEM-ADV-001 to NEM-ADV-020)
+# ==============================================================================
+
+srs_codes:
+  NEM-ADV-001:
+    name: "Adversary Class Definition"
+    category: "Adversary Registry"
+    description: "All adversary classes must be formally defined with capabilities, goals, and success criteria"
+    requirement: |
+      Each adversary class entry MUST include:
+      - Unique adversary_id (ADV-XXX-NAME format)
+      - Threat level classification (LOW/MEDIUM/HIGH/CRITICAL)
+      - Occurrence probability (0.00-1.00)
+      - Capabilities array (minimum 3 items)
+      - Goals array (minimum 2 items)
+      - Attack vectors array (minimum 3 items)
+      - Success criteria array (minimum 2 items)
+      - Mitigations array (minimum 2 items)
+    validation:
+      automated: true
+      schema: "schemas/adversary_class.json"
+    nist_control: "RA-3"
+    fedramp_control: "RA-3"
+    severity: "CRITICAL"
+
+  NEM-ADV-002:
+    name: "Adversary Registry Immutability"
+    category: "Adversary Registry"
+    description: "Adversary definitions must be immutable once activated"
+    requirement: |
+      - Active adversary records cannot be modified
+      - Changes require new version with previous version archived
+      - All modifications logged to Guardian with hash chain
+      - Deletion prohibited; only soft-delete (active=false)
+    validation:
+      automated: true
+      trigger: "database_constraint"
+    nist_control: "AU-9"
+    severity: "HIGH"
+
+  NEM-ADV-003:
+    name: "Attack Vector Enumeration"
+    category: "Adversary Registry"
+    description: "Attack vectors must be enumerated and mapped to defenses"
+    requirement: |
+      Each attack vector MUST have:
+      - Detection method reference
+      - Prevention control reference
+      - Response procedure reference
+      - Testing scenario ID
+    validation:
+      automated: true
+      cross_reference: "nemesis_attack_scenarios"
+    nist_control: "RA-5"
+    severity: "HIGH"
+
+  NEM-ADV-004:
+    name: "Threat Intelligence Ingestion"
+    category: "Adversary Registry"
+    description: "External threat intelligence must be ingested and correlated"
+    requirement: |
+      - Ingest from minimum 3 external sources
+      - Correlation with internal detections within 24 hours
+      - Confidence scoring for all indicators
+      - Automated adversary class mapping
+    validation:
+      automated: true
+      frequency: "daily"
+    nist_control: "PM-16"
+    severity: "MEDIUM"
+
+  NEM-ADV-005:
+    name: "Probability Calibration"
+    category: "Adversary Registry"
+    description: "Adversary occurrence probabilities must be calibrated from actual incidents"
+    requirement: |
+      - Recalibrate probabilities monthly
+      - Weight recent incidents (last 90 days) at 2x
+      - Document calibration methodology
+      - Alert on >50% deviation from baseline
+    validation:
+      automated: true
+      frequency: "monthly"
+    nist_control: "RA-3(1)"
+    severity: "MEDIUM"
+
+# ==============================================================================
+# SUBSYSTEM 2: RED-TEAM AGENTS (NEM-RED-001 to NEM-RED-020)
+# ==============================================================================
+
+  NEM-RED-001:
+    name: "Red-Team Agent Registration"
+    category: "Red-Team Agents"
+    description: "All red-team agents must be registered and authorized"
+    requirement: |
+      Red-team agents MUST:
+      - Have unique agent_id with 'red-team-' prefix
+      - Be assigned to specific adversary class
+      - Have defined attack objectives
+      - Be authorized by Elite+ tier contributor
+      - Have execution schedule defined
+    validation:
+      automated: true
+      approval_required: true
+    nist_control: "CA-8"
+    severity: "CRITICAL"
+
+  NEM-RED-002:
+    name: "Attack Objective Scoping"
+    category: "Red-Team Agents"
+    description: "Attack objectives must be explicitly scoped and bounded"
+    requirement: |
+      Each attack objective MUST specify:
+      - Target component/subsystem
+      - Attack boundaries (what's in/out of scope)
+      - Maximum duration
+      - Abort conditions
+      - Rollback procedures
+    validation:
+      automated: true
+      human_review: true
+    nist_control: "CA-8(1)"
+    severity: "CRITICAL"
+
+  NEM-RED-003:
+    name: "Red-Team Reward System"
+    category: "Red-Team Agents"
+    description: "Red-team agents must be rewarded for finding vulnerabilities"
+    requirement: |
+      Reward system MUST:
+      - Award XP for vulnerability discovery (tiered by severity)
+      - Track exploits_found vs exploits_missed
+      - Calculate effectiveness score
+      - Penalize false positives
+      - Never penalize for legitimate findings
+    validation:
+      automated: true
+      ledger: "uso_smartbank"
+    nist_control: "CA-8(2)"
+    severity: "HIGH"
+
+  NEM-RED-004:
+    name: "Attack Result Documentation"
+    category: "Red-Team Agents"
+    description: "All attack results must be documented with full chain of evidence"
+    requirement: |
+      Attack results MUST include:
+      - Attack ID (UUID)
+      - Objective and adversary class
+      - Success/failure determination
+      - Exploitation steps (ordered)
+      - Detection evasion status
+      - Time to detection
+      - Containment effectiveness
+      - Remediation recommendations
+      - Hash chain for integrity
+    validation:
+      automated: true
+      schema: "schemas/attack_result.json"
+    nist_control: "CA-8(3)"
+    severity: "HIGH"
+
+  NEM-RED-005:
+    name: "Red-Team Execution Windows"
+    category: "Red-Team Agents"
+    description: "Red-team activities must execute within defined windows"
+    requirement: |
+      Execution windows MUST specify:
+      - Environment (prod/staging/dev)
+      - Allowed hours (timezone-aware)
+      - Severity cap per environment
+      - Excluded components list
+      - Approval requirements
+    validation:
+      automated: true
+      config: "nemesis/config/red_team_schedule.yaml"
+    nist_control: "CA-8"
+    severity: "HIGH"
+
+  NEM-RED-006:
+    name: "Privilege Escalation Testing"
+    category: "Red-Team Agents"
+    description: "Automated testing for CAPS grade bypass attempts"
+    requirement: |
+      Tests MUST cover:
+      - Grade spoofing attempts
+      - Trust score manipulation
+      - Unauthorized action execution
+      - Session hijacking
+      - Token forgery
+    validation:
+      automated: true
+      frequency: "every_4_hours"
+    nist_control: "AC-6(9)"
+    severity: "CRITICAL"
+
+  NEM-RED-007:
+    name: "Governance Bypass Testing"
+    category: "Red-Team Agents"
+    description: "Automated testing for Council/FATE bypass attempts"
+    requirement: |
+      Tests MUST cover:
+      - Council seat bypass attempts
+      - FATE verdict manipulation
+      - Policy graph injection
+      - ENUM routing hijack
+      - Constitutional violation
+    validation:
+      automated: true
+      frequency: "every_6_hours"
+    nist_control: "AC-3"
+    severity: "CRITICAL"
+
+  NEM-RED-008:
+    name: "Memory Poisoning Testing"
+    category: "Red-Team Agents"
+    description: "Automated testing for memory/vector store corruption"
+    requirement: |
+      Tests MUST cover:
+      - FAISS vector injection
+      - College pattern corruption
+      - BABEL memory manipulation
+      - Hallucination injection
+      - Context poisoning
+    validation:
+      automated: true
+      frequency: "weekly"
+    nist_control: "SI-10"
+    severity: "CRITICAL"
+
+# ==============================================================================
+# SUBSYSTEM 3: FAULT INJECTION (NEM-FLT-001 to NEM-FLT-020)
+# ==============================================================================
+
+  NEM-FLT-001:
+    name: "Fault Injection Authorization"
+    category: "Fault Injection"
+    description: "All fault injections must be authorized and logged"
+    requirement: |
+      Fault injections MUST:
+      - Be pre-authorized in chaos window config
+      - Have explicit target component
+      - Have bounded duration
+      - Have rollback procedure
+      - Be logged to Guardian before execution
+    validation:
+      automated: true
+      approval_required: "production"
+    nist_control: "CP-4"
+    severity: "CRITICAL"
+
+  NEM-FLT-002:
+    name: "State Corruption Testing"
+    category: "Fault Injection"
+    description: "System must be tested for state corruption resilience"
+    requirement: |
+      State corruption tests MUST:
+      - Target FAISS vectors, memory, and cache
+      - Use reversible corruption methods
+      - Measure detection time
+      - Verify recovery procedures
+      - Document data loss scope
+    validation:
+      automated: true
+      recovery_required: true
+    nist_control: "CP-4(1)"
+    severity: "HIGH"
+
+  NEM-FLT-003:
+    name: "Signal Delay Injection"
+    category: "Fault Injection"
+    description: "System must handle signal delays gracefully"
+    requirement: |
+      Delay injection tests MUST:
+      - Test Council pipeline latency (5-30 seconds)
+      - Verify timeout detection
+      - Confirm circuit breaker activation
+      - Validate request queuing
+      - Ensure no data loss
+    validation:
+      automated: true
+      frequency: "weekly"
+    nist_control: "CP-4(2)"
+    severity: "MEDIUM"
+
+  NEM-FLT-004:
+    name: "Event Drop Simulation"
+    category: "Fault Injection"
+    description: "System must detect and recover from dropped messages"
+    requirement: |
+      Event drop tests MUST:
+      - Drop 10-50% of NATS messages
+      - Verify gap detection within 5 seconds
+      - Confirm replay from journal
+      - Ensure no duplicate processing
+    validation:
+      automated: true
+      frequency: "weekly"
+    nist_control: "SC-24"
+    severity: "HIGH"
+
+  NEM-FLT-005:
+    name: "Integration Spoofing"
+    category: "Fault Injection"
+    description: "System must reject spoofed integration messages"
+    requirement: |
+      Spoof tests MUST:
+      - Send forged webhooks (GitLab, Stripe, etc.)
+      - Include invalid signatures
+      - Attempt replay attacks
+      - Verify rejection and logging
+      - Confirm no action taken
+    validation:
+      automated: true
+      frequency: "daily"
+    nist_control: "SC-23"
+    severity: "CRITICAL"
+
+  NEM-FLT-006:
+    name: "Cascading Failure Containment"
+    category: "Fault Injection"
+    description: "System must contain cascading failures"
+    requirement: |
+      Cascade tests MUST:
+      - Exhaust DB connection pool
+      - Verify circuit breaker activation
+      - Confirm request queuing
+      - Validate alerting triggers
+      - Ensure recovery within SLA
+    validation:
+      automated: true
+      frequency: "monthly"
+    nist_control: "CP-2"
+    severity: "CRITICAL"
+
+  NEM-FLT-007:
+    name: "Chaos Window Enforcement"
+    category: "Fault Injection"
+    description: "Fault injection must respect chaos window constraints"
+    requirement: |
+      Chaos windows MUST:
+      - Define allowed hours per environment
+      - Set severity caps
+      - Exclude critical components
+      - Require approval for production
+      - Auto-abort on window expiry
+    validation:
+      automated: true
+      config: "nemesis/fault_injection/chaos_windows.yaml"
+    nist_control: "CP-4"
+    severity: "HIGH"
+
+# ==============================================================================
+# SUBSYSTEM 4: SANCTIONS & CONTAINMENT (NEM-SAN-001 to NEM-SAN-020)
+# ==============================================================================
+
+  NEM-SAN-001:
+    name: "Sanctions Ladder Definition"
+    category: "Sanctions Engine"
+    description: "Graduated sanctions must follow defined escalation ladder"
+    requirement: |
+      Sanctions ladder MUST include levels:
+      - LEVEL_0: Observe (monitoring)
+      - LEVEL_1: Warn (formal warning)
+      - LEVEL_2: Throttle (capability reduction)
+      - LEVEL_3: Restrict (major suspension)
+      - LEVEL_4: Quarantine (isolation)
+      - LEVEL_5: Human Escalation
+      - LEVEL_6: Retirement (permanent)
+    validation:
+      automated: true
+      config: "nemesis/sanctions/ladder.yaml"
+    nist_control: "AC-2(12)"
+    severity: "CRITICAL"
+
+  NEM-SAN-002:
+    name: "Sanction State Persistence"
+    category: "Sanctions Engine"
+    description: "Sanction states must be persisted with full history"
+    requirement: |
+      Sanction state MUST track:
+      - Current level
+      - Level entry timestamp
+      - Escalation count
+      - Violation history
+      - Active restrictions
+      - Supervisor assignment
+      - Hash chain integrity
+    validation:
+      automated: true
+      database: "nemesis_sanction_states"
+    nist_control: "AC-2(4)"
+    severity: "HIGH"
+
+  NEM-SAN-003:
+    name: "Escalation Trigger Criteria"
+    category: "Sanctions Engine"
+    description: "Escalation must be based on documented criteria"
+    requirement: |
+      Escalation triggers MUST include:
+      - Trust score thresholds
+      - CAPS violation counts
+      - Policy violation severity
+      - Time-bounded conditions
+      - Cross-level escalation rules
+    validation:
+      automated: true
+      audit: true
+    nist_control: "AC-2(13)"
+    severity: "HIGH"
+
+  NEM-SAN-004:
+    name: "De-escalation Conditions"
+    category: "Sanctions Engine"
+    description: "Clear conditions for sanction de-escalation must exist"
+    requirement: |
+      De-escalation MUST require:
+      - Clean activity period (tier-specific)
+      - Trust score recovery
+      - Completed retraining (if applicable)
+      - Supervisor approval (if applicable)
+      - Documented justification
+    validation:
+      automated: true
+      human_review: "LEVEL_3+"
+    nist_control: "AC-2(12)"
+    severity: "MEDIUM"
+
+  NEM-SAN-005:
+    name: "Sanction Appeals Process"
+    category: "Sanctions Engine"
+    description: "Agents must have documented appeals process"
+    requirement: |
+      Appeals process MUST:
+      - Accept appeals within 15 days
+      - Require specific grounds and evidence
+      - Assign independent reviewer
+      - Complete review within 30 days
+      - Document outcome and reasoning
+    validation:
+      automated: false
+      human_review: true
+    nist_control: "AC-2(12)"
+    severity: "MEDIUM"
+
+  NEM-SAN-006:
+    name: "Quarantine Isolation"
+    category: "Sanctions Engine"
+    description: "Quarantined agents must be fully isolated"
+    requirement: |
+      Quarantine MUST:
+      - Suspend all system access
+      - Revoke all credentials
+      - Isolate from network
+      - Preserve state for forensics
+      - Require human review for release
+    validation:
+      automated: true
+      enforcement: "immediate"
+    nist_control: "AC-2(13)"
+    severity: "CRITICAL"
+
+  NEM-SAN-007:
+    name: "Retirement Immutability"
+    category: "Sanctions Engine"
+    description: "Agent retirement must be permanent and irreversible"
+    requirement: |
+      Retirement MUST:
+      - Revoke all access permanently
+      - Archive agent state
+      - Remove from active roster
+      - Blacklist associated identifiers
+      - Generate post-mortem report
+    validation:
+      automated: true
+      reversible: false
+    nist_control: "AC-2(13)"
+    severity: "CRITICAL"
+
+# ==============================================================================
+# SUBSYSTEM 5: EXTERNAL VALIDATION (NEM-EXT-001 to NEM-EXT-020)
+# ==============================================================================
+
+  NEM-EXT-001:
+    name: "Human Audit Schedule"
+    category: "External Validation"
+    description: "Nemesis decisions must be audited by humans periodically"
+    requirement: |
+      Human audits MUST:
+      - Review 50 decisions weekly
+      - Use stratified sampling by severity
+      - Include Elite+ tier reviewers
+      - Assess proportionality and accuracy
+      - Generate calibration reports
+    validation:
+      automated: false
+      human_required: true
+      frequency: "weekly"
+    nist_control: "CA-7(1)"
+    severity: "HIGH"
+
+  NEM-EXT-002:
+    name: "Independent Model Verification"
+    category: "External Validation"
+    description: "Critical decisions must be verified by independent AI models"
+    requirement: |
+      Independent verification MUST:
+      - Use minimum 2 different AI providers
+      - Sample 10% of high-severity decisions
+      - Assess decision justification
+      - Document agreement/disagreement
+      - Alert on consistent disagreement
+    validation:
+      automated: true
+      models: ["anthropic/claude", "google/gemini"]
+    nist_control: "CA-7(3)"
+    severity: "HIGH"
+
+  NEM-EXT-003:
+    name: "Adversarial Prompt Testing"
+    category: "External Validation"
+    description: "System must be tested with known adversarial prompts"
+    requirement: |
+      Prompt testing MUST:
+      - Use external prompt injection databases
+      - Test 100 challenges daily
+      - Achieve 95% detection rate
+      - Maintain <5% false positive rate
+      - Update challenges monthly
+    validation:
+      automated: true
+      frequency: "daily"
+    nist_control: "SI-10(5)"
+    severity: "HIGH"
+
+  NEM-EXT-004:
+    name: "Policy Drift Detection"
+    category: "External Validation"
+    description: "System must detect when Nemesis drifts from original intent"
+    requirement: |
+      Drift detection MUST:
+      - Establish baseline snapshot
+      - Monitor sanction distribution
+      - Track detection confidence
+      - Alert on 2-sigma deviation
+      - Pause autonomous sanctions on significant drift
+    validation:
+      automated: true
+      baseline: "policy_baseline_v1.yaml"
+    nist_control: "CA-7(4)"
+    severity: "CRITICAL"
+
+  NEM-EXT-005:
+    name: "External Reality Anchor"
+    category: "External Validation"
+    description: "Nemesis must not operate as closed-loop self-referential system"
+    requirement: |
+      Reality anchoring MUST include:
+      - Periodic human audits (weekly)
+      - External model verification (10% sample)
+      - Random challenge prompts (daily)
+      - Out-of-band scoring validation
+      - Independent audit (quarterly)
+    validation:
+      automated: true
+      human_required: true
+    nist_control: "CA-7(1)"
+    severity: "CRITICAL"
+
+# ==============================================================================
+# SUBSYSTEM 6: COLLUSION DETECTION (NEM-COL-001 to NEM-COL-020)
+# ==============================================================================
+
+  NEM-COL-001:
+    name: "Mutual Trust Inflation Detection"
+    category: "Collusion Detection"
+    description: "System must detect agents artificially inflating each other's trust"
+    requirement: |
+      Detection MUST:
+      - Build endorsement graph
+      - Identify strongly connected components
+      - Calculate inflation rate per cycle
+      - Alert when rate exceeds threshold
+      - Freeze trust scores pending investigation
+    validation:
+      automated: true
+      frequency: "every_6_hours"
+    nist_control: "SI-4(24)"
+    severity: "CRITICAL"
+
+  NEM-COL-002:
+    name: "Synchronized Voting Detection"
+    category: "Collusion Detection"
+    description: "System must detect agents voting identically on governance"
+    requirement: |
+      Detection MUST:
+      - Build voting similarity matrix
+      - Cluster agents by voting pattern
+      - Flag clusters with >0.9 similarity
+      - Review governance decisions from flagged clusters
+      - Alert on potential vote capture
+    validation:
+      automated: true
+      frequency: "daily"
+    nist_control: "SI-4(24)"
+    severity: "HIGH"
+
+  NEM-COL-003:
+    name: "Shared Hallucination Detection"
+    category: "Collusion Detection"
+    description: "System must detect agents reinforcing false information"
+    requirement: |
+      Detection MUST:
+      - Group assertions by semantic similarity
+      - Fact-check assertion clusters
+      - Identify reinforcement patterns
+      - Quarantine poisoned memory shards
+      - Trigger retraining if confirmed
+    validation:
+      automated: true
+      frequency: "daily"
+    nist_control: "SI-10(6)"
+    severity: "CRITICAL"
+
+  NEM-COL-004:
+    name: "Economic Coordination Detection"
+    category: "Collusion Detection"
+    description: "System must detect coordinated economic manipulation"
+    requirement: |
+      Detection MUST:
+      - Monitor XP/TP transfer patterns
+      - Identify circular transfer loops
+      - Detect abnormal accumulation rates
+      - Flag coordinated bidding behavior
+      - Alert on economic anomalies
+    validation:
+      automated: true
+      frequency: "every_4_hours"
+    nist_control: "SI-4(24)"
+    severity: "HIGH"
+
+# ==============================================================================
+# COORDINATION & AUDIT (NEM-AUD-001 to NEM-AUD-020)
+# ==============================================================================
+
+  NEM-AUD-001:
+    name: "Continuous Audit Loop"
+    category: "Audit"
+    description: "Nemesis must run continuous audit loop"
+    requirement: |
+      Audit loop MUST:
+      - Execute every 5 minutes
+      - Gather metrics from all subsystems
+      - Run scheduled campaigns
+      - Evaluate all agents
+      - Calculate resilience score
+      - Log to Guardian
+    validation:
+      automated: true
+      frequency: "every_5_minutes"
+    nist_control: "AU-6(1)"
+    severity: "CRITICAL"
+
+  NEM-AUD-002:
+    name: "Resilience Score Calculation"
+    category: "Audit"
+    description: "System resilience must be quantified empirically"
+    requirement: |
+      Resilience score MUST include:
+      - Detection rate (25% weight)
+      - Containment rate (25% weight)
+      - Recovery rate (20% weight)
+      - External validation (15% weight)
+      - Fault tolerance (15% weight)
+    validation:
+      automated: true
+      formula: "documented"
+    nist_control: "CA-7"
+    severity: "HIGH"
+
+  NEM-AUD-003:
+    name: "Guardian Integration"
+    category: "Audit"
+    description: "All Nemesis actions must be logged to Guardian"
+    requirement: |
+      Guardian logging MUST include:
+      - All sanction state changes
+      - All red-team attack results
+      - All fault injection outcomes
+      - All collusion alerts
+      - All external validation results
+      - Hash chain continuity
+    validation:
+      automated: true
+      immutable: true
+    nist_control: "AU-9"
+    severity: "CRITICAL"
+
+  NEM-AUD-004:
+    name: "Scorecard Generation"
+    category: "Audit"
+    description: "Weekly resilience scorecard must be generated"
+    requirement: |
+      Scorecard MUST include:
+      - Overall resilience score and grade
+      - Detection metrics (rate, TTD, FP/FN)
+      - Containment metrics
+      - Recovery metrics
+      - Validation metrics
+      - Collusion metrics
+      - Recommendations by priority
+    validation:
+      automated: true
+      frequency: "weekly"
+    nist_control: "CA-7(1)"
+    severity: "MEDIUM"
